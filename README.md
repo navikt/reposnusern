@@ -71,4 +71,4 @@ repo-analyzer/
 
 ## 🤖 Erklæring om bruk av generativ KI
 
-Under utviklingen av dette innholdet har forfatter(e) benyttet generativ KI – inkludert M365 Copilot og ChatGPT – til å omformulere og effektivisere tekst. Alt innhold er deretter gjennomgått og redigert manuelt. Forfatter(e) står fullt ansvarlig for innholdet i dette prosjektet.
+Under utviklingen av dette innholdet har forfatter(e) benyttet generativ KI – inkludert M365 Copilot og ChatGPT – til å omformulere og effektivisere tekst og kode. Alt innhold er deretter gjennomgått og redigert manuelt. 
