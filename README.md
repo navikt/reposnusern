@@ -69,6 +69,22 @@ repo-analyzer/
 └── data/                    # Midlertidig JSON-lagring
 ```
 
+## Kjøring
+
+For å hente data fra GitHub må du angi organisasjonsnavn og et gyldig GitHub-token som miljøvariabler:
+
+```
+export ORG=navikt
+export GITHUB_TOKEN=<din_token>
+go run ./cmd/fetch
+```
+
+Dette scriptet vil:
+- en rå oversikt over alle repoer (data/navikt_repos_raw_dump.json)
+- detaljert analyse av ikke-arkiverte repoer (data/navikt_analysis_data.json)
+
+Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. Scriptet håndterer dette automatisk ved å pause og fortsette når grensen er nådd.
+
 ## 🤖 Erklæring om bruk av generativ KI
 
 Under utviklingen av dette innholdet har forfatter(e) benyttet generativ KI – inkludert M365 Copilot og ChatGPT – til å omformulere og effektivisere tekst og kode. Alt innhold er deretter gjennomgått og redigert manuelt. 

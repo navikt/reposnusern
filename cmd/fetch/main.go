@@ -2,169 +2,239 @@ package main
 
 import (
 	"context"
-	"database/sql"
+	"encoding/base64"
 	"encoding/json"
-	"log"
+	"fmt"
+	"log/slog"
+	"net/http"
 	"os"
+	"path"
+	"strconv"
 	"strings"
-
-	"github.com/jonmartinstorm/reposnusern/internal/storage"
-
-	_ "modernc.org/sqlite"
+	"time"
 )
 
+type TreeFile struct {
+	Path string `json:"path"`
+	URL  string `json:"url"`
+	Type string `json:"type"`
+}
+
 func main() {
-	ctx := context.Background()
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     slog.LevelInfo,
+		AddSource: false,
+	}))
+	slog.SetDefault(logger)
 
-	db, err := sql.Open("sqlite", "file:temp.db?cache=shared&mode=rwc")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	// --- Initialiser database ---
-	schemaBytes, err := os.ReadFile("db/schema.sql")
-	if err != nil {
-		log.Fatalf("kunne ikke lese schema.sql: %v", err)
-	}
-	if _, err := db.ExecContext(ctx, string(schemaBytes)); err != nil {
-		log.Fatalf("kunne ikke kjøre schema.sql: %v", err)
+	org := os.Getenv("ORG")
+	if org == "" {
+		slog.Error("Du må angi organisasjon via ORG=<orgnavn>")
+		os.Exit(1)
 	}
 
-	q := storage.New(db)
-
-	// --- Les og importer repository-data ---
-	repoBytes, err := os.ReadFile("tempdata/repos_raw_dump.json")
-	if err != nil {
-		log.Fatal("klarte ikke å lese repos_raw_dump.json:", err)
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		slog.Error("Mangler GITHUB_TOKEN i environment")
+		os.Exit(1)
 	}
 
-	var repos []map[string]interface{}
-	if err := json.Unmarshal(repoBytes, &repos); err != nil {
-		log.Fatal("klarte ikke å parse JSON for repoer:", err)
+	// Hent full repo-metadata som map
+	repos := []map[string]interface{}{}
+	page := 1
+	for {
+		url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&type=all&page=%d", org, page)
+		var pageRepos []map[string]interface{}
+		slog.Info("Henter repos", "page", page)
+		err := getJSONWithRateLimit(url, token, &pageRepos)
+		if err != nil {
+			slog.Error("Kunne ikke hente repo-metadata", "error", err)
+			os.Exit(1)
+		}
+		if len(pageRepos) == 0 {
+			break
+		}
+		repos = append(repos, pageRepos...)
+		page++
 	}
 
-	for _, r := range repos {
-		topics := []string{}
-		if t, ok := r["topics"].([]interface{}); ok {
-			for _, topic := range t {
-				if s, ok := topic.(string); ok {
-					topics = append(topics, s)
+	_ = os.MkdirAll("data", 0755)
+	rawOut, _ := json.MarshalIndent(repos, "", "  ")
+	rawFile := fmt.Sprintf("data/%s_repos_raw_dump.json", org)
+	_ = os.WriteFile(rawFile, rawOut, 0644)
+	slog.Info("Lagret full repo-metadata", "count", len(repos), "file", rawFile)
+
+	allData := map[string]interface{}{
+		"org":   org,
+		"repos": []map[string]interface{}{},
+	}
+
+	for i, r := range repos {
+		fullName := r["full_name"].(string)
+		if r["archived"].(bool) {
+			continue
+		}
+
+		slog.Info("Bearbeider repo", "index", i+1, "total", len(repos), "repo", fullName)
+
+		result := map[string]interface{}{
+			"repo":      r,
+			"languages": getJSONMap(fmt.Sprintf("https://api.github.com/repos/%s/languages", fullName), token),
+			"files":     map[string][]map[string]string{},
+			"security":  map[string]bool{},
+		}
+		ciConfig := []map[string]string{}
+
+		tree := getJSONMap(fmt.Sprintf("https://api.github.com/repos/%s/git/trees/%s?recursive=1", fullName, r["default_branch"].(string)), token)
+		treeFiles := parseTree(tree)
+
+		for _, tf := range treeFiles {
+			lpath := strings.ToLower(tf.Path)
+			switch {
+			case isDependencyFile(lpath):
+				appendFile(result["files"].(map[string][]map[string]string), path.Base(tf.Path), tf, fullName, token)
+			case path.Base(tf.Path) == "dockerfile":
+				appendFile(result["files"].(map[string][]map[string]string), "Dockerfile", tf, fullName, token)
+			case strings.HasPrefix(tf.Path, ".github/workflows/"):
+				appendCI(&ciConfig, tf, fullName, token)
+			case tf.Path == "SECURITY.md":
+				result["security"].(map[string]bool)["has_security_md"] = true
+			case tf.Path == ".github/dependabot.yml":
+				result["security"].(map[string]bool)["has_dependabot"] = true
+			case tf.Path == ".github/codeql.yml":
+				result["security"].(map[string]bool)["has_codeql"] = true
+			}
+		}
+
+		result["ci_config"] = ciConfig
+
+		if readme := getReadme(fullName, token); readme != "" {
+			result["readme"] = readme
+		}
+
+		allData["repos"] = append(allData["repos"].([]map[string]interface{}), result)
+	}
+
+	outputFile := fmt.Sprintf("data/%s_analysis_data.json", org)
+	allBytes, _ := json.MarshalIndent(allData, "", "  ")
+	_ = os.WriteFile(outputFile, allBytes, 0644)
+	slog.Info("Lagret samlet analyse", "file", outputFile)
+}
+
+func getJSONWithRateLimit(url, token string, out interface{}) error {
+	for {
+		slog.Info("Henter URL", "url", url)
+		req, err := http.NewRequestWithContext(context.Background(), "GET", url, nil)
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Accept", "application/vnd.github+json")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if rl := resp.Header.Get("X-RateLimit-Remaining"); rl == "0" {
+			reset := resp.Header.Get("X-RateLimit-Reset")
+			if reset != "" {
+				if ts, err := strconv.ParseInt(reset, 10, 64); err == nil {
+					wait := time.Until(time.Unix(ts, 0)) + time.Second
+					slog.Warn("Rate limit nådd", "venter", wait.Truncate(time.Second))
+					time.Sleep(wait)
+					continue
 				}
 			}
 		}
 
-		_ = q.InsertRepo(ctx, storage.InsertRepoParams{
-			ID:           int64(r["id"].(float64)),
-			Name:         getString(r["name"]),
-			FullName:     getString(r["full_name"]),
-			Description:  getString(r["description"]),
-			Stars:        int64(r["stargazers_count"].(float64)),
-			Forks:        int64(r["forks_count"].(float64)),
-			Archived:     r["archived"].(bool),
-			Private:      r["private"].(bool),
-			IsFork:       r["fork"].(bool),
-			Language:     getString(r["language"]),
-			SizeMb:       float64(r["size"].(float64)) / 1024.0,
-			UpdatedAt:    getString(r["updated_at"]),
-			PushedAt:     getString(r["pushed_at"]),
-			CreatedAt:    getString(r["created_at"]),
-			HtmlUrl:      getString(r["html_url"]),
-			Topics:       strings.Join(topics, ","),
-			Visibility:   getString(r["visibility"]),
-			License:      extractLicenseName(r["license"]),
-			OpenIssues:   int64(r["open_issues"].(float64)),
-			LanguagesUrl: getString(r["languages_url"]),
-		})
+		return json.NewDecoder(resp.Body).Decode(out)
 	}
+}
 
-	log.Println("📦 Repositories importert.")
-
-	repoNameToID := make(map[string]int64)
-	for _, r := range repos {
-		name := r["name"].(string)
-		repoID := int64(r["id"].(float64))
-		repoNameToID[name] = repoID
-	}
-
-	// --- Les og importer Dockerfiles ---
-	dfBytes, err := os.ReadFile("tempdata/dockerfiles.json")
+func getJSONMap(url, token string) map[string]interface{} {
+	var out map[string]interface{}
+	err := getJSONWithRateLimit(url, token, &out)
 	if err != nil {
-		log.Fatalf("kunne ikke lese dockerfiles.json: %v", err)
+		slog.Error("Feil ved henting", "url", url, "error", err)
+		return nil
 	}
+	return out
+}
 
-	var dockerfiles []struct {
-		RepoID     int64  `json:"repo_id"`
-		FullName   string `json:"full_name"`
-		Dockerfile string `json:"dockerfile"`
+func getReadme(fullName, token string) string {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/readme", fullName)
+	var payload map[string]interface{}
+	if err := getJSONWithRateLimit(url, token, &payload); err != nil {
+		return ""
 	}
-	if err := json.Unmarshal(dfBytes, &dockerfiles); err != nil {
-		log.Fatalf("kunne ikke tolke dockerfiles.json: %v", err)
+	if content, ok := payload["content"].(string); ok {
+		decoded, _ := base64.StdEncoding.DecodeString(strings.ReplaceAll(content, "\n", ""))
+		return string(decoded)
 	}
+	return ""
+}
 
-	for _, df := range dockerfiles {
-		err := q.InsertDockerfile(ctx, storage.InsertDockerfileParams{
-			RepoID:   df.RepoID,
-			FullName: df.FullName,
-			Content:  df.Dockerfile,
-		})
-		if err != nil {
-			log.Printf("❌ klarte ikke å lagre Dockerfile for repo %d: %v", df.RepoID, err)
-		}
+func getGitBlob(url, token string) string {
+	var result map[string]interface{}
+	if err := getJSONWithRateLimit(url, token, &result); err != nil {
+		return ""
 	}
-	log.Println("🐳 Dockerfiles importert.")
+	if content, ok := result["content"].(string); ok {
+		d, _ := base64.StdEncoding.DecodeString(strings.ReplaceAll(content, "\n", ""))
+		return string(d)
+	}
+	return ""
+}
 
-	// --- Les og importer språkstatistikk ---
-	langBytes, err := os.ReadFile("tempdata/repo_lang.json")
-	if err != nil {
-		log.Fatalf("kunne ikke lese repo_lang.json: %v", err)
-	}
+func appendFile(files map[string][]map[string]string, key string, tf TreeFile, repo, token string) {
+	content := getGitBlob(tf.URL, token)
+	files[key] = append(files[key], map[string]string{
+		"path":    tf.Path,
+		"content": content,
+	})
+}
 
-	var langs []struct {
-		Repo      string           `json:"repo"`
-		Languages map[string]int64 `json:"languages"`
-	}
-	if err := json.Unmarshal(langBytes, &langs); err != nil {
-		log.Fatalf("kunne ikke tolke repo_lang.json: %v", err)
-	}
+func appendCI(ciList *[]map[string]string, tf TreeFile, repo, token string) {
+	content := getGitBlob(tf.URL, token)
+	*ciList = append(*ciList, map[string]string{
+		"path":    tf.Path,
+		"content": content,
+	})
+}
 
-	for _, entry := range langs {
-		repoID, ok := repoNameToID[entry.Repo]
-		if !ok {
-			log.Printf("⚠️ repo-navn %s finnes ikke i kartet, hopper over", entry.Repo)
-			continue
-		}
-		for lang, bytes := range entry.Languages {
-			err := q.InsertLanguage(ctx, storage.InsertLanguageParams{
-				RepoID:   repoID,
-				Language: lang,
-				Bytes:    bytes,
-			})
-			if err != nil {
-				log.Printf("❌ klarte ikke å lagre språkdata for repo %s: %v", entry.Repo, err)
+func parseTree(tree map[string]interface{}) []TreeFile {
+	files := []TreeFile{}
+	if tree == nil {
+		return files
+	}
+	if arr, ok := tree["tree"].([]interface{}); ok {
+		for _, item := range arr {
+			entry := item.(map[string]interface{})
+			if entry["type"] == "blob" {
+				files = append(files, TreeFile{
+					Path: entry["path"].(string),
+					URL:  entry["url"].(string),
+					Type: entry["type"].(string),
+				})
 			}
 		}
 	}
-
-	log.Println("🗣️ Språkstatistikk importert.")
-	log.Println("✅ Ferdig.")
+	return files
 }
 
-func getString(v interface{}) string {
-	if v == nil {
-		return ""
+func isDependencyFile(p string) bool {
+	files := []string{
+		"package.json", "pom.xml", "build.gradle", "build.gradle.kts",
+		"go.mod", "cargo.toml", "requirements.txt", "pyproject.toml",
+		"composer.json", ".csproj", "gemfile", "gemfile.lock",
+		"yarn.lock", "pnpm-lock.yaml", "package-lock.json",
 	}
-	return v.(string)
-}
-
-func extractLicenseName(license interface{}) string {
-	if license == nil {
-		return ""
-	}
-	if l, ok := license.(map[string]interface{}); ok {
-		if name, ok := l["name"].(string); ok {
-			return name
+	for _, f := range files {
+		if strings.HasSuffix(p, f) {
+			return true
 		}
 	}
-	return ""
+	return false
 }
