@@ -24,8 +24,10 @@ go.work.sum
 # env file
 .env
 
-/tempdata
+/tempdata/
 temp.db
 .DS_Store
 
 /data/*
+
+/venv/

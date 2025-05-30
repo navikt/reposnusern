@@ -93,8 +93,8 @@ func main() {
 			switch {
 			case isDependencyFile(lpath):
 				appendFile(result["files"].(map[string][]map[string]string), path.Base(tf.Path), tf, fullName, token)
-			case path.Base(tf.Path) == "dockerfile":
-				appendFile(result["files"].(map[string][]map[string]string), "Dockerfile", tf, fullName, token)
+			case strings.HasPrefix(path.Base(lpath), "dockerfile"):
+				appendFile(result["files"].(map[string][]map[string]string), path.Base(tf.Path), tf, fullName, token)
 			case strings.HasPrefix(tf.Path, ".github/workflows/"):
 				appendCI(&ciConfig, tf, fullName, token)
 			case tf.Path == "SECURITY.md":
