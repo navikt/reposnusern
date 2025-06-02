@@ -1,10 +1,10 @@
 CREATE TABLE IF NOT EXISTS repos (
-    id INTEGER PRIMARY KEY,
+    id BIGINT PRIMARY KEY,
     name TEXT NOT NULL,
     full_name TEXT NOT NULL,
     description TEXT NOT NULL,
-    stars INTEGER NOT NULL,
-    forks INTEGER NOT NULL,
+    stars BIGINT NOT NULL,
+    forks BIGINT NOT NULL,
     archived BOOLEAN NOT NULL,
     private BOOLEAN NOT NULL,
     is_fork BOOLEAN NOT NULL,
@@ -17,22 +17,47 @@ CREATE TABLE IF NOT EXISTS repos (
     topics TEXT NOT NULL,
     visibility TEXT NOT NULL,
     license TEXT NOT NULL,
-    open_issues INTEGER NOT NULL,
+    open_issues BIGINT NOT NULL,
     languages_url TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS dockerfiles (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    repo_id INTEGER NOT NULL,
+    id SERIAL PRIMARY KEY,
+    repo_id BIGINT NOT NULL REFERENCES repos(id),
     full_name TEXT NOT NULL,
-    content TEXT NOT NULL,
-    FOREIGN KEY (repo_id) REFERENCES repos(id)
+    path TEXT NOT NULL,
+    content TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS repo_languages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    repo_id INTEGER NOT NULL,
+    id SERIAL PRIMARY KEY,
+    repo_id BIGINT NOT NULL REFERENCES repos(id),
     language TEXT NOT NULL,
-    bytes INTEGER NOT NULL,
-    FOREIGN KEY (repo_id) REFERENCES repos(id)
+    bytes BIGINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS dependency_files (
+    id SERIAL PRIMARY KEY,
+    repo_id BIGINT NOT NULL REFERENCES repos(id),
+    path TEXT NOT NULL,
+    content TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ci_configs (
+    id SERIAL PRIMARY KEY,
+    repo_id BIGINT NOT NULL REFERENCES repos(id),
+    path TEXT NOT NULL,
+    content TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS readmes (
+    repo_id BIGINT PRIMARY KEY REFERENCES repos(id),
+    content TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS repo_security_features (
+    repo_id BIGINT PRIMARY KEY REFERENCES repos(id),
+    has_security_md BOOLEAN NOT NULL DEFAULT FALSE,
+    has_dependabot BOOLEAN NOT NULL DEFAULT FALSE,
+    has_codeql BOOLEAN NOT NULL DEFAULT FALSE
 );

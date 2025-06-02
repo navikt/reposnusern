@@ -9,19 +9,19 @@ import (
 	"context"
 )
 
-const insertLanguage = `-- name: InsertLanguage :exec
+const insertRepoLanguage = `-- name: InsertRepoLanguage :exec
 INSERT INTO repo_languages (
-    repo_id, language, bytes
-) VALUES (?, ?, ?)
+  repo_id, language, bytes
+) VALUES ($1, $2, $3)
 `
 
-type InsertLanguageParams struct {
+type InsertRepoLanguageParams struct {
 	RepoID   int64
 	Language string
 	Bytes    int64
 }
 
-func (q *Queries) InsertLanguage(ctx context.Context, arg InsertLanguageParams) error {
-	_, err := q.db.ExecContext(ctx, insertLanguage, arg.RepoID, arg.Language, arg.Bytes)
+func (q *Queries) InsertRepoLanguage(ctx context.Context, arg InsertRepoLanguageParams) error {
+	_, err := q.db.ExecContext(ctx, insertRepoLanguage, arg.RepoID, arg.Language, arg.Bytes)
 	return err
 }

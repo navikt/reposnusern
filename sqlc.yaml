@@ -2,8 +2,8 @@ version: "2"
 sql:
   - schema: "db/schema.sql"
     queries: "db/queries/"
-    engine: "sqlite"
+    engine: "postgresql"
     gen:
       go:
-        package: "storage"
         out: "internal/storage"
+        package: "storage"

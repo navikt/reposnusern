@@ -4,11 +4,31 @@
 
 package storage
 
+type CiConfig struct {
+	ID      int32
+	RepoID  int64
+	Path    string
+	Content string
+}
+
+type DependencyFile struct {
+	ID      int32
+	RepoID  int64
+	Path    string
+	Content string
+}
+
 type Dockerfile struct {
-	ID       int64
+	ID       int32
 	RepoID   int64
 	FullName string
+	Path     string
 	Content  string
+}
+
+type Readme struct {
+	RepoID  int64
+	Content string
 }
 
 type Repo struct {
@@ -22,7 +42,7 @@ type Repo struct {
 	Private      bool
 	IsFork       bool
 	Language     string
-	SizeMb       float64
+	SizeMb       float32
 	UpdatedAt    string
 	PushedAt     string
 	CreatedAt    string
@@ -35,8 +55,15 @@ type Repo struct {
 }
 
 type RepoLanguage struct {
-	ID       int64
+	ID       int32
 	RepoID   int64
 	Language string
 	Bytes    int64
+}
+
+type RepoSecurityFeature struct {
+	RepoID        int64
+	HasSecurityMd bool
+	HasDependabot bool
+	HasCodeql     bool
 }
