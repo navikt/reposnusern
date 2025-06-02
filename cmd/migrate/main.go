@@ -8,9 +8,8 @@ import (
 	"os"
 	"strings"
 
-	_ "github.com/lib/pq"
-
 	"github.com/jonmartinstorm/reposnusern/internal/storage"
+	_ "github.com/lib/pq"
 )
 
 type FileEntry struct {
@@ -68,16 +67,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("🚀 Importerer til PostgreSQL", "antall_repos", len(dump.Repos))
+	slog.Info("🚀 Importerer til PostgreSQL", "org", dump.Org, "antall_repos", len(dump.Repos))
 
-	for _, entry := range dump.Repos {
+	for i, entry := range dump.Repos {
 		r := entry.Repo
 		id := int64(r["id"].(float64))
+		name := r["full_name"].(string)
+		slog.Info("⏳ Behandler repo", "nummer", i+1, "navn", name)
 
 		repo := storage.InsertRepoParams{
 			ID:           id,
 			Name:         r["name"].(string),
-			FullName:     r["full_name"].(string),
+			FullName:     name,
 			Description:  safeString(r["description"]),
 			Stars:        int64(r["stargazers_count"].(float64)),
 			Forks:        int64(r["forks_count"].(float64)),
@@ -85,7 +86,7 @@ func main() {
 			Private:      r["private"].(bool),
 			IsFork:       r["fork"].(bool),
 			Language:     safeString(r["language"]),
-			SizeMb:       float64(r["size"].(float64)) / 1024.0,
+			SizeMb:       float32(r["size"].(float64)) / 1024.0,
 			UpdatedAt:    r["updated_at"].(string),
 			PushedAt:     r["pushed_at"].(string),
 			CreatedAt:    r["created_at"].(string),
@@ -97,7 +98,7 @@ func main() {
 			LanguagesUrl: r["languages_url"].(string),
 		}
 		if err := queries.InsertRepo(ctx, repo); err != nil {
-			slog.Error("Feil ved repo", "repo", repo.FullName, "error", err)
+			slog.Error("Feil ved repo", "repo", name, "error", err)
 			continue
 		}
 
@@ -108,53 +109,63 @@ func main() {
 				Bytes:    int64(size),
 			})
 			if err != nil {
-				slog.Warn("Språkfeil", "repo", repo.FullName, "language", lang, "error", err)
+				slog.Warn("❗️Språkfeil", "repo", name, "language", lang, "error", err)
 			}
 		}
 
-		for name, files := range entry.Files {
-			if isDependencyFile(name) {
+		for filetype, files := range entry.Files {
+			if isDependencyFile(filetype) {
 				for _, f := range files {
-					_ = queries.InsertDependencyFile(ctx, storage.InsertDependencyFileParams{
+					if err := queries.InsertDependencyFile(ctx, storage.InsertDependencyFileParams{
 						RepoID:  id,
 						Path:    f.Path,
 						Content: f.Content,
-					})
+					}); err != nil {
+						slog.Warn("Dependency-feil", "repo", name, "fil", f.Path, "error", err)
+					}
 				}
 			}
-			if strings.HasPrefix(strings.ToLower(name), "dockerfile") {
+			if strings.HasPrefix(strings.ToLower(filetype), "dockerfile") {
 				for _, f := range files {
-					_ = queries.InsertDockerfile(ctx, storage.InsertDockerfileParams{
+					if err := queries.InsertDockerfile(ctx, storage.InsertDockerfileParams{
 						RepoID:   id,
-						FullName: repo.FullName,
+						FullName: name,
 						Path:     f.Path,
 						Content:  f.Content,
-					})
+					}); err != nil {
+						slog.Warn("Dockerfile-feil", "repo", name, "fil", f.Path, "error", err)
+					}
 				}
 			}
 		}
 
 		for _, f := range entry.CIConfig {
-			_ = queries.InsertCIConfig(ctx, storage.InsertCIConfigParams{
+			if err := queries.InsertCIConfig(ctx, storage.InsertCIConfigParams{
 				RepoID:  id,
 				Path:    f.Path,
 				Content: f.Content,
-			})
+			}); err != nil {
+				slog.Warn("CI-feil", "repo", name, "fil", f.Path, "error", err)
+			}
 		}
 
 		if entry.Readme != "" {
-			_ = queries.InsertReadme(ctx, storage.InsertReadmeParams{
+			if err := queries.InsertReadme(ctx, storage.InsertReadmeParams{
 				RepoID:  id,
 				Content: entry.Readme,
-			})
+			}); err != nil {
+				slog.Warn("README-feil", "repo", name, "error", err)
+			}
 		}
 
-		_ = queries.InsertSecurityFeatures(ctx, storage.InsertSecurityFeaturesParams{
+		if err := queries.InsertSecurityFeatures(ctx, storage.InsertSecurityFeaturesParams{
 			RepoID:        id,
 			HasSecurityMd: entry.Security["has_security_md"],
 			HasDependabot: entry.Security["has_dependabot"],
 			HasCodeql:     entry.Security["has_codeql"],
-		})
+		}); err != nil {
+			slog.Warn("Security-feil", "repo", name, "error", err)
+		}
 	}
 
 	slog.Info("✅ Ferdig importert!")

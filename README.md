@@ -1,4 +1,4 @@
-# 🕵️ reposnusern
+# 🕵️ reposnusern (POC)
 
 **reposnusern** er et verktøy for å analysere GitHub-repositorier i en organisasjon – med nysgjerrighet, struktur og en dæsj AI.
 
@@ -37,39 +37,54 @@ Målet med dette prosjektet er å lage et fleksibelt og utvidbart analyseverktø
 
 ## 🧪 PoC-status
 
+### 1. Datainnhenting
+
 Proof-of-Concept bruker følgende:
-- `go + sqlc + sqlite3`
-- JSON-filer med:
-  - Repo-metadata
-  - Språkstatistikk
-  - Øverste nivå `Dockerfile`-innhold
+- `go + sqlc + PostgreSQL` 
+- GitHub-API med mellomlagring i JSON
+- Støtte for:
+  - Repo-metadata og språk
+  - Dockerfiles og dependency-filer
+  - CI-konfigurasjon, README og sikkerhetsfunksjoner
 
 Dette gir et godt grunnlag for å bygge videre analyser, inkludert rammeverksdeteksjon basert på språk og filstruktur.
+
+### 2. Analyse
+TODO
+
+### 3. Tilgjengeliggjøring
+TODO (akkurat nå kan man hente det i en posgresdb.)
 
 ## 📁 Prosjektstruktur
 ```
 repo-analyzer/
-│
+reposnusern/
 ├── cmd/
-│   ├── fetch/               # Henter og lagrer nye data fra GitHub
-│   ├── analyze/             # Kjører ulike analyser
-│   └── api/                 # Starter opp en enkel API-server
+│   ├── fetch/ # Henter og lagrer data fra GitHub
+│   ├── import/ # Importerer JSON-data til database
+│   ├── migrate/ # Kjør initial migrering av PostgreSQL
+│   └── analyze/ # Fremtidig analyser og spørringer
 │
 ├── internal/
-│   ├── fetcher/             # GitHub API-klient + JSON-mellomlagring
-│   ├── analyzer/            # Analyse av Dockerfiles og dependencies
-│   ├── storage/             # sqlc + generell datatilgang
-│   ├── models/              # Delte datastrukturer
-│   └── config/              # Konfigurasjonshåndtering
+│   ├── fetcher/ # GitHub-klient og mellomlagring
+│   ├── analyzer/ # Analyse av Dockerfiles og dependencies
+│   ├── storage/ # sqlc-basert tilgang til databasen
+│   ├── models/ # Delte datastrukturer
+│   └── config/ # Håndtering av konfig og secrets
 │
-├── migrations/              # databaseoppsett og migreringer
-├── schema.sql               # SQLite-skjema
-├── sqlc.yaml                # sqlc-konfigurasjon
+├── db/
+│   ├── queries/ # sqlc-spørringer
+│   └── schema.sql # PostgreSQL-schema
+│
+├── data/ # Midlertidige JSON-filer
+├── sqlc.yaml # sqlc-konfigurasjon
 ├── go.mod / go.sum
-└── data/                    # Midlertidig JSON-lagring
+└── README.md
 ```
 
 ## Kjøring
+
+### Json henting
 
 For å hente data fra GitHub må du angi organisasjonsnavn og et gyldig GitHub-token som miljøvariabler:
 
@@ -85,6 +100,26 @@ Dette scriptet vil:
 
 Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. Scriptet håndterer dette automatisk ved å pause og fortsette når grensen er nådd.
 
+### Migrering til PostgresSQL
+
+Eksempel:
+
+```
+export POSTGRES_DSN="postgres://<bruker>:<passord>@<fqdn>:5432/reposnusern?sslmode=require"
+go run ./cmd/migrate
+```
+
+## TODO
+
+- [ ] 🔐 Hindre at passord og secrets utilsiktet havner i logger
+- [ ] 🌐 Bygge et lite Go-API for noen nyttige queries
+- [ ] ☁️ Gjøre klart for K8s-deploy (config, secrets, jobs)
+- [ ] ✅ Legge til noen enkle tester (det var jo bare en PoC 😅)
+- [ ] 🧹 Refaktorering og deling av logikk
+- [ ] Oppdatere schema så vi tar vare på dato vi har hentet informasjonen fra. (Så vi kan ta vare på trenden.)
+- [ ] 📊 Mer visuell analyse og rapportering i neste steg
+
 ## 🤖 Erklæring om bruk av generativ KI
 
-Under utviklingen av dette innholdet har forfatter(e) benyttet generativ KI – inkludert M365 Copilot og ChatGPT – til å omformulere og effektivisere tekst og kode. Alt innhold er deretter gjennomgått og redigert manuelt. 
+Under utviklingen av dette innholdet har forfatter(e) benyttet generativ KI – inkludert M365 Copilot og ChatGPT – til å omformulere og effektivisere tekst og kode. Alt innhold er deretter gjennomgått og en del redigert manuelt. 
+
