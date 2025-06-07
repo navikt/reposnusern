@@ -94,6 +94,21 @@ export GITHUB_TOKEN=<din_token>
 go run ./cmd/fetch
 ```
 
+Alternativt
+```
+# Bygg containeren
+podman build -t reposnusnern .
+
+# Kjør med nødvendige miljøvariabler og bind-mount for å se utdata
+podman run --rm \
+  -e ORG=dinorg \
+  -e GITHUB_TOKEN=ghp_dintokenher \
+  -e REPOSNUSERDEBUG=true \
+  -v "$PWD/data":/data \
+  reposnusnern
+
+```
+
 Dette scriptet vil:
 - en rå oversikt over alle repoer (data/navikt_repos_raw_dump.json)
 - detaljert analyse av ikke-arkiverte repoer (data/navikt_analysis_data.json)
@@ -119,7 +134,10 @@ go run ./cmd/migrate
 - [ ] Oppdatere schema så vi tar vare på dato vi har hentet informasjonen fra. (Så vi kan ta vare på trenden.)
 - [ ] 📊 Mer visuell analyse og rapportering i neste steg
 
+## Annen inspirasjon
+ - [Fuck it, ship it - Stine Mølgaard og Jacob Bøtter](https://fuckitshipit.dk/)
+ - [Codin' Dirty - Carson Gross](https://htmx.org/essays/codin-dirty/)
+
 ## 🤖 Erklæring om bruk av generativ KI
 
 Under utviklingen av dette innholdet har forfatter(e) benyttet generativ KI – inkludert M365 Copilot og ChatGPT – til å omformulere og effektivisere tekst og kode. Alt innhold er deretter gjennomgått og en del redigert manuelt. 
-
