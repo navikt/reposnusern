@@ -33,11 +33,10 @@ func main() {
 	// Hent full repo-metadata som map
 	repos := fetcher.GetAllRepos(org, token)
 
-	_ = os.MkdirAll("data", 0755)
-	rawOut, _ := json.MarshalIndent(repos, "", "  ")
-	rawFile := fmt.Sprintf("data/%s_repos_raw_dump.json", org)
-	_ = os.WriteFile(rawFile, rawOut, 0644)
-	slog.Info("Lagret full repo-metadata", "count", len(repos), "file", rawFile)
+	if err := fetcher.StoreRepoDumpJSON("data", org, repos); err != nil {
+		slog.Error("Feil under lagring av repo-dump", "error", err)
+		os.Exit(1)
+	}
 
 	allData := map[string]interface{}{
 		"org":   org,
