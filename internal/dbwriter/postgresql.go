@@ -22,6 +22,7 @@ type RepoEntry struct {
 	CIConfig  []FileEntry            `json:"ci_config"`
 	Readme    string                 `json:"readme"`
 	Security  map[string]bool        `json:"security"`
+	SBOM      map[string]interface{} `json:"sbom"`
 }
 
 type Dump struct {
@@ -73,15 +74,22 @@ func IsDependencyFile(name string) bool {
 
 func ImportToPostgreSQLDB(dump Dump, db *sql.DB) error {
 	ctx := context.Background()
-	queries := storage.New(db)
 
 	for i, entry := range dump.Repos {
-		if err := importRepo(ctx, queries, entry, i); err != nil {
-			return err
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("start tx: %w", err)
 		}
 
+		queries := storage.New(tx)
+		if err := importRepo(ctx, queries, entry, i); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("import repo: %w", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit failed: %w", err)
+		}
 	}
-
 	return nil
 }
 
@@ -119,15 +127,12 @@ func importRepo(ctx context.Context, queries *storage.Queries, entry RepoEntry, 
 	}
 
 	insertLanguages(ctx, queries, id, name, entry.Languages)
-
 	insertDependencyFiles(ctx, queries, id, name, entry.Files)
 	insertDockerfiles(ctx, queries, id, name, entry.Files)
-
 	insertCIConfig(ctx, queries, id, name, entry.CIConfig)
-
 	insertReadme(ctx, queries, id, name, entry.Readme)
-
 	insertSecurityFeatures(ctx, queries, id, name, entry.Security)
+	insertSBOMPackagesGithub(ctx, queries, id, name, entry.SBOM)
 
 	return nil
 }
@@ -247,4 +252,63 @@ func insertSecurityFeatures(
 	}
 }
 
-// func insertSBOMGithubPackages(...) // 👈 NY
+func insertSBOMPackagesGithub(
+	ctx context.Context,
+	queries *storage.Queries,
+	repoID int64,
+	name string,
+	sbomRaw map[string]interface{},
+) {
+	if sbomRaw == nil {
+		return
+	}
+
+	sbomInner, ok := sbomRaw["sbom"].(map[string]interface{})
+	if !ok {
+		slog.Warn("❗️Ugyldig sbom-format", "repo", name)
+		return
+	}
+
+	packages, ok := sbomInner["packages"].([]interface{})
+	if !ok {
+		slog.Warn("❗️Ingen pakker i sbom", "repo", name)
+		return
+	}
+
+	for _, p := range packages {
+		pkg, ok := p.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		nameVal := SafeString(pkg["name"])
+		version := SafeString(pkg["versionInfo"])
+		license := SafeString(pkg["licenseConcluded"])
+
+		// Prøv å hente ut PURL (Package URL) fra externalRefs
+		var purl string
+		if refs, ok := pkg["externalRefs"].([]interface{}); ok {
+			for _, ref := range refs {
+				refMap, ok := ref.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				if refMap["referenceType"] == "purl" {
+					purl = SafeString(refMap["referenceLocator"])
+					break
+				}
+			}
+		}
+
+		err := queries.InsertGithubSBOM(ctx, storage.InsertGithubSBOMParams{
+			RepoID:  repoID,
+			Name:    nameVal,
+			Version: sql.NullString{String: version, Valid: version != ""},
+			License: sql.NullString{String: license, Valid: license != ""},
+			Purl:    sql.NullString{String: purl, Valid: purl != ""},
+		})
+		if err != nil {
+			slog.Warn("🚨 SBOM-insert-feil", "repo", name, "package", nameVal, "error", err)
+		}
+	}
+}
