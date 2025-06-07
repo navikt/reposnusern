@@ -28,6 +28,7 @@ func main() {
 		<-ctx.Done()
 		slog.Info("SIGTERM mottatt – rydder opp...")
 		// Her kan vi legge til ekstra rydding om vi trenger det
+		// TODO sende context til dbcall og skriving av filer.
 	}()
 
 	org := os.Getenv("ORG")
