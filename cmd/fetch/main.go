@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -89,8 +88,9 @@ func main() {
 		allData["repos"] = append(allData["repos"].([]map[string]interface{}), result)
 	}
 
-	outputFile := fmt.Sprintf("data/%s_analysis_data.json", org)
-	allBytes, _ := json.MarshalIndent(allData, "", "  ")
-	_ = os.WriteFile(outputFile, allBytes, 0644)
-	slog.Info("Lagret samlet analyse", "file", outputFile)
+	if err := fetcher.StoreRepoDetailedJSON("data", org, allData); err != nil {
+		slog.Error("Feil under lagring av repo-dump", "error", err)
+		os.Exit(1)
+	}
+
 }
