@@ -31,3 +31,4 @@ temp.db
 /data/*
 
 /venv/
+/utils/
