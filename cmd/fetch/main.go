@@ -1,18 +1,16 @@
 package main
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
-	"net/http"
 	"os"
 	"path"
-	"strconv"
 	"strings"
-	"time"
+
+	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
 )
 
 type TreeFile struct {
@@ -49,7 +47,7 @@ func main() {
 		url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&type=all&page=%d", org, page)
 		var pageRepos []map[string]interface{}
 		slog.Info("Henter repos", "page", page)
-		err := getJSONWithRateLimit(url, token, &pageRepos)
+		err := fetcher.GetJSONWithRateLimit(url, token, &pageRepos)
 		if err != nil {
 			slog.Error("Kunne ikke hente repo-metadata", "error", err)
 			os.Exit(1)
@@ -59,11 +57,11 @@ func main() {
 		}
 
 		if debug {
-			// Shuffle og velg 5 tilfeldig
+			// Shuffle og velg 3 tilfeldig
 			rand.Shuffle(len(pageRepos), func(i, j int) {
 				pageRepos[i], pageRepos[j] = pageRepos[j], pageRepos[i]
 			})
-			repos = append(repos, pageRepos[:min(5, len(pageRepos))]...)
+			repos = append(repos, pageRepos[:min(3, len(pageRepos))]...)
 			break
 		} else {
 			repos = append(repos, pageRepos...)
@@ -135,41 +133,9 @@ func main() {
 	slog.Info("Lagret samlet analyse", "file", outputFile)
 }
 
-func getJSONWithRateLimit(url, token string, out interface{}) error {
-	for {
-		slog.Info("Henter URL", "url", url)
-		req, err := http.NewRequestWithContext(context.Background(), "GET", url, nil)
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Authorization", "Bearer "+token)
-		req.Header.Set("Accept", "application/vnd.github+json")
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-
-		if rl := resp.Header.Get("X-RateLimit-Remaining"); rl == "0" {
-			reset := resp.Header.Get("X-RateLimit-Reset")
-			if reset != "" {
-				if ts, err := strconv.ParseInt(reset, 10, 64); err == nil {
-					wait := time.Until(time.Unix(ts, 0)) + time.Second
-					slog.Warn("Rate limit nådd", "venter", wait.Truncate(time.Second))
-					time.Sleep(wait)
-					continue
-				}
-			}
-		}
-
-		return json.NewDecoder(resp.Body).Decode(out)
-	}
-}
-
 func getJSONMap(url, token string) map[string]interface{} {
 	var out map[string]interface{}
-	err := getJSONWithRateLimit(url, token, &out)
+	err := fetcher.GetJSONWithRateLimit(url, token, &out)
 	if err != nil {
 		slog.Error("Feil ved henting", "url", url, "error", err)
 		return nil
@@ -180,7 +146,7 @@ func getJSONMap(url, token string) map[string]interface{} {
 func getReadme(fullName, token string) string {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/readme", fullName)
 	var payload map[string]interface{}
-	if err := getJSONWithRateLimit(url, token, &payload); err != nil {
+	if err := fetcher.GetJSONWithRateLimit(url, token, &payload); err != nil {
 		return ""
 	}
 	if content, ok := payload["content"].(string); ok {
@@ -192,7 +158,7 @@ func getReadme(fullName, token string) string {
 
 func getGitBlob(url, token string) string {
 	var result map[string]interface{}
-	if err := getJSONWithRateLimit(url, token, &result); err != nil {
+	if err := fetcher.GetJSONWithRateLimit(url, token, &result); err != nil {
 		return ""
 	}
 	if content, ok := result["content"].(string); ok {
