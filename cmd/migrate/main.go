@@ -8,28 +8,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/jonmartinstorm/reposnusern/internal/dbwriter"
 	"github.com/jonmartinstorm/reposnusern/internal/storage"
 	_ "github.com/lib/pq"
 )
-
-type FileEntry struct {
-	Path    string `json:"path"`
-	Content string `json:"content"`
-}
-
-type RepoEntry struct {
-	Repo      map[string]interface{} `json:"repo"`
-	Languages map[string]int         `json:"languages"`
-	Files     map[string][]FileEntry `json:"files"`
-	CIConfig  []FileEntry            `json:"ci_config"`
-	Readme    string                 `json:"readme"`
-	Security  map[string]bool        `json:"security"`
-}
-
-type Dump struct {
-	Org   string      `json:"org"`
-	Repos []RepoEntry `json:"repos"`
-}
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -61,7 +43,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var dump Dump
+	var dump dbwriter.Dump
 	if err := json.Unmarshal(data, &dump); err != nil {
 		slog.Error("Kunne ikke parse JSON", "error", err)
 		os.Exit(1)
@@ -79,21 +61,21 @@ func main() {
 			ID:           id,
 			Name:         r["name"].(string),
 			FullName:     name,
-			Description:  safeString(r["description"]),
+			Description:  dbwriter.SafeString(r["description"]),
 			Stars:        int64(r["stargazers_count"].(float64)),
 			Forks:        int64(r["forks_count"].(float64)),
 			Archived:     r["archived"].(bool),
 			Private:      r["private"].(bool),
 			IsFork:       r["fork"].(bool),
-			Language:     safeString(r["language"]),
+			Language:     dbwriter.SafeString(r["language"]),
 			SizeMb:       float32(r["size"].(float64)) / 1024.0,
 			UpdatedAt:    r["updated_at"].(string),
 			PushedAt:     r["pushed_at"].(string),
 			CreatedAt:    r["created_at"].(string),
 			HtmlUrl:      r["html_url"].(string),
-			Topics:       joinStrings(r["topics"]),
+			Topics:       dbwriter.JoinStrings(r["topics"]),
 			Visibility:   r["visibility"].(string),
-			License:      extractLicense(r),
+			License:      dbwriter.ExtractLicense(r),
 			OpenIssues:   int64(r["open_issues_count"].(float64)),
 			LanguagesUrl: r["languages_url"].(string),
 		}
@@ -114,7 +96,7 @@ func main() {
 		}
 
 		for filetype, files := range entry.Files {
-			if isDependencyFile(filetype) {
+			if dbwriter.IsDependencyFile(filetype) {
 				for _, f := range files {
 					if err := queries.InsertDependencyFile(ctx, storage.InsertDependencyFileParams{
 						RepoID:  id,
@@ -169,46 +151,4 @@ func main() {
 	}
 
 	slog.Info("✅ Ferdig importert!")
-}
-
-func safeString(v interface{}) string {
-	if v == nil {
-		return ""
-	}
-	return v.(string)
-}
-
-func joinStrings(arr interface{}) string {
-	if arr == nil {
-		return ""
-	}
-	raw := arr.([]interface{})
-	out := make([]string, 0, len(raw))
-	for _, v := range raw {
-		out = append(out, v.(string))
-	}
-	return strings.Join(out, ",")
-}
-
-func extractLicense(r map[string]interface{}) string {
-	if r["license"] == nil {
-		return ""
-	}
-	return r["license"].(map[string]interface{})["spdx_id"].(string)
-}
-
-func isDependencyFile(name string) bool {
-	known := []string{
-		"package.json", "pom.xml", "build.gradle", "build.gradle.kts",
-		"go.mod", "cargo.toml", "requirements.txt", "pyproject.toml",
-		"composer.json", ".csproj", "gemfile", "gemfile.lock",
-		"yarn.lock", "pnpm-lock.yaml", "package-lock.json",
-	}
-	name = strings.ToLower(name)
-	for _, k := range known {
-		if k == name {
-			return true
-		}
-	}
-	return false
 }
