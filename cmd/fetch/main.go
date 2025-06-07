@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"path"
@@ -40,8 +41,10 @@ func main() {
 	}
 
 	// Hent full repo-metadata som map
+	debug := os.Getenv("REPOSNUSERDEBUG") == "true"
 	repos := []map[string]interface{}{}
 	page := 1
+
 	for {
 		url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&type=all&page=%d", org, page)
 		var pageRepos []map[string]interface{}
@@ -54,7 +57,18 @@ func main() {
 		if len(pageRepos) == 0 {
 			break
 		}
-		repos = append(repos, pageRepos...)
+
+		if debug {
+			// Shuffle og velg 5 tilfeldig
+			rand.Shuffle(len(pageRepos), func(i, j int) {
+				pageRepos[i], pageRepos[j] = pageRepos[j], pageRepos[i]
+			})
+			repos = append(repos, pageRepos[:min(5, len(pageRepos))]...)
+			break
+		} else {
+			repos = append(repos, pageRepos...)
+		}
+
 		page++
 	}
 
