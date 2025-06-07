@@ -9,10 +9,10 @@ import (
 	"context"
 )
 
-const insertDockerfile = `-- name: InsertDockerfile :exec
-INSERT INTO dockerfiles (
-  repo_id, full_name, path, content
-) VALUES ($1, $2, $3, $4)
+const insertDockerfile = `-- name: InsertDockerfile :one
+INSERT INTO dockerfiles (repo_id, full_name, path, content)
+VALUES ($1, $2, $3, $4)
+RETURNING id
 `
 
 type InsertDockerfileParams struct {
@@ -22,12 +22,14 @@ type InsertDockerfileParams struct {
 	Content  string
 }
 
-func (q *Queries) InsertDockerfile(ctx context.Context, arg InsertDockerfileParams) error {
-	_, err := q.db.ExecContext(ctx, insertDockerfile,
+func (q *Queries) InsertDockerfile(ctx context.Context, arg InsertDockerfileParams) (int32, error) {
+	row := q.db.QueryRowContext(ctx, insertDockerfile,
 		arg.RepoID,
 		arg.FullName,
 		arg.Path,
 		arg.Content,
 	)
-	return err
+	var id int32
+	err := row.Scan(&id)
+	return id, err
 }

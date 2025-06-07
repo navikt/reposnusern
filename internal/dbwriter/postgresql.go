@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/jonmartinstorm/reposnusern/internal/containers"
 	"github.com/jonmartinstorm/reposnusern/internal/parser"
 	"github.com/jonmartinstorm/reposnusern/internal/storage"
 )
@@ -186,13 +187,46 @@ func insertDockerfiles(
 			continue
 		}
 		for _, f := range fileEntries {
-			if err := queries.InsertDockerfile(ctx, storage.InsertDockerfileParams{
+			dockerfileID, err := queries.InsertDockerfile(ctx, storage.InsertDockerfileParams{
 				RepoID:   repoID,
 				FullName: name,
 				Path:     f.Path,
 				Content:  f.Content,
-			}); err != nil {
-				slog.Warn("Dockerfile-feil", "repo", name, "fil", f.Path, "error", err)
+			})
+			if err != nil {
+				slog.Warn("🚨 Dockerfile-feil", "repo", name, "fil", f.Path, "error", err)
+				continue
+			}
+
+			features := containers.ParseDockerfile(f.Content)
+
+			err = queries.InsertDockerfileFeatures(ctx, storage.InsertDockerfileFeaturesParams{
+				DockerfileID: dockerfileID,
+				BaseImage:    sql.NullString{String: features.BaseImage, Valid: features.BaseImage != ""},
+				BaseTag:      sql.NullString{String: features.BaseTag, Valid: features.BaseTag != ""},
+				UsesLatestTag: sql.NullBool{
+					Bool:  features.UsesLatestTag,
+					Valid: true,
+				},
+				HasUserInstruction: sql.NullBool{
+					Bool:  features.HasUserInstruction,
+					Valid: true,
+				},
+				HasCopySensitive: sql.NullBool{
+					Bool:  features.HasCopySensitive,
+					Valid: true,
+				},
+				HasPackageInstalls: sql.NullBool{
+					Bool:  features.HasPackageInstalls,
+					Valid: true,
+				},
+				UsesMultistage: sql.NullBool{
+					Bool:  features.UsesMultistage,
+					Valid: true,
+				},
+			})
+			if err != nil {
+				slog.Warn("⚠️ Dockerfile-feature-feil", "repo", name, "fil", f.Path, "error", err)
 			}
 		}
 	}
