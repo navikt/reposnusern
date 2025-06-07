@@ -4,6 +4,10 @@
 
 package storage
 
+import (
+	"database/sql"
+)
+
 type CiConfig struct {
 	ID      int32
 	RepoID  int64
@@ -12,10 +16,9 @@ type CiConfig struct {
 }
 
 type DependencyFile struct {
-	ID      int32
-	RepoID  int64
-	Path    string
-	Content string
+	ID     int32
+	RepoID int64
+	Path   string
 }
 
 type Dockerfile struct {
@@ -24,6 +27,17 @@ type Dockerfile struct {
 	FullName string
 	Path     string
 	Content  string
+}
+
+type DockerfileFeature struct {
+	DockerfileID       int32
+	BaseImage          sql.NullString
+	BaseTag            sql.NullString
+	UsesLatestTag      sql.NullBool
+	HasUserInstruction sql.NullBool
+	HasCopySensitive   sql.NullBool
+	HasPackageInstalls sql.NullBool
+	UsesMultistage     sql.NullBool
 }
 
 type Readme struct {
@@ -66,4 +80,23 @@ type RepoSecurityFeature struct {
 	HasSecurityMd bool
 	HasDependabot bool
 	HasCodeql     bool
+}
+
+type SbomGithubPackage struct {
+	ID      int32
+	RepoID  int64
+	Name    string
+	Version sql.NullString
+	License sql.NullString
+	Purl    sql.NullString
+}
+
+type SbomParsedPackage struct {
+	ID       int32
+	RepoID   int64
+	Name     string
+	PkgGroup sql.NullString
+	Version  sql.NullString
+	Type     string
+	Path     string
 }

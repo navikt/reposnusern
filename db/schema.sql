@@ -39,8 +39,7 @@ CREATE TABLE IF NOT EXISTS repo_languages (
 CREATE TABLE IF NOT EXISTS dependency_files (
     id SERIAL PRIMARY KEY,
     repo_id BIGINT NOT NULL REFERENCES repos(id),
-    path TEXT NOT NULL,
-    content TEXT NOT NULL
+    path TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS ci_configs (
@@ -60,4 +59,34 @@ CREATE TABLE IF NOT EXISTS repo_security_features (
     has_security_md BOOLEAN NOT NULL DEFAULT FALSE,
     has_dependabot BOOLEAN NOT NULL DEFAULT FALSE,
     has_codeql BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS sbom_github_packages (
+    id SERIAL PRIMARY KEY,
+    repo_id BIGINT NOT NULL REFERENCES repos(id),
+    name TEXT NOT NULL,
+    version TEXT,
+    license TEXT,
+    purl TEXT
+);
+
+CREATE TABLE IF NOT EXISTS sbom_parsed_packages (
+    id SERIAL PRIMARY KEY,
+    repo_id BIGINT NOT NULL REFERENCES repos(id),
+    name TEXT NOT NULL,
+    pkg_group TEXT,
+    version TEXT,
+    type TEXT NOT NULL,
+    path TEXT NOT NULL 
+);
+
+CREATE TABLE IF NOT EXISTS dockerfile_features (
+    dockerfile_id INTEGER PRIMARY KEY REFERENCES dockerfiles(id),
+    base_image TEXT,              
+    base_tag TEXT,                
+    uses_latest_tag BOOLEAN,
+    has_user_instruction BOOLEAN,
+    has_copy_sensitive BOOLEAN,
+    has_package_installs BOOLEAN,
+    uses_multistage BOOLEAN
 );

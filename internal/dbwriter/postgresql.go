@@ -123,9 +123,8 @@ func ImportToPostgreSQLDB(dump Dump, db *sql.DB) error {
 			if IsDependencyFile(filetype) {
 				for _, f := range files {
 					if err := queries.InsertDependencyFile(ctx, storage.InsertDependencyFileParams{
-						RepoID:  id,
-						Path:    f.Path,
-						Content: f.Content,
+						RepoID: id,
+						Path:   f.Path,
 					}); err != nil {
 						slog.Warn("Dependency-feil", "repo", name, "fil", f.Path, "error", err)
 					}
