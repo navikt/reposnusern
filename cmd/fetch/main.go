@@ -91,13 +91,13 @@ func main() {
 
 		result := map[string]interface{}{
 			"repo":      r,
-			"languages": getJSONMap(fmt.Sprintf("https://api.github.com/repos/%s/languages", fullName), token),
+			"languages": fetcher.GetJSONMap(fmt.Sprintf("https://api.github.com/repos/%s/languages", fullName), token),
 			"files":     map[string][]map[string]string{},
 			"security":  map[string]bool{},
 		}
 		ciConfig := []map[string]string{}
 
-		tree := getJSONMap(fmt.Sprintf("https://api.github.com/repos/%s/git/trees/%s?recursive=1", fullName, r["default_branch"].(string)), token)
+		tree := fetcher.GetJSONMap(fmt.Sprintf("https://api.github.com/repos/%s/git/trees/%s?recursive=1", fullName, r["default_branch"].(string)), token)
 		treeFiles := parseTree(tree)
 
 		for _, tf := range treeFiles {
@@ -131,16 +131,6 @@ func main() {
 	allBytes, _ := json.MarshalIndent(allData, "", "  ")
 	_ = os.WriteFile(outputFile, allBytes, 0644)
 	slog.Info("Lagret samlet analyse", "file", outputFile)
-}
-
-func getJSONMap(url, token string) map[string]interface{} {
-	var out map[string]interface{}
-	err := fetcher.GetJSONWithRateLimit(url, token, &out)
-	if err != nil {
-		slog.Error("Feil ved henting", "url", url, "error", err)
-		return nil
-	}
-	return out
 }
 
 func getReadme(fullName, token string) string {

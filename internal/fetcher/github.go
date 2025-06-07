@@ -41,3 +41,13 @@ func GetJSONWithRateLimit(url, token string, out interface{}) error {
 		return json.NewDecoder(resp.Body).Decode(out)
 	}
 }
+
+func GetJSONMap(url, token string) map[string]interface{} {
+	var out map[string]interface{}
+	err := GetJSONWithRateLimit(url, token, &out)
+	if err != nil {
+		slog.Error("Feil ved henting", "url", url, "error", err)
+		return nil
+	}
+	return out
+}
