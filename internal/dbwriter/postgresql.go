@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/jonmartinstorm/reposnusern/internal/parser"
 	"github.com/jonmartinstorm/reposnusern/internal/storage"
 )
 
@@ -133,6 +134,7 @@ func importRepo(ctx context.Context, queries *storage.Queries, entry RepoEntry, 
 	insertReadme(ctx, queries, id, name, entry.Readme)
 	insertSecurityFeatures(ctx, queries, id, name, entry.Security)
 	insertSBOMPackagesGithub(ctx, queries, id, name, entry.SBOM)
+	insertParsedSBOM(ctx, queries, id, name, entry.Files)
 
 	return nil
 }
@@ -309,6 +311,43 @@ func insertSBOMPackagesGithub(
 		})
 		if err != nil {
 			slog.Warn("🚨 SBOM-insert-feil", "repo", name, "package", nameVal, "error", err)
+		}
+	}
+}
+
+func insertParsedSBOM(
+	ctx context.Context,
+	queries *storage.Queries,
+	repoID int64,
+	name string,
+	files map[string][]FileEntry,
+) {
+	// map[string][]FileEntry ➜ map[string][]byte
+	flat := make(map[string][]byte)
+	for _, fileEntries := range files {
+		for _, f := range fileEntries {
+			flat[f.Path] = []byte(f.Content)
+		}
+	}
+
+	mp := parser.NewMultiParser()
+	deps, err := mp.ParseFiles(flat)
+	if err != nil {
+		slog.Warn("❗️Dependency-parsing feilet", "repo", name, "error", err)
+		return
+	}
+
+	for _, d := range deps {
+		err := queries.InsertParsedSBOM(ctx, storage.InsertParsedSBOMParams{
+			RepoID:   repoID,
+			Name:     d.Name,
+			PkgGroup: sql.NullString{String: d.Group, Valid: d.Group != ""},
+			Version:  sql.NullString{String: d.Version, Valid: d.Version != ""},
+			Type:     d.Type,
+			Path:     d.Path,
+		})
+		if err != nil {
+			slog.Warn("❗️Feil ved InsertParsedSBOM", "repo", name, "dependency", d.Name, "error", err)
 		}
 	}
 }
