@@ -9,30 +9,13 @@ Målet med dette prosjektet er å lage et fleksibelt og utvidbart analyseverktø
 ### 1. Datainnhenting
 
 - Henter metadata, språkbruk, Dockerfiles og dependency-filer fra alle repoer i en GitHub-organisasjon.
-- Data lagres i en relasjonsdatabase (SQLite i PoC).
-- Bruker JSON-filer som mellomlagring for å redusere GitHub API-bruk.
+- Data lagres i en relasjonsdatabase (PostgreSQL).
 - Kjøres periodisk (f.eks. via cron-jobb).
-
-### 2. Analyseverktøy
-
-- Kjører regelbaserte analyser av:
-  - Dockerfiles (best practices og sikkerhet)
-  - Dependency-filer (rammeverk og versjonsbruk per språk)
-  - Språkstatistikk
-- Resultater lagres i databasen for effektiv spørring og videre bruk.
-
-### 3. Tilgjengeliggjøring av data
-
-- Tilbyr en enkel API for å hente ut data og analyseresultater.
-- Tanken er at dataene kan brukes av:
-  - Andre Go-programmer
-  - Jupyter-notebooks
-  - Visualiseringsverktøy som Power BI, Metabase eller Grafana
 
 ### Teknologier og oppsett
 
 - 🧠 Språk: Go
-- 🗃️ Database: SQLite (sqlc brukt for typesikker tilgang)
+- 🗃️ Database: PostgreSQL (sqlc brukt for typesikker tilgang)
 - 📦 Strukturelt monorepo – men med tydelig inndeling
 
 ## 🧪 PoC-status
@@ -49,36 +32,28 @@ Proof-of-Concept bruker følgende:
 
 Dette gir et godt grunnlag for å bygge videre analyser, inkludert rammeverksdeteksjon basert på språk og filstruktur.
 
-### 2. Analyse
-TODO
-
-### 3. Tilgjengeliggjøring
-TODO (akkurat nå kan man hente det i en posgresdb.)
 
 ## 📁 Prosjektstruktur
 ```
-repo-analyzer/
 reposnusern/
 ├── cmd/
-│   ├── fetch/ # Henter og lagrer data fra GitHub
-│   ├── import/ # Importerer JSON-data til database
-│   ├── migrate/ # Kjør initial migrering av PostgreSQL
-│   └── analyze/ # Fremtidig analyser og spørringer
+│   ├── fetch/      # Henter og lagrer data fra GitHub
+│   └── migrate/    # Importerer JSON-data til PostgreSQL
 │
 ├── internal/
-│   ├── fetcher/ # GitHub-klient og mellomlagring
-│   ├── analyzer/ # Analyse av Dockerfiles og dependencies
-│   ├── storage/ # sqlc-basert tilgang til databasen
-│   ├── models/ # Delte datastrukturer
-│   └── config/ # Håndtering av konfig og secrets
+│   ├── fetcher/    # GitHub-klient og mellomlagring
+│   ├── dbwriter/   # Analyse av Dockerfiles og dependencies
+│   ├── storage/    # sqlc-basert tilgang til databasen
+│   └── parser/     # Parsing av filer
 │
 ├── db/
-│   ├── queries/ # sqlc-spørringer
-│   └── schema.sql # PostgreSQL-schema
+│   ├── queries/    # sqlc-spørringer
+│   └── schema.sql  # PostgreSQL-schema
 │
-├── data/ # Midlertidige JSON-filer
-├── sqlc.yaml # sqlc-konfigurasjon
-├── go.mod / go.sum
+├── data/           # Midlertidige JSON-filer
+├── sqlc.yaml       # sqlc-konfigurasjon
+├── go.mod / go.sum # Go-moduldefinisjoner
+├── Dockerfile      # Bygging og kjøring i container
 └── README.md
 ```
 
@@ -113,7 +88,7 @@ Dette scriptet vil:
 - en rå oversikt over alle repoer (data/navikt_repos_raw_dump.json)
 - detaljert analyse av ikke-arkiverte repoer (data/navikt_analysis_data.json)
 
-Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. Scriptet håndterer dette automatisk ved å pause og fortsette når grensen er nådd.
+Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. Koden håndterer dette automatisk ved å pause og fortsette når grensen er nådd.
 
 ### Migrering til PostgresSQL
 
@@ -126,13 +101,13 @@ go run ./cmd/migrate
 
 ## TODO
 
+- [ ] Parsing av forskjellige dependency filer
+- [ ] Også hente REST API endpoints for software bill of materials (SBOM)
 - [ ] 🔐 Hindre at passord og secrets utilsiktet havner i logger
-- [ ] 🌐 Bygge et lite Go-API for noen nyttige queries
 - [ ] ☁️ Gjøre klart for K8s-deploy (config, secrets, jobs)
 - [ ] ✅ Legge til noen enkle tester (det var jo bare en PoC 😅)
 - [ ] 🧹 Refaktorering og deling av logikk
 - [ ] Oppdatere schema så vi tar vare på dato vi har hentet informasjonen fra. (Så vi kan ta vare på trenden.)
-- [ ] 📊 Mer visuell analyse og rapportering i neste steg
 
 ## Annen inspirasjon
  - [Fuck it, ship it - Stine Mølgaard og Jacob Bøtter](https://fuckitshipit.dk/)

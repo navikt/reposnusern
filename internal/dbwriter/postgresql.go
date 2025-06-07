@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/jonmartinstorm/reposnusern/internal/containers"
+	"github.com/jonmartinstorm/reposnusern/internal/parser"
 	"github.com/jonmartinstorm/reposnusern/internal/storage"
 )
 
@@ -22,6 +24,7 @@ type RepoEntry struct {
 	CIConfig  []FileEntry            `json:"ci_config"`
 	Readme    string                 `json:"readme"`
 	Security  map[string]bool        `json:"security"`
+	SBOM      map[string]interface{} `json:"sbom"`
 }
 
 type Dump struct {
@@ -73,106 +76,312 @@ func IsDependencyFile(name string) bool {
 
 func ImportToPostgreSQLDB(dump Dump, db *sql.DB) error {
 	ctx := context.Background()
-	queries := storage.New(db)
 
 	for i, entry := range dump.Repos {
-		r := entry.Repo
-		id := int64(r["id"].(float64))
-		name := r["full_name"].(string)
-		slog.Info("⏳ Behandler repo", "nummer", i+1, "navn", name)
-
-		repo := storage.InsertRepoParams{
-			ID:           id,
-			Name:         r["name"].(string),
-			FullName:     name,
-			Description:  SafeString(r["description"]),
-			Stars:        int64(r["stargazers_count"].(float64)),
-			Forks:        int64(r["forks_count"].(float64)),
-			Archived:     r["archived"].(bool),
-			Private:      r["private"].(bool),
-			IsFork:       r["fork"].(bool),
-			Language:     SafeString(r["language"]),
-			SizeMb:       float32(r["size"].(float64)) / 1024.0,
-			UpdatedAt:    r["updated_at"].(string),
-			PushedAt:     r["pushed_at"].(string),
-			CreatedAt:    r["created_at"].(string),
-			HtmlUrl:      r["html_url"].(string),
-			Topics:       JoinStrings(r["topics"]),
-			Visibility:   r["visibility"].(string),
-			License:      ExtractLicense(r),
-			OpenIssues:   int64(r["open_issues_count"].(float64)),
-			LanguagesUrl: r["languages_url"].(string),
-		}
-		if err := queries.InsertRepo(ctx, repo); err != nil {
-			slog.Error("🚨 Feil ved InsertRepo – avbryter import", "repo", name, "error", err)
-			return fmt.Errorf("insert repo failed: %w", err)
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("start tx: %w", err)
 		}
 
-		for lang, size := range entry.Languages {
-			err := queries.InsertRepoLanguage(ctx, storage.InsertRepoLanguageParams{
-				RepoID:   id,
-				Language: lang,
-				Bytes:    int64(size),
+		queries := storage.New(tx)
+		if err := importRepo(ctx, queries, entry, i); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("import repo: %w", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("commit failed: %w", err)
+		}
+	}
+	return nil
+}
+
+func importRepo(ctx context.Context, queries *storage.Queries, entry RepoEntry, index int) error {
+	r := entry.Repo
+	id := int64(r["id"].(float64))
+	name := r["full_name"].(string)
+	slog.Info("⏳ Behandler repo", "nummer", index+1, "navn", name)
+
+	repo := storage.InsertRepoParams{
+		ID:           id,
+		Name:         r["name"].(string),
+		FullName:     name,
+		Description:  SafeString(r["description"]),
+		Stars:        int64(r["stargazers_count"].(float64)),
+		Forks:        int64(r["forks_count"].(float64)),
+		Archived:     r["archived"].(bool),
+		Private:      r["private"].(bool),
+		IsFork:       r["fork"].(bool),
+		Language:     SafeString(r["language"]),
+		SizeMb:       float32(r["size"].(float64)) / 1024.0,
+		UpdatedAt:    r["updated_at"].(string),
+		PushedAt:     r["pushed_at"].(string),
+		CreatedAt:    r["created_at"].(string),
+		HtmlUrl:      r["html_url"].(string),
+		Topics:       JoinStrings(r["topics"]),
+		Visibility:   r["visibility"].(string),
+		License:      ExtractLicense(r),
+		OpenIssues:   int64(r["open_issues_count"].(float64)),
+		LanguagesUrl: r["languages_url"].(string),
+	}
+	if err := queries.InsertRepo(ctx, repo); err != nil {
+		slog.Error("🚨 Feil ved InsertRepo – avbryter import", "repo", name, "error", err)
+		return fmt.Errorf("insert repo failed: %w", err)
+	}
+
+	insertLanguages(ctx, queries, id, name, entry.Languages)
+	insertDependencyFiles(ctx, queries, id, name, entry.Files)
+	insertDockerfiles(ctx, queries, id, name, entry.Files)
+	insertCIConfig(ctx, queries, id, name, entry.CIConfig)
+	insertReadme(ctx, queries, id, name, entry.Readme)
+	insertSecurityFeatures(ctx, queries, id, name, entry.Security)
+	insertSBOMPackagesGithub(ctx, queries, id, name, entry.SBOM)
+	insertParsedSBOM(ctx, queries, id, name, entry.Files)
+
+	return nil
+}
+
+func insertLanguages(ctx context.Context, queries *storage.Queries, repoID int64, name string, langs map[string]int) {
+	for lang, size := range langs {
+		err := queries.InsertRepoLanguage(ctx, storage.InsertRepoLanguageParams{
+			RepoID:   repoID,
+			Language: lang,
+			Bytes:    int64(size),
+		})
+		if err != nil {
+			slog.Warn("❗️Språkfeil", "repo", name, "language", lang, "error", err)
+		}
+	}
+}
+
+func insertDependencyFiles(
+	ctx context.Context,
+	queries *storage.Queries,
+	repoID int64,
+	name string,
+	files map[string][]FileEntry,
+) {
+	for filetype, fileEntries := range files {
+		if !IsDependencyFile(filetype) {
+			continue
+		}
+		for _, f := range fileEntries {
+			if err := queries.InsertDependencyFile(ctx, storage.InsertDependencyFileParams{
+				RepoID: repoID,
+				Path:   f.Path,
+			}); err != nil {
+				slog.Warn("Dependency-feil", "repo", name, "fil", f.Path, "error", err)
+			}
+		}
+	}
+}
+
+func insertDockerfiles(
+	ctx context.Context,
+	queries *storage.Queries,
+	repoID int64,
+	name string,
+	files map[string][]FileEntry,
+) {
+	for filetype, fileEntries := range files {
+		if !strings.HasPrefix(strings.ToLower(filetype), "dockerfile") {
+			continue
+		}
+		for _, f := range fileEntries {
+			dockerfileID, err := queries.InsertDockerfile(ctx, storage.InsertDockerfileParams{
+				RepoID:   repoID,
+				FullName: name,
+				Path:     f.Path,
+				Content:  f.Content,
 			})
 			if err != nil {
-				slog.Warn("❗️Språkfeil", "repo", name, "language", lang, "error", err)
+				slog.Warn("🚨 Dockerfile-feil", "repo", name, "fil", f.Path, "error", err)
+				continue
+			}
+
+			features := containers.ParseDockerfile(f.Content)
+
+			err = queries.InsertDockerfileFeatures(ctx, storage.InsertDockerfileFeaturesParams{
+				DockerfileID: dockerfileID,
+				BaseImage:    sql.NullString{String: features.BaseImage, Valid: features.BaseImage != ""},
+				BaseTag:      sql.NullString{String: features.BaseTag, Valid: features.BaseTag != ""},
+				UsesLatestTag: sql.NullBool{
+					Bool:  features.UsesLatestTag,
+					Valid: true,
+				},
+				HasUserInstruction: sql.NullBool{
+					Bool:  features.HasUserInstruction,
+					Valid: true,
+				},
+				HasCopySensitive: sql.NullBool{
+					Bool:  features.HasCopySensitive,
+					Valid: true,
+				},
+				HasPackageInstalls: sql.NullBool{
+					Bool:  features.HasPackageInstalls,
+					Valid: true,
+				},
+				UsesMultistage: sql.NullBool{
+					Bool:  features.UsesMultistage,
+					Valid: true,
+				},
+			})
+			if err != nil {
+				slog.Warn("⚠️ Dockerfile-feature-feil", "repo", name, "fil", f.Path, "error", err)
 			}
 		}
+	}
+}
 
-		for filetype, files := range entry.Files {
-			if IsDependencyFile(filetype) {
-				for _, f := range files {
-					if err := queries.InsertDependencyFile(ctx, storage.InsertDependencyFileParams{
-						RepoID:  id,
-						Path:    f.Path,
-						Content: f.Content,
-					}); err != nil {
-						slog.Warn("Dependency-feil", "repo", name, "fil", f.Path, "error", err)
-					}
-				}
-			}
-			if strings.HasPrefix(strings.ToLower(filetype), "dockerfile") {
-				for _, f := range files {
-					if err := queries.InsertDockerfile(ctx, storage.InsertDockerfileParams{
-						RepoID:   id,
-						FullName: name,
-						Path:     f.Path,
-						Content:  f.Content,
-					}); err != nil {
-						slog.Warn("Dockerfile-feil", "repo", name, "fil", f.Path, "error", err)
-					}
-				}
-			}
-		}
-
-		for _, f := range entry.CIConfig {
-			if err := queries.InsertCIConfig(ctx, storage.InsertCIConfigParams{
-				RepoID:  id,
-				Path:    f.Path,
-				Content: f.Content,
-			}); err != nil {
-				slog.Warn("CI-feil", "repo", name, "fil", f.Path, "error", err)
-			}
-		}
-
-		if entry.Readme != "" {
-			if err := queries.InsertReadme(ctx, storage.InsertReadmeParams{
-				RepoID:  id,
-				Content: entry.Readme,
-			}); err != nil {
-				slog.Warn("README-feil", "repo", name, "error", err)
-			}
-		}
-
-		if err := queries.InsertSecurityFeatures(ctx, storage.InsertSecurityFeaturesParams{
-			RepoID:        id,
-			HasSecurityMd: entry.Security["has_security_md"],
-			HasDependabot: entry.Security["has_dependabot"],
-			HasCodeql:     entry.Security["has_codeql"],
+func insertCIConfig(
+	ctx context.Context,
+	queries *storage.Queries,
+	repoID int64,
+	name string,
+	files []FileEntry,
+) {
+	for _, f := range files {
+		if err := queries.InsertCIConfig(ctx, storage.InsertCIConfigParams{
+			RepoID:  repoID,
+			Path:    f.Path,
+			Content: f.Content,
 		}); err != nil {
-			slog.Warn("Security-feil", "repo", name, "error", err)
+			slog.Warn("CI-feil", "repo", name, "fil", f.Path, "error", err)
+		}
+	}
+}
+
+// func insertDockerfiles(...)
+
+func insertReadme(
+	ctx context.Context,
+	queries *storage.Queries,
+	repoID int64,
+	name string,
+	content string,
+) {
+	if content == "" {
+		return
+	}
+
+	if err := queries.InsertReadme(ctx, storage.InsertReadmeParams{
+		RepoID:  repoID,
+		Content: content,
+	}); err != nil {
+		slog.Warn("README-feil", "repo", name, "error", err)
+	}
+}
+
+func insertSecurityFeatures(
+	ctx context.Context,
+	queries *storage.Queries,
+	repoID int64,
+	name string,
+	security map[string]bool,
+) {
+	if err := queries.InsertSecurityFeatures(ctx, storage.InsertSecurityFeaturesParams{
+		RepoID:        repoID,
+		HasSecurityMd: security["has_security_md"],
+		HasDependabot: security["has_dependabot"],
+		HasCodeql:     security["has_codeql"],
+	}); err != nil {
+		slog.Warn("Security-feil", "repo", name, "error", err)
+	}
+}
+
+func insertSBOMPackagesGithub(
+	ctx context.Context,
+	queries *storage.Queries,
+	repoID int64,
+	name string,
+	sbomRaw map[string]interface{},
+) {
+	if sbomRaw == nil {
+		return
+	}
+
+	sbomInner, ok := sbomRaw["sbom"].(map[string]interface{})
+	if !ok {
+		slog.Warn("❗️Ugyldig sbom-format", "repo", name)
+		return
+	}
+
+	packages, ok := sbomInner["packages"].([]interface{})
+	if !ok {
+		slog.Warn("❗️Ingen pakker i sbom", "repo", name)
+		return
+	}
+
+	for _, p := range packages {
+		pkg, ok := p.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		nameVal := SafeString(pkg["name"])
+		version := SafeString(pkg["versionInfo"])
+		license := SafeString(pkg["licenseConcluded"])
+
+		// Prøv å hente ut PURL (Package URL) fra externalRefs
+		var purl string
+		if refs, ok := pkg["externalRefs"].([]interface{}); ok {
+			for _, ref := range refs {
+				refMap, ok := ref.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				if refMap["referenceType"] == "purl" {
+					purl = SafeString(refMap["referenceLocator"])
+					break
+				}
+			}
+		}
+
+		err := queries.InsertGithubSBOM(ctx, storage.InsertGithubSBOMParams{
+			RepoID:  repoID,
+			Name:    nameVal,
+			Version: sql.NullString{String: version, Valid: version != ""},
+			License: sql.NullString{String: license, Valid: license != ""},
+			Purl:    sql.NullString{String: purl, Valid: purl != ""},
+		})
+		if err != nil {
+			slog.Warn("🚨 SBOM-insert-feil", "repo", name, "package", nameVal, "error", err)
+		}
+	}
+}
+
+func insertParsedSBOM(
+	ctx context.Context,
+	queries *storage.Queries,
+	repoID int64,
+	name string,
+	files map[string][]FileEntry,
+) {
+	// map[string][]FileEntry ➜ map[string][]byte
+	flat := make(map[string][]byte)
+	for _, fileEntries := range files {
+		for _, f := range fileEntries {
+			flat[f.Path] = []byte(f.Content)
 		}
 	}
 
-	return nil
+	mp := parser.NewMultiParser()
+	deps, err := mp.ParseFiles(flat)
+	if err != nil {
+		slog.Warn("❗️Dependency-parsing feilet", "repo", name, "error", err)
+		return
+	}
+
+	for _, d := range deps {
+		err := queries.InsertParsedSBOM(ctx, storage.InsertParsedSBOMParams{
+			RepoID:   repoID,
+			Name:     d.Name,
+			PkgGroup: sql.NullString{String: d.Group, Valid: d.Group != ""},
+			Version:  sql.NullString{String: d.Version, Valid: d.Version != ""},
+			Type:     d.Type,
+			Path:     d.Path,
+		})
+		if err != nil {
+			slog.Warn("❗️Feil ved InsertParsedSBOM", "repo", name, "dependency", d.Name, "error", err)
+		}
+	}
 }

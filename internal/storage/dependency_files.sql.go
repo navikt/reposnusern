@@ -11,17 +11,16 @@ import (
 
 const insertDependencyFile = `-- name: InsertDependencyFile :exec
 INSERT INTO dependency_files (
-  repo_id, path, content
-) VALUES ($1, $2, $3)
+  repo_id, path
+) VALUES ($1, $2)
 `
 
 type InsertDependencyFileParams struct {
-	RepoID  int64
-	Path    string
-	Content string
+	RepoID int64
+	Path   string
 }
 
 func (q *Queries) InsertDependencyFile(ctx context.Context, arg InsertDependencyFileParams) error {
-	_, err := q.db.ExecContext(ctx, insertDependencyFile, arg.RepoID, arg.Path, arg.Content)
+	_, err := q.db.ExecContext(ctx, insertDependencyFile, arg.RepoID, arg.Path)
 	return err
 }
