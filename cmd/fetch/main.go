@@ -120,7 +120,7 @@ func main() {
 
 		result["ci_config"] = ciConfig
 
-		if readme := getReadme(fullName, token); readme != "" {
+		if readme := fetcher.GetReadme(fullName, token); readme != "" {
 			result["readme"] = readme
 		}
 
@@ -131,19 +131,6 @@ func main() {
 	allBytes, _ := json.MarshalIndent(allData, "", "  ")
 	_ = os.WriteFile(outputFile, allBytes, 0644)
 	slog.Info("Lagret samlet analyse", "file", outputFile)
-}
-
-func getReadme(fullName, token string) string {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/readme", fullName)
-	var payload map[string]interface{}
-	if err := fetcher.GetJSONWithRateLimit(url, token, &payload); err != nil {
-		return ""
-	}
-	if content, ok := payload["content"].(string); ok {
-		decoded, _ := base64.StdEncoding.DecodeString(strings.ReplaceAll(content, "\n", ""))
-		return string(decoded)
-	}
-	return ""
 }
 
 func getGitBlob(url, token string) string {

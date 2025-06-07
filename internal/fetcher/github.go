@@ -2,10 +2,13 @@ package fetcher
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -50,4 +53,17 @@ func GetJSONMap(url, token string) map[string]interface{} {
 		return nil
 	}
 	return out
+}
+
+func GetReadme(fullName, token string) string {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/readme", fullName)
+	var payload map[string]interface{}
+	if err := GetJSONWithRateLimit(url, token, &payload); err != nil {
+		return ""
+	}
+	if content, ok := payload["content"].(string); ok {
+		decoded, _ := base64.StdEncoding.DecodeString(strings.ReplaceAll(content, "\n", ""))
+		return string(decoded)
+	}
+	return ""
 }
