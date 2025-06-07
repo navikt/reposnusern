@@ -34,7 +34,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	allData := fetcher.GetDetailsActiveRepos(org, token, repos)
+	//allData := fetcher.GetDetailsActiveRepos(org, token, repos)
+	allData := fetcher.GetDetailsActiveReposGraphQL(org, token, repos)
 
 	if err := fetcher.StoreRepoDetailedJSON("data", org, allData); err != nil {
 		slog.Error("Feil under lagring av repo-dump", "error", err)
