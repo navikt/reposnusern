@@ -37,9 +37,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	allData := map[string]interface{}{
-		"org":   org,
-		"repos": []map[string]interface{}{},
+	allData := fetcher.OrgRepos{
+		Org:   org,
+		Repos: []map[string]interface{}{},
 	}
 
 	for i, r := range repos {
@@ -85,7 +85,7 @@ func main() {
 			result["readme"] = readme
 		}
 
-		allData["repos"] = append(allData["repos"].([]map[string]interface{}), result)
+		allData.Repos = append(allData.Repos, result)
 	}
 
 	if err := fetcher.StoreRepoDetailedJSON("data", org, allData); err != nil {

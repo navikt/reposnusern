@@ -20,6 +20,11 @@ type TreeFile struct {
 	Type string `json:"type"`
 }
 
+type OrgRepos struct {
+	Org   string                   `json:"org"`
+	Repos []map[string]interface{} `json:"repos"` // Kan også struktureres mer hvis ønskelig
+}
+
 // GetJSONWithRateLimit henter JSON fra en URL og respekterer GitHub rate-limiting.
 func GetJSONWithRateLimit(url, token string, out interface{}) error {
 	for {

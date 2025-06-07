@@ -27,7 +27,7 @@ func StoreRepoDumpJSON(dir, org string, repos []map[string]interface{}) error {
 	return nil
 }
 
-func StoreRepoDetailedJSON(dir, org string, allData map[string]interface{}) error {
+func StoreRepoDetailedJSON(dir, org string, allData OrgRepos) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("kunne ikke opprette katalog %s: %w", dir, err)
 	}
@@ -42,6 +42,6 @@ func StoreRepoDetailedJSON(dir, org string, allData map[string]interface{}) erro
 		return fmt.Errorf("kunne ikke skrive til fil %s: %w", rawFile, err)
 	}
 
-	slog.Info("Lagret samlet analyse", "count", len(allData), "file", rawFile)
+	slog.Info("Lagret samlet analyse", "count", len(allData.Repos), "file", rawFile)
 	return nil
 }
