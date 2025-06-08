@@ -11,11 +11,11 @@ RUN go mod download
 COPY . .
 
 # Bygg binæren
-RUN go build -o fetch ./cmd/fetch
+RUN go build -o full ./cmd/full
 
 # --- Runtime stage ---
 FROM gcr.io/distroless/static-debian12
 
-COPY --from=builder /app/fetch /fetch
+COPY --from=builder /app/full /full
 
-CMD ["/fetch"]
+CMD ["/full"]

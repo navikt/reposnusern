@@ -168,7 +168,7 @@ func GetAllRepos(org, token string) []map[string]interface{} {
 			rand.Shuffle(len(pageRepos), func(i, j int) {
 				pageRepos[i], pageRepos[j] = pageRepos[j], pageRepos[i]
 			})
-			repos = append(repos, pageRepos[:min(3, len(pageRepos))]...)
+			repos = append(repos, pageRepos[:min(10, len(pageRepos))]...)
 			break
 		} else {
 			repos = append(repos, pageRepos...)
