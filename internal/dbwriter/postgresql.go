@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/jonmartinstorm/reposnusern/internal/containers"
 	"github.com/jonmartinstorm/reposnusern/internal/parser"
 	"github.com/jonmartinstorm/reposnusern/internal/storage"
 )
@@ -56,22 +55,6 @@ func ExtractLicense(r map[string]interface{}) string {
 		return ""
 	}
 	return r["license"].(map[string]interface{})["spdx_id"].(string)
-}
-
-func IsDependencyFile(name string) bool {
-	known := []string{
-		"package.json", "pom.xml", "build.gradle", "build.gradle.kts",
-		"go.mod", "cargo.toml", "requirements.txt", "pyproject.toml",
-		"composer.json", ".csproj", "gemfile", "gemfile.lock",
-		"yarn.lock", "pnpm-lock.yaml", "package-lock.json",
-	}
-	name = strings.ToLower(name)
-	for _, k := range known {
-		if k == name {
-			return true
-		}
-	}
-	return false
 }
 
 func ImportToPostgreSQLDB(dump Dump, db *sql.DB) error {
@@ -129,13 +112,11 @@ func importRepo(ctx context.Context, queries *storage.Queries, entry RepoEntry, 
 	}
 
 	insertLanguages(ctx, queries, id, name, entry.Languages)
-	insertDependencyFiles(ctx, queries, id, name, entry.Files)
 	insertDockerfiles(ctx, queries, id, name, entry.Files)
 	insertCIConfig(ctx, queries, id, name, entry.CIConfig)
 	insertReadme(ctx, queries, id, name, entry.Readme)
 	insertSecurityFeatures(ctx, queries, id, name, entry.Security)
 	insertSBOMPackagesGithub(ctx, queries, id, name, entry.SBOM)
-	insertParsedSBOM(ctx, queries, id, name, entry.Files)
 
 	return nil
 }
@@ -149,28 +130,6 @@ func insertLanguages(ctx context.Context, queries *storage.Queries, repoID int64
 		})
 		if err != nil {
 			slog.Warn("❗️Språkfeil", "repo", name, "language", lang, "error", err)
-		}
-	}
-}
-
-func insertDependencyFiles(
-	ctx context.Context,
-	queries *storage.Queries,
-	repoID int64,
-	name string,
-	files map[string][]FileEntry,
-) {
-	for filetype, fileEntries := range files {
-		if !IsDependencyFile(filetype) {
-			continue
-		}
-		for _, f := range fileEntries {
-			if err := queries.InsertDependencyFile(ctx, storage.InsertDependencyFileParams{
-				RepoID: repoID,
-				Path:   f.Path,
-			}); err != nil {
-				slog.Warn("Dependency-feil", "repo", name, "fil", f.Path, "error", err)
-			}
 		}
 	}
 }
@@ -198,7 +157,7 @@ func insertDockerfiles(
 				continue
 			}
 
-			features := containers.ParseDockerfile(f.Content)
+			features := parser.ParseDockerfile(f.Content)
 
 			err = queries.InsertDockerfileFeatures(ctx, storage.InsertDockerfileFeaturesParams{
 				DockerfileID: dockerfileID,
@@ -249,8 +208,6 @@ func insertCIConfig(
 		}
 	}
 }
-
-// func insertDockerfiles(...)
 
 func insertReadme(
 	ctx context.Context,
@@ -345,43 +302,6 @@ func insertSBOMPackagesGithub(
 		})
 		if err != nil {
 			slog.Warn("🚨 SBOM-insert-feil", "repo", name, "package", nameVal, "error", err)
-		}
-	}
-}
-
-func insertParsedSBOM(
-	ctx context.Context,
-	queries *storage.Queries,
-	repoID int64,
-	name string,
-	files map[string][]FileEntry,
-) {
-	// map[string][]FileEntry ➜ map[string][]byte
-	flat := make(map[string][]byte)
-	for _, fileEntries := range files {
-		for _, f := range fileEntries {
-			flat[f.Path] = []byte(f.Content)
-		}
-	}
-
-	mp := parser.NewMultiParser()
-	deps, err := mp.ParseFiles(flat)
-	if err != nil {
-		slog.Warn("❗️Dependency-parsing feilet", "repo", name, "error", err)
-		return
-	}
-
-	for _, d := range deps {
-		err := queries.InsertParsedSBOM(ctx, storage.InsertParsedSBOMParams{
-			RepoID:   repoID,
-			Name:     d.Name,
-			PkgGroup: sql.NullString{String: d.Group, Valid: d.Group != ""},
-			Version:  sql.NullString{String: d.Version, Valid: d.Version != ""},
-			Type:     d.Type,
-			Path:     d.Path,
-		})
-		if err != nil {
-			slog.Warn("❗️Feil ved InsertParsedSBOM", "repo", name, "dependency", d.Name, "error", err)
 		}
 	}
 }

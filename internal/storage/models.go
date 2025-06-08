@@ -15,12 +15,6 @@ type CiConfig struct {
 	Content string
 }
 
-type DependencyFile struct {
-	ID     int32
-	RepoID int64
-	Path   string
-}
-
 type Dockerfile struct {
 	ID       int32
 	RepoID   int64
@@ -89,14 +83,4 @@ type SbomGithubPackage struct {
 	Version sql.NullString
 	License sql.NullString
 	Purl    sql.NullString
-}
-
-type SbomParsedPackage struct {
-	ID       int32
-	RepoID   int64
-	Name     string
-	PkgGroup sql.NullString
-	Version  sql.NullString
-	Type     string
-	Path     string
 }

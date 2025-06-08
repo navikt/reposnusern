@@ -172,10 +172,16 @@ func FetchRepoGraphQL(owner, name, token string) map[string]interface{} {
 				if !ok {
 					continue
 				}
+
 				name, _ := entry["name"].(string)
 				lowerName := strings.ToLower(name)
 
-				// Hent .object.text hvis det finnes
+				// 🚫 Ikke hent innhold med mindre det er en dockerfile
+				if !strings.Contains(lowerName, "dockerfile") {
+					continue
+				}
+
+				// ✅ Nå vet vi det er relevant → hent .object.text
 				var content string
 				if obj, ok := entry["object"].(map[string]interface{}); ok {
 					if text, ok := obj["text"].(string); ok {
@@ -183,16 +189,7 @@ func FetchRepoGraphQL(owner, name, token string) map[string]interface{} {
 					}
 				}
 
-				// Legg til dependency file
-				if IsDependencyFile(lowerName) && content != "" {
-					files[lowerName] = append(files[lowerName], map[string]string{
-						"path":    name,
-						"content": content,
-					})
-				}
-
-				// Legg til dockerfile
-				if strings.HasPrefix(lowerName, "dockerfile") && content != "" {
+				if content != "" {
 					files[lowerName] = append(files[lowerName], map[string]string{
 						"path":    name,
 						"content": content,

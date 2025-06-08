@@ -36,12 +36,6 @@ CREATE TABLE IF NOT EXISTS repo_languages (
     bytes BIGINT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS dependency_files (
-    id SERIAL PRIMARY KEY,
-    repo_id BIGINT NOT NULL REFERENCES repos(id),
-    path TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS ci_configs (
     id SERIAL PRIMARY KEY,
     repo_id BIGINT NOT NULL REFERENCES repos(id),
@@ -68,16 +62,6 @@ CREATE TABLE IF NOT EXISTS sbom_github_packages (
     version TEXT,
     license TEXT,
     purl TEXT
-);
-
-CREATE TABLE IF NOT EXISTS sbom_parsed_packages (
-    id SERIAL PRIMARY KEY,
-    repo_id BIGINT NOT NULL REFERENCES repos(id),
-    name TEXT NOT NULL,
-    pkg_group TEXT,
-    version TEXT,
-    type TEXT NOT NULL,
-    path TEXT NOT NULL 
 );
 
 CREATE TABLE IF NOT EXISTS dockerfile_features (
