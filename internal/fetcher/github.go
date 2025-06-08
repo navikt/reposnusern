@@ -2,14 +2,12 @@ package fetcher
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -59,77 +57,6 @@ func GetJSONWithRateLimit(url, token string, out interface{}) error {
 	}
 }
 
-func GetJSONMap(url, token string) map[string]interface{} {
-	var out map[string]interface{}
-	err := GetJSONWithRateLimit(url, token, &out)
-	if err != nil {
-		slog.Error("Feil ved henting", "url", url, "error", err)
-		return nil
-	}
-	return out
-}
-
-func GetReadme(fullName, token string) string {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/readme", fullName)
-	var payload map[string]interface{}
-	if err := GetJSONWithRateLimit(url, token, &payload); err != nil {
-		return ""
-	}
-	if content, ok := payload["content"].(string); ok {
-		decoded, _ := base64.StdEncoding.DecodeString(strings.ReplaceAll(content, "\n", ""))
-		return string(decoded)
-	}
-	return ""
-}
-
-func getGitBlob(url, token string) string {
-	var result map[string]interface{}
-	if err := GetJSONWithRateLimit(url, token, &result); err != nil {
-		return ""
-	}
-	if content, ok := result["content"].(string); ok {
-		d, _ := base64.StdEncoding.DecodeString(strings.ReplaceAll(content, "\n", ""))
-		return string(d)
-	}
-	return ""
-}
-
-func AppendFile(files map[string][]map[string]string, key string, tf TreeFile, repo, token string) {
-	content := getGitBlob(tf.URL, token)
-	files[key] = append(files[key], map[string]string{
-		"path":    tf.Path,
-		"content": content,
-	})
-}
-
-func AppendCI(ciList *[]map[string]string, tf TreeFile, repo, token string) {
-	content := getGitBlob(tf.URL, token)
-	*ciList = append(*ciList, map[string]string{
-		"path":    tf.Path,
-		"content": content,
-	})
-}
-
-func ParseTree(tree map[string]interface{}) []TreeFile {
-	files := []TreeFile{}
-	if tree == nil {
-		return files
-	}
-	if arr, ok := tree["tree"].([]interface{}); ok {
-		for _, item := range arr {
-			entry := item.(map[string]interface{})
-			if entry["type"] == "blob" {
-				files = append(files, TreeFile{
-					Path: entry["path"].(string),
-					URL:  entry["url"].(string),
-					Type: entry["type"].(string),
-				})
-			}
-		}
-	}
-	return files
-}
-
 func IsDependencyFile(p string) bool {
 	files := []string{
 		"package.json", "pom.xml", "build.gradle", "build.gradle.kts",
@@ -177,58 +104,4 @@ func GetAllRepos(org, token string) []map[string]interface{} {
 		page++
 	}
 	return repos
-}
-
-func GetDetailsActiveRepos(org, token string, repos []map[string]interface{}) OrgRepos {
-	allData := OrgRepos{
-		Org:   org,
-		Repos: []map[string]interface{}{},
-	}
-
-	for i, r := range repos {
-		fullName := r["full_name"].(string)
-		if r["archived"].(bool) {
-			continue
-		}
-
-		slog.Info("Bearbeider repo", "index", i+1, "total", len(repos), "repo", fullName)
-
-		result := map[string]interface{}{
-			"repo":      r,
-			"languages": GetJSONMap(fmt.Sprintf("https://api.github.com/repos/%s/languages", fullName), token),
-			"files":     map[string][]map[string]string{},
-			"security":  map[string]bool{},
-		}
-		ciConfig := []map[string]string{}
-
-		tree := GetJSONMap(fmt.Sprintf("https://api.github.com/repos/%s/git/trees/%s?recursive=1", fullName, r["default_branch"].(string)), token)
-		treeFiles := ParseTree(tree)
-
-		for _, tf := range treeFiles {
-			lpath := strings.ToLower(tf.Path)
-			switch {
-			case IsDependencyFile(lpath):
-				AppendFile(result["files"].(map[string][]map[string]string), path.Base(tf.Path), tf, fullName, token)
-			case strings.HasPrefix(path.Base(lpath), "dockerfile"):
-				AppendFile(result["files"].(map[string][]map[string]string), path.Base(tf.Path), tf, fullName, token)
-			case strings.HasPrefix(tf.Path, ".github/workflows/"):
-				AppendCI(&ciConfig, tf, fullName, token)
-			case tf.Path == "SECURITY.md":
-				result["security"].(map[string]bool)["has_security_md"] = true
-			case tf.Path == ".github/dependabot.yml":
-				result["security"].(map[string]bool)["has_dependabot"] = true
-			case tf.Path == ".github/codeql.yml":
-				result["security"].(map[string]bool)["has_codeql"] = true
-			}
-		}
-
-		result["ci_config"] = ciConfig
-
-		if readme := GetReadme(fullName, token); readme != "" {
-			result["readme"] = readme
-		}
-
-		allData.Repos = append(allData.Repos, result)
-	}
-	return allData
 }
