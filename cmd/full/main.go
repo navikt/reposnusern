@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -72,21 +71,9 @@ func main() {
 	slog.Info("🔍 Henter oversikt over alle repos")
 	repos := fetcher.GetAllRepos(org, token)
 
-	// Lagre oversikt som JSON
-	if err := fetcher.StoreRepoDumpJSON("data", org, repos); err != nil {
-		slog.Error("Feil under lagring av repo-dump", "error", err)
-		os.Exit(1)
-	}
-
 	// Hent detaljer via GraphQL
 	slog.Info("📦 Henter detaljert info for aktive repos")
 	allData := fetcher.GetDetailsActiveReposGraphQL(org, token, repos)
-
-	// Lagre detaljert info som JSON
-	if err := fetcher.StoreRepoDetailedJSON("data", org, allData); err != nil {
-		slog.Error("Feil under lagring av repo-dump", "error", err)
-		os.Exit(1)
-	}
 
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
@@ -95,22 +82,10 @@ func main() {
 	}
 	defer db.Close()
 
-	// les inn og parse Json fil.
-	data, err := os.ReadFile("data/navikt_analysis_data.json")
-	if err != nil {
-		slog.Error("Kunne ikke lese JSON", "error", err)
-		os.Exit(1)
-	}
-	var dump dbwriter.Dump
-	if err := json.Unmarshal(data, &dump); err != nil {
-		slog.Error("Kunne ikke parse JSON", "error", err)
-		os.Exit(1)
-	}
-
 	// skriv til postgresql.
-	slog.Info("🚀 Importerer til PostgreSQL", "org", dump.Org, "antall_repos", len(dump.Repos))
+	slog.Info("🚀 Importerer til PostgreSQL", "org", allData.Org, "antall_repos", len(allData.Repos))
 
-	err = dbwriter.ImportToPostgreSQLDB(dump, db)
+	err = dbwriter.ImportToPostgreSQLDB(allData, db)
 	if err != nil {
 		slog.Error("Kunne ikke skrive til DB", "error", err)
 		os.Exit(1)

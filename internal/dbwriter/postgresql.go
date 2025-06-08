@@ -7,29 +7,10 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/jonmartinstorm/reposnusern/internal/models"
 	"github.com/jonmartinstorm/reposnusern/internal/parser"
 	"github.com/jonmartinstorm/reposnusern/internal/storage"
 )
-
-type FileEntry struct {
-	Path    string `json:"path"`
-	Content string `json:"content"`
-}
-
-type RepoEntry struct {
-	Repo      map[string]interface{} `json:"repo"`
-	Languages map[string]int         `json:"languages"`
-	Files     map[string][]FileEntry `json:"files"`
-	CIConfig  []FileEntry            `json:"ci_config"`
-	Readme    string                 `json:"readme"`
-	Security  map[string]bool        `json:"security"`
-	SBOM      map[string]interface{} `json:"sbom"`
-}
-
-type Dump struct {
-	Org   string      `json:"org"`
-	Repos []RepoEntry `json:"repos"`
-}
 
 func SafeString(v interface{}) string {
 	if v == nil {
@@ -57,7 +38,7 @@ func ExtractLicense(r map[string]interface{}) string {
 	return r["license"].(map[string]interface{})["spdx_id"].(string)
 }
 
-func ImportToPostgreSQLDB(dump Dump, db *sql.DB) error {
+func ImportToPostgreSQLDB(dump models.OrgRepos, db *sql.DB) error {
 	ctx := context.Background()
 
 	for i, entry := range dump.Repos {
@@ -78,7 +59,7 @@ func ImportToPostgreSQLDB(dump Dump, db *sql.DB) error {
 	return nil
 }
 
-func importRepo(ctx context.Context, queries *storage.Queries, entry RepoEntry, index int) error {
+func importRepo(ctx context.Context, queries *storage.Queries, entry models.RepoEntry, index int) error {
 	r := entry.Repo
 	id := int64(r["id"].(float64))
 	name := r["full_name"].(string)
@@ -139,7 +120,7 @@ func insertDockerfiles(
 	queries *storage.Queries,
 	repoID int64,
 	name string,
-	files map[string][]FileEntry,
+	files map[string][]models.FileEntry,
 ) {
 	for filetype, fileEntries := range files {
 		if !strings.HasPrefix(strings.ToLower(filetype), "dockerfile") {
@@ -196,7 +177,7 @@ func insertCIConfig(
 	queries *storage.Queries,
 	repoID int64,
 	name string,
-	files []FileEntry,
+	files []models.FileEntry,
 ) {
 	for _, f := range files {
 		if err := queries.InsertCIConfig(ctx, storage.InsertCIConfigParams{

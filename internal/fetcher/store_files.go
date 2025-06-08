@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"os"
 	"path"
+
+	"github.com/jonmartinstorm/reposnusern/internal/models"
 )
 
 func StoreRepoDumpJSON(dir, org string, repos []map[string]interface{}) error {
@@ -27,7 +29,7 @@ func StoreRepoDumpJSON(dir, org string, repos []map[string]interface{}) error {
 	return nil
 }
 
-func StoreRepoDetailedJSON(dir, org string, allData OrgRepos) error {
+func StoreRepoDetailedJSON(dir, org string, allData models.OrgRepos) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("kunne ikke opprette katalog %s: %w", dir, err)
 	}
