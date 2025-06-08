@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -55,21 +54,6 @@ func GetJSONWithRateLimit(url, token string, out interface{}) error {
 
 		return json.NewDecoder(resp.Body).Decode(out)
 	}
-}
-
-func IsDependencyFile(p string) bool {
-	files := []string{
-		"package.json", "pom.xml", "build.gradle", "build.gradle.kts",
-		"go.mod", "cargo.toml", "requirements.txt", "pyproject.toml",
-		"composer.json", ".csproj", "gemfile", "gemfile.lock",
-		"yarn.lock", "pnpm-lock.yaml", "package-lock.json",
-	}
-	for _, f := range files {
-		if strings.HasSuffix(p, f) {
-			return true
-		}
-	}
-	return false
 }
 
 func GetAllRepos(org, token string) []map[string]interface{} {
