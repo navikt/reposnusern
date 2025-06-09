@@ -66,11 +66,21 @@ CREATE TABLE IF NOT EXISTS sbom_github_packages (
 
 CREATE TABLE IF NOT EXISTS dockerfile_features (
     dockerfile_id INTEGER PRIMARY KEY REFERENCES dockerfiles(id),
-    base_image TEXT,              
-    base_tag TEXT,                
+    base_image TEXT,
+    base_tag TEXT,
     uses_latest_tag BOOLEAN,
     has_user_instruction BOOLEAN,
     has_copy_sensitive BOOLEAN,
     has_package_installs BOOLEAN,
-    uses_multistage BOOLEAN
+    uses_multistage BOOLEAN,
+    has_healthcheck BOOLEAN,
+    uses_add_instruction BOOLEAN,
+    has_label_metadata BOOLEAN,
+    has_expose BOOLEAN,
+    has_entrypoint_or_cmd BOOLEAN,
+    installs_curl_or_wget BOOLEAN,
+    installs_build_tools BOOLEAN,
+    has_apt_get_clean BOOLEAN,
+    world_writable BOOLEAN,
+    has_secrets_in_env_or_arg BOOLEAN
 );

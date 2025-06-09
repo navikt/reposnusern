@@ -140,29 +140,24 @@ func insertDockerfiles(
 			features := parser.ParseDockerfile(f.Content)
 
 			err = queries.InsertDockerfileFeatures(ctx, storage.InsertDockerfileFeaturesParams{
-				DockerfileID: dockerfileID,
-				BaseImage:    sql.NullString{String: features.BaseImage, Valid: features.BaseImage != ""},
-				BaseTag:      sql.NullString{String: features.BaseTag, Valid: features.BaseTag != ""},
-				UsesLatestTag: sql.NullBool{
-					Bool:  features.UsesLatestTag,
-					Valid: true,
-				},
-				HasUserInstruction: sql.NullBool{
-					Bool:  features.HasUserInstruction,
-					Valid: true,
-				},
-				HasCopySensitive: sql.NullBool{
-					Bool:  features.HasCopySensitive,
-					Valid: true,
-				},
-				HasPackageInstalls: sql.NullBool{
-					Bool:  features.HasPackageInstalls,
-					Valid: true,
-				},
-				UsesMultistage: sql.NullBool{
-					Bool:  features.UsesMultistage,
-					Valid: true,
-				},
+				DockerfileID:         dockerfileID,
+				BaseImage:            sql.NullString{String: features.BaseImage, Valid: features.BaseImage != ""},
+				BaseTag:              sql.NullString{String: features.BaseTag, Valid: features.BaseTag != ""},
+				UsesLatestTag:        sql.NullBool{Bool: features.UsesLatestTag, Valid: true},
+				HasUserInstruction:   sql.NullBool{Bool: features.HasUserInstruction, Valid: true},
+				HasCopySensitive:     sql.NullBool{Bool: features.HasCopySensitive, Valid: true},
+				HasPackageInstalls:   sql.NullBool{Bool: features.HasPackageInstalls, Valid: true},
+				UsesMultistage:       sql.NullBool{Bool: features.UsesMultistage, Valid: true},
+				HasHealthcheck:       sql.NullBool{Bool: features.HasHealthcheck, Valid: true},
+				UsesAddInstruction:   sql.NullBool{Bool: features.UsesAddInstruction, Valid: true},
+				HasLabelMetadata:     sql.NullBool{Bool: features.HasLabelMetadata, Valid: true},
+				HasExpose:            sql.NullBool{Bool: features.HasExpose, Valid: true},
+				HasEntrypointOrCmd:   sql.NullBool{Bool: features.HasEntrypointOrCmd, Valid: true},
+				InstallsCurlOrWget:   sql.NullBool{Bool: features.InstallsCurlOrWget, Valid: true},
+				InstallsBuildTools:   sql.NullBool{Bool: features.InstallsBuildTools, Valid: true},
+				HasAptGetClean:       sql.NullBool{Bool: features.HasAptGetClean, Valid: true},
+				WorldWritable:        sql.NullBool{Bool: features.WorldWritable, Valid: true},
+				HasSecretsInEnvOrArg: sql.NullBool{Bool: features.HasSecretsInEnvOrArg, Valid: true},
 			})
 			if err != nil {
 				slog.Warn("⚠️ Dockerfile-feature-feil", "repo", name, "fil", f.Path, "error", err)

@@ -24,14 +24,24 @@ type Dockerfile struct {
 }
 
 type DockerfileFeature struct {
-	DockerfileID       int32
-	BaseImage          sql.NullString
-	BaseTag            sql.NullString
-	UsesLatestTag      sql.NullBool
-	HasUserInstruction sql.NullBool
-	HasCopySensitive   sql.NullBool
-	HasPackageInstalls sql.NullBool
-	UsesMultistage     sql.NullBool
+	DockerfileID         int32
+	BaseImage            sql.NullString
+	BaseTag              sql.NullString
+	UsesLatestTag        sql.NullBool
+	HasUserInstruction   sql.NullBool
+	HasCopySensitive     sql.NullBool
+	HasPackageInstalls   sql.NullBool
+	UsesMultistage       sql.NullBool
+	HasHealthcheck       sql.NullBool
+	UsesAddInstruction   sql.NullBool
+	HasLabelMetadata     sql.NullBool
+	HasExpose            sql.NullBool
+	HasEntrypointOrCmd   sql.NullBool
+	InstallsCurlOrWget   sql.NullBool
+	InstallsBuildTools   sql.NullBool
+	HasAptGetClean       sql.NullBool
+	WorldWritable        sql.NullBool
+	HasSecretsInEnvOrArg sql.NullBool
 }
 
 type Readme struct {
