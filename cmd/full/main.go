@@ -13,8 +13,7 @@ import (
 	"time"
 
 	"github.com/jonmartinstorm/reposnusern/internal/config"
-	"github.com/jonmartinstorm/reposnusern/internal/dbwriter"
-	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
+	"github.com/jonmartinstorm/reposnusern/internal/runner"
 	_ "github.com/lib/pq"
 )
 
@@ -36,6 +35,7 @@ func main() {
 		// TODO sende context til dbcall og skriving av filer.
 	}()
 
+	// Last inn env og legg i config.
 	cfg := config.LoadConfig()
 	if err := config.ValidateConfig(cfg); err != nil {
 		log.Fatal(err)
@@ -56,31 +56,12 @@ func main() {
 
 	start := time.Now()
 
-	// Hent repo-liste fra GitHub
-	slog.Info("🔍 Henter oversikt over alle repos")
-	repos := fetcher.GetAllRepos(cfg)
-
-	// Hent detaljer via GraphQL
-	slog.Info("📦 Henter detaljert info for aktive repos")
-	allData := fetcher.GetDetailsActiveReposGraphQL(cfg.Org, cfg.Token, repos)
-
-	db, err := sql.Open("postgres", cfg.PostgresDSN)
+	// Kjør runner
+	err = runner.Run(ctx, cfg)
 	if err != nil {
-		slog.Error("Kunne ikke åpne DB-forbindelse", "error", err)
+		slog.Error("Runner feilet", "error", err)
 		os.Exit(1)
 	}
-	defer db.Close()
-
-	// skriv til postgresql.
-	slog.Info("🚀 Importerer til PostgreSQL", "org", allData.Org, "antall_repos", len(allData.Repos))
-
-	err = dbwriter.ImportToPostgreSQLDB(allData, db)
-	if err != nil {
-		slog.Error("Kunne ikke skrive til DB", "error", err)
-		os.Exit(1)
-	}
-
-	slog.Info("✅ Ferdig importert!")
 
 	logMemoryStats()
 
