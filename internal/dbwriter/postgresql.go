@@ -5,109 +5,83 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"runtime"
 	"strings"
 
+	"github.com/jonmartinstorm/reposnusern/internal/models"
 	"github.com/jonmartinstorm/reposnusern/internal/parser"
 	"github.com/jonmartinstorm/reposnusern/internal/storage"
 )
 
-type FileEntry struct {
-	Path    string `json:"path"`
-	Content string `json:"content"`
+func safeLicense(lic *struct{ SpdxID string }) string {
+	if lic == nil {
+		return ""
+	}
+	return lic.SpdxID
 }
 
-type RepoEntry struct {
-	Repo      map[string]interface{} `json:"repo"`
-	Languages map[string]int         `json:"languages"`
-	Files     map[string][]FileEntry `json:"files"`
-	CIConfig  []FileEntry            `json:"ci_config"`
-	Readme    string                 `json:"readme"`
-	Security  map[string]bool        `json:"security"`
-	SBOM      map[string]interface{} `json:"sbom"`
-}
-
-type Dump struct {
-	Org   string      `json:"org"`
-	Repos []RepoEntry `json:"repos"`
-}
-
-func SafeString(v interface{}) string {
+func safeString(v interface{}) string {
 	if v == nil {
 		return ""
 	}
 	return v.(string)
 }
 
-func JoinStrings(arr interface{}) string {
-	if arr == nil {
-		return ""
-	}
-	raw := arr.([]interface{})
-	out := make([]string, 0, len(raw))
-	for _, v := range raw {
-		out = append(out, v.(string))
-	}
-	return strings.Join(out, ",")
-}
-
-func ExtractLicense(r map[string]interface{}) string {
-	if r["license"] == nil {
-		return ""
-	}
-	return r["license"].(map[string]interface{})["spdx_id"].(string)
-}
-
-func ImportToPostgreSQLDB(dump Dump, db *sql.DB) error {
+func ImportToPostgreSQLDB(dump models.OrgRepos, db *sql.DB) error {
 	ctx := context.Background()
 
 	for i, entry := range dump.Repos {
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("start tx: %w", err)
-		}
 
-		queries := storage.New(tx)
-		if err := importRepo(ctx, queries, entry, i); err != nil {
-			tx.Rollback()
+		if err := ImportRepo(ctx, db, entry, i); err != nil {
+
 			return fmt.Errorf("import repo: %w", err)
 		}
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit failed: %w", err)
+
+		if i%25 == 0 {
+			runtime.GC()
 		}
 	}
 	return nil
 }
 
-func importRepo(ctx context.Context, queries *storage.Queries, entry RepoEntry, index int) error {
+func ImportRepo(ctx context.Context, db *sql.DB, entry models.RepoEntry, index int) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("start tx: %w", err)
+	}
+
+	queries := storage.New(tx)
+
 	r := entry.Repo
-	id := int64(r["id"].(float64))
-	name := r["full_name"].(string)
-	slog.Info("⏳ Behandler repo", "nummer", index+1, "navn", name)
+	id := int64(r.ID)
+	name := r.FullName
 
 	repo := storage.InsertRepoParams{
 		ID:           id,
-		Name:         r["name"].(string),
+		Name:         r.Name,
 		FullName:     name,
-		Description:  SafeString(r["description"]),
-		Stars:        int64(r["stargazers_count"].(float64)),
-		Forks:        int64(r["forks_count"].(float64)),
-		Archived:     r["archived"].(bool),
-		Private:      r["private"].(bool),
-		IsFork:       r["fork"].(bool),
-		Language:     SafeString(r["language"]),
-		SizeMb:       float32(r["size"].(float64)) / 1024.0,
-		UpdatedAt:    r["updated_at"].(string),
-		PushedAt:     r["pushed_at"].(string),
-		CreatedAt:    r["created_at"].(string),
-		HtmlUrl:      r["html_url"].(string),
-		Topics:       JoinStrings(r["topics"]),
-		Visibility:   r["visibility"].(string),
-		License:      ExtractLicense(r),
-		OpenIssues:   int64(r["open_issues_count"].(float64)),
-		LanguagesUrl: r["languages_url"].(string),
+		Description:  r.Description,
+		Stars:        r.Stars,
+		Forks:        r.Forks,
+		Archived:     r.Archived,
+		Private:      r.Private,
+		IsFork:       r.IsFork,
+		Language:     r.Language,
+		SizeMb:       float32(r.Size) / 1024.0,
+		UpdatedAt:    r.UpdatedAt,
+		PushedAt:     r.PushedAt,
+		CreatedAt:    r.CreatedAt,
+		HtmlUrl:      r.HtmlUrl,
+		Topics:       strings.Join(r.Topics, ","),
+		Visibility:   r.Visibility,
+		License:      safeLicense((*struct{ SpdxID string })(r.License)),
+		OpenIssues:   r.OpenIssues,
+		LanguagesUrl: r.LanguagesURL,
 	}
+
 	if err := queries.InsertRepo(ctx, repo); err != nil {
-		slog.Error("🚨 Feil ved InsertRepo – avbryter import", "repo", name, "error", err)
+		tx.Rollback()
+		slog.Error("🚨 Feil ved InsertRepo – ruller tilbake", "repo", name, "error", err)
 		return fmt.Errorf("insert repo failed: %w", err)
 	}
 
@@ -117,6 +91,11 @@ func importRepo(ctx context.Context, queries *storage.Queries, entry RepoEntry, 
 	insertReadme(ctx, queries, id, name, entry.Readme)
 	insertSecurityFeatures(ctx, queries, id, name, entry.Security)
 	insertSBOMPackagesGithub(ctx, queries, id, name, entry.SBOM)
+
+	if err := tx.Commit(); err != nil {
+		slog.Error("🚨 Commit-feil – ruller tilbake", "repo", name, "error", err)
+		return fmt.Errorf("commit failed: %w", err)
+	}
 
 	return nil
 }
@@ -139,7 +118,7 @@ func insertDockerfiles(
 	queries *storage.Queries,
 	repoID int64,
 	name string,
-	files map[string][]FileEntry,
+	files map[string][]models.FileEntry,
 ) {
 	for filetype, fileEntries := range files {
 		if !strings.HasPrefix(strings.ToLower(filetype), "dockerfile") {
@@ -160,29 +139,24 @@ func insertDockerfiles(
 			features := parser.ParseDockerfile(f.Content)
 
 			err = queries.InsertDockerfileFeatures(ctx, storage.InsertDockerfileFeaturesParams{
-				DockerfileID: dockerfileID,
-				BaseImage:    sql.NullString{String: features.BaseImage, Valid: features.BaseImage != ""},
-				BaseTag:      sql.NullString{String: features.BaseTag, Valid: features.BaseTag != ""},
-				UsesLatestTag: sql.NullBool{
-					Bool:  features.UsesLatestTag,
-					Valid: true,
-				},
-				HasUserInstruction: sql.NullBool{
-					Bool:  features.HasUserInstruction,
-					Valid: true,
-				},
-				HasCopySensitive: sql.NullBool{
-					Bool:  features.HasCopySensitive,
-					Valid: true,
-				},
-				HasPackageInstalls: sql.NullBool{
-					Bool:  features.HasPackageInstalls,
-					Valid: true,
-				},
-				UsesMultistage: sql.NullBool{
-					Bool:  features.UsesMultistage,
-					Valid: true,
-				},
+				DockerfileID:         dockerfileID,
+				BaseImage:            sql.NullString{String: features.BaseImage, Valid: features.BaseImage != ""},
+				BaseTag:              sql.NullString{String: features.BaseTag, Valid: features.BaseTag != ""},
+				UsesLatestTag:        sql.NullBool{Bool: features.UsesLatestTag, Valid: true},
+				HasUserInstruction:   sql.NullBool{Bool: features.HasUserInstruction, Valid: true},
+				HasCopySensitive:     sql.NullBool{Bool: features.HasCopySensitive, Valid: true},
+				HasPackageInstalls:   sql.NullBool{Bool: features.HasPackageInstalls, Valid: true},
+				UsesMultistage:       sql.NullBool{Bool: features.UsesMultistage, Valid: true},
+				HasHealthcheck:       sql.NullBool{Bool: features.HasHealthcheck, Valid: true},
+				UsesAddInstruction:   sql.NullBool{Bool: features.UsesAddInstruction, Valid: true},
+				HasLabelMetadata:     sql.NullBool{Bool: features.HasLabelMetadata, Valid: true},
+				HasExpose:            sql.NullBool{Bool: features.HasExpose, Valid: true},
+				HasEntrypointOrCmd:   sql.NullBool{Bool: features.HasEntrypointOrCmd, Valid: true},
+				InstallsCurlOrWget:   sql.NullBool{Bool: features.InstallsCurlOrWget, Valid: true},
+				InstallsBuildTools:   sql.NullBool{Bool: features.InstallsBuildTools, Valid: true},
+				HasAptGetClean:       sql.NullBool{Bool: features.HasAptGetClean, Valid: true},
+				WorldWritable:        sql.NullBool{Bool: features.WorldWritable, Valid: true},
+				HasSecretsInEnvOrArg: sql.NullBool{Bool: features.HasSecretsInEnvOrArg, Valid: true},
 			})
 			if err != nil {
 				slog.Warn("⚠️ Dockerfile-feature-feil", "repo", name, "fil", f.Path, "error", err)
@@ -196,7 +170,7 @@ func insertCIConfig(
 	queries *storage.Queries,
 	repoID int64,
 	name string,
-	files []FileEntry,
+	files []models.FileEntry,
 ) {
 	for _, f := range files {
 		if err := queries.InsertCIConfig(ctx, storage.InsertCIConfigParams{
@@ -274,9 +248,9 @@ func insertSBOMPackagesGithub(
 			continue
 		}
 
-		nameVal := SafeString(pkg["name"])
-		version := SafeString(pkg["versionInfo"])
-		license := SafeString(pkg["licenseConcluded"])
+		nameVal := safeString(pkg["name"])
+		version := safeString(pkg["versionInfo"])
+		license := safeString(pkg["licenseConcluded"])
 
 		// Prøv å hente ut PURL (Package URL) fra externalRefs
 		var purl string
@@ -287,7 +261,7 @@ func insertSBOMPackagesGithub(
 					continue
 				}
 				if refMap["referenceType"] == "purl" {
-					purl = SafeString(refMap["referenceLocator"])
+					purl = safeString(refMap["referenceLocator"])
 					break
 				}
 			}

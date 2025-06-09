@@ -7,17 +7,19 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+
+	"github.com/jonmartinstorm/reposnusern/internal/models"
 )
 
-func GetDetailsActiveReposGraphQL(org, token string, repos []map[string]interface{}) OrgRepos {
-	allData := OrgRepos{
+func GetDetailsActiveReposGraphQL(org, token string, repos []models.RepoMeta) models.OrgRepos {
+	allData := models.OrgRepos{
 		Org:   org,
-		Repos: []map[string]interface{}{},
+		Repos: []models.RepoEntry{},
 	}
 
 	for i, r := range repos {
-		fullName := r["full_name"].(string)
-		if r["archived"].(bool) {
+		fullName := r.FullName
+		if r.Archived {
 			continue
 		}
 		slog.Info("Bearbeider repo (GraphQL)", "index", i+1, "total", len(repos), "repo", fullName)
@@ -26,29 +28,17 @@ func GetDetailsActiveReposGraphQL(org, token string, repos []map[string]interfac
 		owner, name := parts[0], parts[1]
 
 		// Hent metadata via GraphQL
-		data := FetchRepoGraphQL(owner, name, token)
+		data := FetchRepoGraphQL(owner, name, token, r)
 		if data == nil {
-			slog.Warn("Hoppet over repo pga. tomt GraphQL-svar", "repo", fullName)
+			slog.Warn("Hoppet over repo", "repo", fullName)
 			continue
 		}
-
-		// Strukturér resultatet
-		result := map[string]interface{}{
-			"repo":      r,
-			"languages": data["languages"],
-			"files":     data["files"],
-			"security":  data["security"],
-			"ci_config": data["ci_config"],
-			"readme":    data["readme"],
-			"sbom":      data["sbom"],
-		}
-
-		allData.Repos = append(allData.Repos, result)
+		allData.Repos = append(allData.Repos, *data)
 	}
 	return allData
 }
 
-func FetchRepoGraphQL(owner, name, token string) map[string]interface{} {
+func FetchRepoGraphQL(owner, name, token string, baseRepo models.RepoMeta) *models.RepoEntry {
 	query := fmt.Sprintf(`
 	{
 		repository(owner: "%s", name: "%s") {
@@ -245,13 +235,15 @@ func FetchRepoGraphQL(owner, name, token string) map[string]interface{} {
 	}
 
 	sbom := FetchSBOM(owner, name, token)
-	return map[string]interface{}{
-		"languages": langs,
-		"files":     files,
-		"ci_config": ci,
-		"security":  security,
-		"readme":    readme,
-		"sbom":      sbom,
+
+	return &models.RepoEntry{
+		Repo:      baseRepo,
+		Languages: langs,
+		Files:     convertFiles(files),
+		CIConfig:  convertToFileEntries(ci),
+		Readme:    readme,
+		Security:  security,
+		SBOM:      sbom,
 	}
 }
 
@@ -279,4 +271,23 @@ func FetchSBOM(owner, repo, token string) map[string]interface{} {
 		return nil
 	}
 	return sbom
+}
+
+func convertToFileEntries(entries []map[string]string) []models.FileEntry {
+	var result []models.FileEntry
+	for _, e := range entries {
+		result = append(result, models.FileEntry{
+			Path:    e["path"],
+			Content: e["content"],
+		})
+	}
+	return result
+}
+
+func convertFiles(input map[string][]map[string]string) map[string][]models.FileEntry {
+	out := map[string][]models.FileEntry{}
+	for k, v := range input {
+		out[k] = convertToFileEntries(v)
+	}
+	return out
 }

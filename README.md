@@ -71,12 +71,14 @@ podman run --rm \
   -e GITHUB_TOKEN=ghp_dintokenher \
   -e POSTGRES_DSN="postgres://<bruker>:<passord>@<fqdn>:5432/reposnusern?sslmode=require" \
   -e REPOSNUSERDEBUG=true \
+  -e REPOSNUSERARCHIVE=false \
   -v "$PWD/data":/data \
   reposnusnern
 
 ```
 
 REPOSNUSERDEBUG=true gjør at maks 10 repos blir hentet, for å teste ut uten å spamme github apiet.
+REPOSNUSERARCHIVE=true vil sette at arkiverte repos også blir hentet, ellers blir kun aktive hentet.
 
 Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. Koden håndterer dette automatisk ved å pause og fortsette når grensen er nådd.
 
@@ -87,10 +89,13 @@ Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. 
 - [x] 🔐 Hindre at passord og secrets utilsiktet havner i logger
 - [x] ✅ Legge til noen enkle tester (det var jo bare en PoC 😅)
 - [x] 🧹 Refaktorering og deling av logikk
+- [ ] Bedre logging
 - [ ] ☁️ Gjøre klart for K8s-deploy (config, secrets, jobs)
 - [ ] Sørge for at GraphQL versjonen også parser lenger ned enn toppnivå mappen.
 - [ ] Vurdere om sbom direkte har fjernet behovet for dependency files
 - [ ] Optimalisering
+  - [ ] Lage en bulk insert til db for relevante objekter
+  - [ ] Fortsette å optimalisere på minne
 - [ ] Forbedre dockerfile features parseren for mer info
 - [ ] Oppdatere schema så vi tar vare på dato vi har hentet informasjonen fra. (Så vi kan ta vare på trenden.)
 
@@ -102,8 +107,8 @@ Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. 
 Med ca 1600 repos:
 
 ```
-{"time":"2025-06-08T05:36:56.224416798Z","level":"INFO","msg":"📊 Minnebruk","alloc":"1.3 GiB","totalAlloc":"9.2 GiB","sys":"4.7 GiB","numGC":38}
-{"time":"2025-06-08T05:36:56.224425548Z","level":"INFO","msg":"✅ Ferdig!","varighet":"38m42.752306706s"}
+{"time":"2025-06-09T19:40:24.731770893Z","level":"INFO","msg":"📊 Minnebruk","alloc":"1.1 GiB","totalAlloc":"3.6 GiB","sys":"1.4 GiB","numGC":38}
+{"time":"2025-06-09T19:40:24.73178756Z","level":"INFO","msg":"✅ Ferdig!","varighet":"42m47.74474624s"}
 ```
 
 ## 🤖 Erklæring om bruk av generativ KI

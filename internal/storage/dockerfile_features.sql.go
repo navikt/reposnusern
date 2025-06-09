@@ -12,20 +12,49 @@ import (
 
 const insertDockerfileFeatures = `-- name: InsertDockerfileFeatures :exec
 INSERT INTO dockerfile_features (
-  dockerfile_id, base_image, base_tag, uses_latest_tag,
-  has_user_instruction, has_copy_sensitive, has_package_installs, uses_multistage
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+  dockerfile_id,
+  base_image,
+  base_tag,
+  uses_latest_tag,
+  has_user_instruction,
+  has_copy_sensitive,
+  has_package_installs,
+  uses_multistage,
+  has_healthcheck,
+  uses_add_instruction,
+  has_label_metadata,
+  has_expose,
+  has_entrypoint_or_cmd,
+  installs_curl_or_wget,
+  installs_build_tools,
+  has_apt_get_clean,
+  world_writable,
+  has_secrets_in_env_or_arg
+) VALUES (
+  $1, $2, $3, $4, $5, $6, $7, $8,
+  $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+)
 `
 
 type InsertDockerfileFeaturesParams struct {
-	DockerfileID       int32
-	BaseImage          sql.NullString
-	BaseTag            sql.NullString
-	UsesLatestTag      sql.NullBool
-	HasUserInstruction sql.NullBool
-	HasCopySensitive   sql.NullBool
-	HasPackageInstalls sql.NullBool
-	UsesMultistage     sql.NullBool
+	DockerfileID         int32
+	BaseImage            sql.NullString
+	BaseTag              sql.NullString
+	UsesLatestTag        sql.NullBool
+	HasUserInstruction   sql.NullBool
+	HasCopySensitive     sql.NullBool
+	HasPackageInstalls   sql.NullBool
+	UsesMultistage       sql.NullBool
+	HasHealthcheck       sql.NullBool
+	UsesAddInstruction   sql.NullBool
+	HasLabelMetadata     sql.NullBool
+	HasExpose            sql.NullBool
+	HasEntrypointOrCmd   sql.NullBool
+	InstallsCurlOrWget   sql.NullBool
+	InstallsBuildTools   sql.NullBool
+	HasAptGetClean       sql.NullBool
+	WorldWritable        sql.NullBool
+	HasSecretsInEnvOrArg sql.NullBool
 }
 
 func (q *Queries) InsertDockerfileFeatures(ctx context.Context, arg InsertDockerfileFeaturesParams) error {
@@ -38,6 +67,16 @@ func (q *Queries) InsertDockerfileFeatures(ctx context.Context, arg InsertDocker
 		arg.HasCopySensitive,
 		arg.HasPackageInstalls,
 		arg.UsesMultistage,
+		arg.HasHealthcheck,
+		arg.UsesAddInstruction,
+		arg.HasLabelMetadata,
+		arg.HasExpose,
+		arg.HasEntrypointOrCmd,
+		arg.InstallsCurlOrWget,
+		arg.InstallsBuildTools,
+		arg.HasAptGetClean,
+		arg.WorldWritable,
+		arg.HasSecretsInEnvOrArg,
 	)
 	return err
 }

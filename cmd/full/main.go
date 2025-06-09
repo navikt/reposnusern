@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
+	"log"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jonmartinstorm/reposnusern/internal/dbwriter"
-	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
+	"github.com/jonmartinstorm/reposnusern/internal/config"
+	"github.com/jonmartinstorm/reposnusern/internal/runner"
 	_ "github.com/lib/pq"
 )
 
@@ -35,26 +35,18 @@ func main() {
 		// TODO sende context til dbcall og skriving av filer.
 	}()
 
-	org := os.Getenv("ORG")
-	if org == "" {
-		slog.Error("Du må angi organisasjon via ORG=<orgnavn>")
-		os.Exit(1)
+	// Last inn env og legg i config.
+	cfg := config.LoadConfig()
+	if err := config.ValidateConfig(cfg); err != nil {
+		log.Fatal(err)
 	}
 
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		slog.Error("Mangler GITHUB_TOKEN i environment")
-		os.Exit(1)
-	}
-
-	dsn := os.Getenv("POSTGRES_DSN")
-	if dsn == "" {
-		slog.Error("❌ POSTGRES_DSN ikke satt")
-		os.Exit(1)
+	if !cfg.SkipArchived {
+		slog.Info("📦 Inkluderer arkiverte repositories")
 	}
 
 	// Test tidlig
-	testDB, err := sql.Open("postgres", dsn)
+	testDB, err := sql.Open("postgres", cfg.PostgresDSN)
 	if err != nil {
 		slog.Error("Kunne ikke åpne DB-forbindelse", "error", err)
 		os.Exit(1)
@@ -68,55 +60,12 @@ func main() {
 
 	start := time.Now()
 
-	// Hent repo-liste fra GitHub
-	slog.Info("🔍 Henter oversikt over alle repos")
-	repos := fetcher.GetAllRepos(org, token)
-
-	// Lagre oversikt som JSON
-	if err := fetcher.StoreRepoDumpJSON("data", org, repos); err != nil {
-		slog.Error("Feil under lagring av repo-dump", "error", err)
-		os.Exit(1)
-	}
-
-	// Hent detaljer via GraphQL
-	slog.Info("📦 Henter detaljert info for aktive repos")
-	allData := fetcher.GetDetailsActiveReposGraphQL(org, token, repos)
-
-	// Lagre detaljert info som JSON
-	if err := fetcher.StoreRepoDetailedJSON("data", org, allData); err != nil {
-		slog.Error("Feil under lagring av repo-dump", "error", err)
-		os.Exit(1)
-	}
-
-	db, err := sql.Open("postgres", dsn)
+	// Kjør runner
+	err = runner.Run(ctx, cfg)
 	if err != nil {
-		slog.Error("Kunne ikke åpne DB-forbindelse", "error", err)
+		slog.Error("Runner feilet", "error", err)
 		os.Exit(1)
 	}
-	defer db.Close()
-
-	// les inn og parse Json fil.
-	data, err := os.ReadFile("data/navikt_analysis_data.json")
-	if err != nil {
-		slog.Error("Kunne ikke lese JSON", "error", err)
-		os.Exit(1)
-	}
-	var dump dbwriter.Dump
-	if err := json.Unmarshal(data, &dump); err != nil {
-		slog.Error("Kunne ikke parse JSON", "error", err)
-		os.Exit(1)
-	}
-
-	// skriv til postgresql.
-	slog.Info("🚀 Importerer til PostgreSQL", "org", dump.Org, "antall_repos", len(dump.Repos))
-
-	err = dbwriter.ImportToPostgreSQLDB(dump, db)
-	if err != nil {
-		slog.Error("Kunne ikke skrive til DB", "error", err)
-		os.Exit(1)
-	}
-
-	slog.Info("✅ Ferdig importert!")
 
 	logMemoryStats()
 
