@@ -6,18 +6,20 @@ import (
 )
 
 type Config struct {
-	Org         string
-	Token       string
-	PostgresDSN string
-	Debug       bool
+	Org          string
+	Token        string
+	PostgresDSN  string
+	Debug        bool
+	SkipArchived bool
 }
 
 func LoadConfig() Config {
 	return Config{
-		Org:         os.Getenv("ORG"),
-		Token:       os.Getenv("GITHUB_TOKEN"),
-		PostgresDSN: os.Getenv("POSTGRES_DSN"),
-		Debug:       os.Getenv("REPOSNUSERDEBUG") == "true",
+		Org:          os.Getenv("ORG"),
+		Token:        os.Getenv("GITHUB_TOKEN"),
+		PostgresDSN:  os.Getenv("POSTGRES_DSN"),
+		Debug:        os.Getenv("REPOSNUSERDEBUG") == "true",
+		SkipArchived: os.Getenv("REPOSNUSERARCHIVED") != "true",
 	}
 }
 

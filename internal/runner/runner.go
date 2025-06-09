@@ -24,7 +24,6 @@ func Run(ctx context.Context, cfg config.Config) error {
 	}
 	defer db.Close()
 
-	// 💡 Viktig for langvarig import
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(10 * time.Minute)
@@ -42,9 +41,14 @@ func Run(ctx context.Context, cfg config.Config) error {
 		}
 
 		for _, repo := range repos {
-			repoIndex++
+			if cfg.SkipArchived && repo.Archived {
+				if cfg.Debug {
+					slog.Info("⏭️ Skipper arkivert repo", "repo", repo.FullName)
+				}
+				continue
+			}
 
-			if cfg.Debug && repoIndex > MaxDebugRepos {
+			if cfg.Debug && repoIndex >= MaxDebugRepos {
 				slog.Info("🛑 Debug-modus: stopper etter 10 repoer")
 				return nil
 			}
@@ -56,20 +60,22 @@ func Run(ctx context.Context, cfg config.Config) error {
 				continue
 			}
 
+			repoIndex++
+			slog.Info("⏳ Behandler repo", "nummer", repoIndex, "navn", repo.FullName)
+
 			if err := dbwriter.ImportRepo(ctx, db, *entry, repoIndex); err != nil {
 				return fmt.Errorf("import repo: %w", err)
 			}
 
 			entry = nil
-			// 💧 Memory flush hint
 			if repoIndex%25 == 0 {
 				runtime.GC()
 			}
-
 		}
 
 		page++
 	}
+
 	slog.Info("✅ Ferdig med alle repos!")
 	return nil
 }

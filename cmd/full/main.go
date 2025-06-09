@@ -41,6 +41,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if !cfg.SkipArchived {
+		slog.Info("📦 Inkluderer arkiverte repositories")
+	}
+
 	// Test tidlig
 	testDB, err := sql.Open("postgres", cfg.PostgresDSN)
 	if err != nil {

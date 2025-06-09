@@ -55,7 +55,6 @@ func ImportRepo(ctx context.Context, db *sql.DB, entry models.RepoEntry, index i
 	r := entry.Repo
 	id := int64(r.ID)
 	name := r.FullName
-	slog.Info("⏳ Behandler repo", "nummer", index+1, "navn", name)
 
 	repo := storage.InsertRepoParams{
 		ID:           id,

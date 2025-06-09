@@ -71,12 +71,14 @@ podman run --rm \
   -e GITHUB_TOKEN=ghp_dintokenher \
   -e POSTGRES_DSN="postgres://<bruker>:<passord>@<fqdn>:5432/reposnusern?sslmode=require" \
   -e REPOSNUSERDEBUG=true \
+  -e REPOSNUSERARCHIVE=false \
   -v "$PWD/data":/data \
   reposnusnern
 
 ```
 
 REPOSNUSERDEBUG=true gjør at maks 10 repos blir hentet, for å teste ut uten å spamme github apiet.
+REPOSNUSERARCHIVE=true vil sette at arkiverte repos også blir hentet, ellers blir kun aktive hentet.
 
 Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. Koden håndterer dette automatisk ved å pause og fortsette når grensen er nådd.
 
@@ -91,6 +93,8 @@ Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. 
 - [ ] Sørge for at GraphQL versjonen også parser lenger ned enn toppnivå mappen.
 - [ ] Vurdere om sbom direkte har fjernet behovet for dependency files
 - [ ] Optimalisering
+  - [ ] Lage en bulk insert til db for relevante objekter
+  - [ ] Fortsette å optimalisere på minne
 - [ ] Forbedre dockerfile features parseren for mer info
 - [ ] Oppdatere schema så vi tar vare på dato vi har hentet informasjonen fra. (Så vi kan ta vare på trenden.)
 
