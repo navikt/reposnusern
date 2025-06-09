@@ -45,7 +45,6 @@ func ImportToPostgreSQLDB(dump models.OrgRepos, db *sql.DB) error {
 			return fmt.Errorf("commit failed: %w", err)
 		}
 
-		entry = models.RepoEntry{}
 		if i%25 == 0 {
 			runtime.GC()
 		}
