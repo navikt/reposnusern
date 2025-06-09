@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"math/rand/v2"
 	"net/http"
 	"strconv"
 	"time"
@@ -60,13 +59,6 @@ func GetRepoPage(cfg config.Config, page int) ([]models.RepoMeta, error) {
 	err := GetJSONWithRateLimit(url, cfg.Token, &pageRepos)
 	if err != nil {
 		return nil, err
-	}
-
-	if cfg.Debug {
-		rand.Shuffle(len(pageRepos), func(i, j int) {
-			pageRepos[i], pageRepos[j] = pageRepos[j], pageRepos[i]
-		})
-		return pageRepos[:min(10, len(pageRepos))], nil
 	}
 
 	return pageRepos, nil
