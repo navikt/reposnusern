@@ -31,18 +31,10 @@ func ImportToPostgreSQLDB(dump models.OrgRepos, db *sql.DB) error {
 	ctx := context.Background()
 
 	for i, entry := range dump.Repos {
-		tx, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("start tx: %w", err)
-		}
 
-		queries := storage.New(tx)
-		if err := importRepo(ctx, queries, entry, i); err != nil {
-			tx.Rollback()
+		if err := ImportRepo(ctx, db, entry, i); err != nil {
+
 			return fmt.Errorf("import repo: %w", err)
-		}
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("commit failed: %w", err)
 		}
 
 		if i%25 == 0 {
@@ -52,7 +44,14 @@ func ImportToPostgreSQLDB(dump models.OrgRepos, db *sql.DB) error {
 	return nil
 }
 
-func importRepo(ctx context.Context, queries *storage.Queries, entry models.RepoEntry, index int) error {
+func ImportRepo(ctx context.Context, db *sql.DB, entry models.RepoEntry, index int) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("start tx: %w", err)
+	}
+
+	queries := storage.New(tx)
+
 	r := entry.Repo
 	id := int64(r.ID)
 	name := r.FullName
@@ -80,8 +79,10 @@ func importRepo(ctx context.Context, queries *storage.Queries, entry models.Repo
 		OpenIssues:   r.OpenIssues,
 		LanguagesUrl: r.LanguagesURL,
 	}
+
 	if err := queries.InsertRepo(ctx, repo); err != nil {
-		slog.Error("🚨 Feil ved InsertRepo – avbryter import", "repo", name, "error", err)
+		tx.Rollback()
+		slog.Error("🚨 Feil ved InsertRepo – ruller tilbake", "repo", name, "error", err)
 		return fmt.Errorf("insert repo failed: %w", err)
 	}
 
@@ -91,6 +92,11 @@ func importRepo(ctx context.Context, queries *storage.Queries, entry models.Repo
 	insertReadme(ctx, queries, id, name, entry.Readme)
 	insertSecurityFeatures(ctx, queries, id, name, entry.Security)
 	insertSBOMPackagesGithub(ctx, queries, id, name, entry.SBOM)
+
+	if err := tx.Commit(); err != nil {
+		slog.Error("🚨 Commit-feil – ruller tilbake", "repo", name, "error", err)
+		return fmt.Errorf("commit failed: %w", err)
+	}
 
 	return nil
 }
