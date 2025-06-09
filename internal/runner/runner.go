@@ -60,6 +60,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 				return fmt.Errorf("import repo: %w", err)
 			}
 
+			entry = nil
 			// 💧 Memory flush hint
 			if repoIndex%25 == 0 {
 				runtime.GC()
