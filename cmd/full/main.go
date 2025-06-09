@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -11,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jonmartinstorm/reposnusern/internal/config"
 	"github.com/jonmartinstorm/reposnusern/internal/dbwriter"
 	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
 	_ "github.com/lib/pq"
@@ -34,26 +36,13 @@ func main() {
 		// TODO sende context til dbcall og skriving av filer.
 	}()
 
-	org := os.Getenv("ORG")
-	if org == "" {
-		slog.Error("Du må angi organisasjon via ORG=<orgnavn>")
-		os.Exit(1)
-	}
-
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		slog.Error("Mangler GITHUB_TOKEN i environment")
-		os.Exit(1)
-	}
-
-	dsn := os.Getenv("POSTGRES_DSN")
-	if dsn == "" {
-		slog.Error("❌ POSTGRES_DSN ikke satt")
-		os.Exit(1)
+	cfg := config.LoadConfig()
+	if err := config.ValidateConfig(cfg); err != nil {
+		log.Fatal(err)
 	}
 
 	// Test tidlig
-	testDB, err := sql.Open("postgres", dsn)
+	testDB, err := sql.Open("postgres", cfg.PostgresDSN)
 	if err != nil {
 		slog.Error("Kunne ikke åpne DB-forbindelse", "error", err)
 		os.Exit(1)
@@ -69,13 +58,13 @@ func main() {
 
 	// Hent repo-liste fra GitHub
 	slog.Info("🔍 Henter oversikt over alle repos")
-	repos := fetcher.GetAllRepos(org, token)
+	repos := fetcher.GetAllRepos(cfg)
 
 	// Hent detaljer via GraphQL
 	slog.Info("📦 Henter detaljert info for aktive repos")
-	allData := fetcher.GetDetailsActiveReposGraphQL(org, token, repos)
+	allData := fetcher.GetDetailsActiveReposGraphQL(cfg.Org, cfg.Token, repos)
 
-	db, err := sql.Open("postgres", dsn)
+	db, err := sql.Open("postgres", cfg.PostgresDSN)
 	if err != nil {
 		slog.Error("Kunne ikke åpne DB-forbindelse", "error", err)
 		os.Exit(1)
@@ -83,7 +72,7 @@ func main() {
 	defer db.Close()
 
 	// skriv til postgresql.
-	slog.Info("🚀 Importerer til PostgreSQL", "org", allData.Org, "antall_repos", len(allData.Repos))
+	slog.Info("🚀 Importerer til PostgreSQL", "cfg.Org", allData.Org, "antall_repos", len(allData.Repos))
 
 	err = dbwriter.ImportToPostgreSQLDB(allData, db)
 	if err != nil {

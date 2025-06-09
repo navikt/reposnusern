@@ -10,6 +10,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/jonmartinstorm/reposnusern/internal/config"
 )
 
 type TreeFile struct {
@@ -51,16 +53,15 @@ func GetJSONWithRateLimit(url, token string, out interface{}) error {
 	}
 }
 
-func GetAllRepos(org, token string) []map[string]interface{} {
-	debug := os.Getenv("REPOSNUSERDEBUG") == "true"
+func GetAllRepos(cfg config.Config) []map[string]interface{} {
 	repos := []map[string]interface{}{}
 	page := 1
 
 	for {
-		url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&type=all&page=%d", org, page)
+		url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&type=all&page=%d", cfg.Org, page)
 		var pageRepos []map[string]interface{}
 		slog.Info("Henter repos", "page", page)
-		err := GetJSONWithRateLimit(url, token, &pageRepos)
+		err := GetJSONWithRateLimit(url, cfg.Token, &pageRepos)
 		if err != nil {
 			slog.Error("Kunne ikke hente repo-metadata", "error", err)
 			os.Exit(1)
@@ -69,7 +70,7 @@ func GetAllRepos(org, token string) []map[string]interface{} {
 			break
 		}
 
-		if debug {
+		if cfg.Debug {
 			// Shuffle og velg 3 tilfeldig
 			rand.Shuffle(len(pageRepos), func(i, j int) {
 				pageRepos[i], pageRepos[j] = pageRepos[j], pageRepos[i]

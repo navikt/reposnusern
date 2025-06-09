@@ -17,7 +17,7 @@ func LoadConfig() Config {
 		Org:         os.Getenv("ORG"),
 		Token:       os.Getenv("GITHUB_TOKEN"),
 		PostgresDSN: os.Getenv("POSTGRES_DSN"),
-		Debug:       os.Getenv("REPOSNUSERDEBUG") == "false",
+		Debug:       os.Getenv("REPOSNUSERDEBUG") == "true",
 	}
 }
 
