@@ -13,30 +13,18 @@ import (
 	"github.com/jonmartinstorm/reposnusern/internal/storage"
 )
 
-func SafeString(v interface{}) string {
+func safeLicense(lic *struct{ SpdxID string }) string {
+	if lic == nil {
+		return ""
+	}
+	return lic.SpdxID
+}
+
+func safeString(v interface{}) string {
 	if v == nil {
 		return ""
 	}
 	return v.(string)
-}
-
-func JoinStrings(arr interface{}) string {
-	if arr == nil {
-		return ""
-	}
-	raw := arr.([]interface{})
-	out := make([]string, 0, len(raw))
-	for _, v := range raw {
-		out = append(out, v.(string))
-	}
-	return strings.Join(out, ",")
-}
-
-func ExtractLicense(r map[string]interface{}) string {
-	if r["license"] == nil {
-		return ""
-	}
-	return r["license"].(map[string]interface{})["spdx_id"].(string)
 }
 
 func ImportToPostgreSQLDB(dump models.OrgRepos, db *sql.DB) error {
@@ -67,31 +55,31 @@ func ImportToPostgreSQLDB(dump models.OrgRepos, db *sql.DB) error {
 
 func importRepo(ctx context.Context, queries *storage.Queries, entry models.RepoEntry, index int) error {
 	r := entry.Repo
-	id := int64(r["id"].(float64))
-	name := r["full_name"].(string)
+	id := int64(r.ID)
+	name := r.FullName
 	slog.Info("⏳ Behandler repo", "nummer", index+1, "navn", name)
 
 	repo := storage.InsertRepoParams{
 		ID:           id,
-		Name:         r["name"].(string),
+		Name:         r.Name,
 		FullName:     name,
-		Description:  SafeString(r["description"]),
-		Stars:        int64(r["stargazers_count"].(float64)),
-		Forks:        int64(r["forks_count"].(float64)),
-		Archived:     r["archived"].(bool),
-		Private:      r["private"].(bool),
-		IsFork:       r["fork"].(bool),
-		Language:     SafeString(r["language"]),
-		SizeMb:       float32(r["size"].(float64)) / 1024.0,
-		UpdatedAt:    r["updated_at"].(string),
-		PushedAt:     r["pushed_at"].(string),
-		CreatedAt:    r["created_at"].(string),
-		HtmlUrl:      r["html_url"].(string),
-		Topics:       JoinStrings(r["topics"]),
-		Visibility:   r["visibility"].(string),
-		License:      ExtractLicense(r),
-		OpenIssues:   int64(r["open_issues_count"].(float64)),
-		LanguagesUrl: r["languages_url"].(string),
+		Description:  r.Description,
+		Stars:        r.Stars,
+		Forks:        r.Forks,
+		Archived:     r.Archived,
+		Private:      r.Private,
+		IsFork:       r.IsFork,
+		Language:     r.Language,
+		SizeMb:       float32(r.Size) / 1024.0,
+		UpdatedAt:    r.UpdatedAt,
+		PushedAt:     r.PushedAt,
+		CreatedAt:    r.CreatedAt,
+		HtmlUrl:      r.HtmlUrl,
+		Topics:       strings.Join(r.Topics, ","),
+		Visibility:   r.Visibility,
+		License:      safeLicense((*struct{ SpdxID string })(r.License)),
+		OpenIssues:   r.OpenIssues,
+		LanguagesUrl: r.LanguagesURL,
 	}
 	if err := queries.InsertRepo(ctx, repo); err != nil {
 		slog.Error("🚨 Feil ved InsertRepo – avbryter import", "repo", name, "error", err)
@@ -261,9 +249,9 @@ func insertSBOMPackagesGithub(
 			continue
 		}
 
-		nameVal := SafeString(pkg["name"])
-		version := SafeString(pkg["versionInfo"])
-		license := SafeString(pkg["licenseConcluded"])
+		nameVal := safeString(pkg["name"])
+		version := safeString(pkg["versionInfo"])
+		license := safeString(pkg["licenseConcluded"])
 
 		// Prøv å hente ut PURL (Package URL) fra externalRefs
 		var purl string
@@ -274,7 +262,7 @@ func insertSBOMPackagesGithub(
 					continue
 				}
 				if refMap["referenceType"] == "purl" {
-					purl = SafeString(refMap["referenceLocator"])
+					purl = safeString(refMap["referenceLocator"])
 					break
 				}
 			}

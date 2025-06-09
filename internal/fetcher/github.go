@@ -7,11 +7,11 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
 	"github.com/jonmartinstorm/reposnusern/internal/config"
+	"github.com/jonmartinstorm/reposnusern/internal/models"
 )
 
 type TreeFile struct {
@@ -53,42 +53,9 @@ func GetJSONWithRateLimit(url, token string, out interface{}) error {
 	}
 }
 
-func GetAllRepos(cfg config.Config) []map[string]interface{} {
-	repos := []map[string]interface{}{}
-	page := 1
-
-	for {
-		url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&type=all&page=%d", cfg.Org, page)
-		var pageRepos []map[string]interface{}
-		slog.Info("Henter repos", "page", page)
-		err := GetJSONWithRateLimit(url, cfg.Token, &pageRepos)
-		if err != nil {
-			slog.Error("Kunne ikke hente repo-metadata", "error", err)
-			os.Exit(1)
-		}
-		if len(pageRepos) == 0 {
-			break
-		}
-
-		if cfg.Debug {
-			// Shuffle og velg 3 tilfeldig
-			rand.Shuffle(len(pageRepos), func(i, j int) {
-				pageRepos[i], pageRepos[j] = pageRepos[j], pageRepos[i]
-			})
-			repos = append(repos, pageRepos[:min(10, len(pageRepos))]...)
-			break
-		} else {
-			repos = append(repos, pageRepos...)
-		}
-
-		page++
-	}
-	return repos
-}
-
-func GetRepoPage(cfg config.Config, page int) ([]map[string]interface{}, error) {
+func GetRepoPage(cfg config.Config, page int) ([]models.RepoMeta, error) {
 	url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&type=all&page=%d", cfg.Org, page)
-	var pageRepos []map[string]interface{}
+	var pageRepos []models.RepoMeta
 	slog.Info("Henter repos", "page", page)
 	err := GetJSONWithRateLimit(url, cfg.Token, &pageRepos)
 	if err != nil {
