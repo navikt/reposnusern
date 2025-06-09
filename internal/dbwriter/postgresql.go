@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"runtime"
 	"strings"
 
 	"github.com/jonmartinstorm/reposnusern/internal/models"
@@ -54,6 +55,11 @@ func ImportToPostgreSQLDB(dump models.OrgRepos, db *sql.DB) error {
 		}
 		if err := tx.Commit(); err != nil {
 			return fmt.Errorf("commit failed: %w", err)
+		}
+
+		entry = models.RepoEntry{}
+		if i%25 == 0 {
+			runtime.GC()
 		}
 	}
 	return nil

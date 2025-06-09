@@ -85,3 +85,22 @@ func GetAllRepos(cfg config.Config) []map[string]interface{} {
 	}
 	return repos
 }
+
+func GetRepoPage(cfg config.Config, page int) ([]map[string]interface{}, error) {
+	url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&type=all&page=%d", cfg.Org, page)
+	var pageRepos []map[string]interface{}
+	slog.Info("Henter repos", "page", page)
+	err := GetJSONWithRateLimit(url, cfg.Token, &pageRepos)
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.Debug {
+		rand.Shuffle(len(pageRepos), func(i, j int) {
+			pageRepos[i], pageRepos[j] = pageRepos[j], pageRepos[i]
+		})
+		return pageRepos[:min(10, len(pageRepos))], nil
+	}
+
+	return pageRepos, nil
+}

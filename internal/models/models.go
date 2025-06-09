@@ -15,16 +15,6 @@ type RepoEntry struct {
 	SBOM      map[string]interface{} `json:"sbom"`
 }
 
-// result := map[string]interface{}{
-// 	"repo":      r,
-// 	"languages": data["languages"],
-// 	"files":     data["files"],
-// 	"security":  data["security"],
-// 	"ci_config": data["ci_config"],
-// 	"readme":    data["readme"],
-// 	"sbom":      data["sbom"],
-// }
-
 type OrgRepos struct {
 	Org   string      `json:"org"`
 	Repos []RepoEntry `json:"repos"`

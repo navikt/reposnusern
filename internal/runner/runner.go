@@ -3,41 +3,56 @@ package runner
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
-	"os"
+	"runtime"
 
 	"github.com/jonmartinstorm/reposnusern/internal/config"
 	"github.com/jonmartinstorm/reposnusern/internal/dbwriter"
 	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
+	"github.com/jonmartinstorm/reposnusern/internal/models"
 )
 
 func Run(ctx context.Context, cfg config.Config) error {
-	slog.Info("🔍 Henter oversikt over alle repos (paged 100 og 100)")
-	allRepos := fetcher.GetAllRepos(cfg)
+	slog.Info("🔁 Starter repo-import per page")
 
-	for i := 0; i < len(allRepos); i += 100 {
-		end := i + 100
-		if end > len(allRepos) {
-			end = len(allRepos)
-		}
-		batch := allRepos[i:end]
+	db, err := sql.Open("postgres", cfg.PostgresDSN)
+	if err != nil {
+		return fmt.Errorf("DB-feil: %w", err)
+	}
+	defer db.Close()
 
-		slog.Info("📦 Henter detaljert info for repos", "batch_start", i, "batch_end", end)
-		batchData := fetcher.GetDetailsActiveReposGraphQL(cfg.Org, cfg.Token, batch)
-
-		db, err := sql.Open("postgres", cfg.PostgresDSN)
+	page := 1
+	for {
+		repos, err := fetcher.GetRepoPage(cfg, page)
 		if err != nil {
-			slog.Error("Kunne ikke åpne DB-forbindelse", "error", err)
-			os.Exit(1)
-		}
-		defer db.Close()
-
-		slog.Info("📝 Skriver batch til DB", "antall_repos", len(batchData.Repos))
-		if err := dbwriter.ImportToPostgreSQLDB(batchData, db); err != nil {
 			return err
 		}
-	}
+		if len(repos) == 0 {
+			break
+		}
 
-	slog.Info("✅ Ferdig importert hele organisasjonen!")
+		slog.Info("📦 Henter detaljer via GraphQL", "antall", len(repos))
+		data := fetcher.GetDetailsActiveReposGraphQL(cfg.Org, cfg.Token, repos)
+
+		slog.Info("📝 Skriver til DB", "antall_repos", len(data.Repos))
+		if err := dbwriter.ImportToPostgreSQLDB(data, db); err != nil {
+			return err
+		}
+
+		// FLUSH DATA
+		data = models.OrgRepos{} // tom struct
+		repos = nil              // slice nulles
+		page++
+		if cfg.Debug {
+			break // for å ikke gå uendelig i test
+		}
+
+		// Hint til GC ved høy minnebruk
+		if page%5 == 0 {
+			runtime.GC()
+		}
+	}
+	slog.Info("✅ Ferdig med all import")
 	return nil
 }
