@@ -89,6 +89,7 @@ Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. 
 - [x] 🔐 Hindre at passord og secrets utilsiktet havner i logger
 - [x] ✅ Legge til noen enkle tester (det var jo bare en PoC 😅)
 - [x] 🧹 Refaktorering og deling av logikk
+- [ ] Bedre logging
 - [ ] ☁️ Gjøre klart for K8s-deploy (config, secrets, jobs)
 - [ ] Sørge for at GraphQL versjonen også parser lenger ned enn toppnivå mappen.
 - [ ] Vurdere om sbom direkte har fjernet behovet for dependency files
