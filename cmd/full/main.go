@@ -72,7 +72,7 @@ func main() {
 	defer db.Close()
 
 	// skriv til postgresql.
-	slog.Info("🚀 Importerer til PostgreSQL", "cfg.Org", allData.Org, "antall_repos", len(allData.Repos))
+	slog.Info("🚀 Importerer til PostgreSQL", "org", allData.Org, "antall_repos", len(allData.Repos))
 
 	err = dbwriter.ImportToPostgreSQLDB(allData, db)
 	if err != nil {
