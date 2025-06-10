@@ -109,3 +109,27 @@ RUN apt-get update && apt-get install -y gcc make curl && apt-get clean
 		t.Errorf("expected HasAptGetClean true")
 	}
 }
+
+func TestParseDockerfile_MissingBits(t *testing.T) {
+	content := `
+FROM alpine
+LABEL version="1.0"
+EXPOSE 443
+HEALTHCHECK CMD curl -f http://localhost || exit 1
+RUN chmod 777 /tmp/file
+`
+	f := ParseDockerfile(content)
+
+	if !f.HasLabelMetadata {
+		t.Errorf("expected HasLabelMetadata true")
+	}
+	if !f.HasExpose {
+		t.Errorf("expected HasExpose true")
+	}
+	if !f.HasHealthcheck {
+		t.Errorf("expected HasHealthcheck true")
+	}
+	if !f.WorldWritable {
+		t.Errorf("expected WorldWritable true")
+	}
+}
