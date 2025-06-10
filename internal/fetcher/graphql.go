@@ -56,14 +56,18 @@ func FetchSBOM(owner, repo, token string) map[string]interface{} {
 }
 
 func ParseRepoData(data map[string]interface{}, baseRepo models.RepoMeta) *models.RepoEntry {
-
+	repoData, ok := data["repository"].(map[string]interface{})
+	if !ok {
+		slog.Warn("❌ Mangler 'repository'-data i GraphQL-response")
+		return nil
+	}
 	return &models.RepoEntry{
 		Repo:      baseRepo,
-		Languages: ExtractLanguages(data),
-		Files:     ExtractFiles(data),
-		CIConfig:  ExtractCI(data),
-		Readme:    ExtractReadme(data),
-		Security:  ExtractSecurity(data),
+		Languages: ExtractLanguages(repoData),
+		Files:     ExtractFiles(repoData),
+		CIConfig:  ExtractCI(repoData),
+		Readme:    ExtractReadme(repoData),
+		Security:  ExtractSecurity(repoData),
 	}
 }
 
