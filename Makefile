@@ -6,13 +6,30 @@ build:
 run:
 	@go run cmd/${ARTIFACT_NAME}/main.go 
 
-go-test:
+ci: tidy vet lint test
+
+# -------------------------------
+# Test targets
+# -------------------------------
+
+unit:
 	@go test -v $(shell go list ./... | grep -v /test/)
+
+integration:
+	@go test -v -tags=integration $(shell go list ./... | grep -v /test/)
+
+e2e:
+	@go test -v -tags=e2e ./tests/e2e/...
+
+test: unit integration
+
+# -------------------------------
+# Coverage
+# -------------------------------
 
 COVER_OUT = cover.out
 COVER_FILTERED = cover.filtered.out
 
-# Filer og mapper du vil ekskludere
 EXCLUDE_FILES = \
     cmd/$(ARTIFACT_NAME)/main.go \
     internal/storage/ \
@@ -25,6 +42,26 @@ go-test-with-cover:
 	@cat $(COVER_OUT) $(EXCLUDE_GREP) > $(COVER_FILTERED)
 	@go tool cover -html=$(COVER_FILTERED) -o cover.html
 	@open cover.html || xdg-open cover.html || echo "Åpne cover.html manuelt"
+
+# -------------------------------
+# Lint og hygiene
+# -------------------------------
+
+vet:
+	@go vet ./...
+
+tidy:
+	@go mod tidy
+
+lint:
+	@golangci-lint run
+
+check-secrets:
+	@! grep -r "ghp_" . || (echo "🚨 GitHub token funnet i kode!"; exit 1)
+
+# -------------------------------
+# Mock-generering
+# -------------------------------
 
 generate-mocks:
 	@mockery --all --with-expecter --keeptree
