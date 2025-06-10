@@ -10,7 +10,7 @@ import (
 )
 
 func FetchRepoGraphQL(owner, name, token string, baseRepo models.RepoMeta) *models.RepoEntry {
-	query := buildRepoQuery(owner, name)
+	query := BuildRepoQuery(owner, name)
 
 	reqBody := map[string]string{"query": query}
 	bodyBytes, err := json.Marshal(reqBody)
@@ -36,14 +36,14 @@ func FetchRepoGraphQL(owner, name, token string, baseRepo models.RepoMeta) *mode
 		return nil
 	}
 
-	sbom := fetchSBOM(owner, name, token)
-	entry := parseRepoData(data, baseRepo)
+	sbom := FetchSBOM(owner, name, token)
+	entry := ParseRepoData(data, baseRepo)
 
 	entry.SBOM = sbom
 	return entry
 }
 
-func fetchSBOM(owner, repo, token string) map[string]interface{} {
+func FetchSBOM(owner, repo, token string) map[string]interface{} {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/dependency-graph/sbom", owner, repo)
 
 	var sbom map[string]interface{}
@@ -55,19 +55,19 @@ func fetchSBOM(owner, repo, token string) map[string]interface{} {
 	return sbom
 }
 
-func parseRepoData(data map[string]interface{}, baseRepo models.RepoMeta) *models.RepoEntry {
+func ParseRepoData(data map[string]interface{}, baseRepo models.RepoMeta) *models.RepoEntry {
 
 	return &models.RepoEntry{
 		Repo:      baseRepo,
-		Languages: extractLanguages(data),
-		Files:     extractFiles(data),
-		CIConfig:  extractCI(data),
-		Readme:    extractReadme(data),
-		Security:  extractSecurity(data),
+		Languages: ExtractLanguages(data),
+		Files:     ExtractFiles(data),
+		CIConfig:  ExtractCI(data),
+		Readme:    ExtractReadme(data),
+		Security:  ExtractSecurity(data),
 	}
 }
 
-func extractLanguages(data map[string]interface{}) map[string]int {
+func ExtractLanguages(data map[string]interface{}) map[string]int {
 	langs := map[string]int{}
 
 	if langsData, ok := data["languages"].(map[string]interface{}); ok {
@@ -99,7 +99,7 @@ func extractLanguages(data map[string]interface{}) map[string]int {
 	return langs
 }
 
-func extractFiles(data map[string]interface{}) map[string][]models.FileEntry {
+func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 	files := map[string][]map[string]string{}
 
 	// Dependency files
@@ -134,10 +134,10 @@ func extractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 			}
 		}
 	}
-	return convertFiles(files)
+	return ConvertFiles(files)
 }
 
-func extractCI(data map[string]interface{}) []models.FileEntry {
+func ExtractCI(data map[string]interface{}) []models.FileEntry {
 	ci := []map[string]string{}
 	// CI config
 	if workflows, ok := data["workflows"].(map[string]interface{}); ok {
@@ -167,10 +167,10 @@ func extractCI(data map[string]interface{}) []models.FileEntry {
 			}
 		}
 	}
-	return convertToFileEntries(ci)
+	return ConvertToFileEntries(ci)
 }
 
-func extractSecurity(data map[string]interface{}) map[string]bool {
+func ExtractSecurity(data map[string]interface{}) map[string]bool {
 	security := map[string]bool{}
 	security["has_security_md"] = data["SECURITY"] != nil
 	security["has_dependabot"] = data["dependabot"] != nil
@@ -178,7 +178,7 @@ func extractSecurity(data map[string]interface{}) map[string]bool {
 	return security
 }
 
-func extractReadme(data map[string]interface{}) string {
+func ExtractReadme(data map[string]interface{}) string {
 	if val, ok := data["README"].(map[string]interface{}); ok {
 		if text, ok := val["text"].(string); ok {
 			return text
@@ -187,7 +187,7 @@ func extractReadme(data map[string]interface{}) string {
 	return ""
 }
 
-func buildRepoQuery(owner string, name string) string {
+func BuildRepoQuery(owner string, name string) string {
 	query := fmt.Sprintf(`
 	{
 		repository(owner: "%s", name: "%s") {
@@ -251,7 +251,7 @@ func buildRepoQuery(owner string, name string) string {
 	return query
 }
 
-func convertToFileEntries(entries []map[string]string) []models.FileEntry {
+func ConvertToFileEntries(entries []map[string]string) []models.FileEntry {
 	var result []models.FileEntry
 	for _, e := range entries {
 		result = append(result, models.FileEntry{
@@ -262,10 +262,10 @@ func convertToFileEntries(entries []map[string]string) []models.FileEntry {
 	return result
 }
 
-func convertFiles(input map[string][]map[string]string) map[string][]models.FileEntry {
+func ConvertFiles(input map[string][]map[string]string) map[string][]models.FileEntry {
 	out := map[string][]models.FileEntry{}
 	for k, v := range input {
-		out[k] = convertToFileEntries(v)
+		out[k] = ConvertToFileEntries(v)
 	}
 	return out
 }

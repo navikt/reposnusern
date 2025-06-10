@@ -1,401 +1,243 @@
-package fetcher
+package fetcher_test
 
 import (
-	"reflect"
-	"strings"
 	"testing"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
 	"github.com/jonmartinstorm/reposnusern/internal/models"
 )
 
-func TestConvertToFileEntries(t *testing.T) {
-	input := []map[string]string{
-		{"path": "Dockerfile", "content": "FROM alpine"},
-		{"path": "build.sh", "content": "#!/bin/sh"},
-	}
-	expected := []models.FileEntry{
-		{Path: "Dockerfile", Content: "FROM alpine"},
-		{Path: "build.sh", Content: "#!/bin/sh"},
-	}
-
-	result := convertToFileEntries(input)
-	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("expected %+v, got %+v", expected, result)
-	}
+// 🔁 Ginkgo sin test-runner. Denne trengs for at "go test" skal vite hvor den skal starte.
+func TestFetcher(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Fetcher – GraphQL-funksjoner")
 }
 
-func TestConvertFiles(t *testing.T) {
-	input := map[string][]map[string]string{
-		"dockerfile": {
-			{"path": "Dockerfile", "content": "FROM alpine"},
-		},
-		"scripts": {
-			{"path": "build.sh", "content": "#!/bin/sh"},
-		},
-	}
-	expected := map[string][]models.FileEntry{
-		"dockerfile": {
-			{Path: "Dockerfile", Content: "FROM alpine"},
-		},
-		"scripts": {
-			{Path: "build.sh", Content: "#!/bin/sh"},
-		},
-	}
+var _ = Describe("GraphQL-relaterte hjelpefunksjoner", func() {
 
-	result := convertFiles(input)
-	if !reflect.DeepEqual(result, expected) {
-		t.Errorf("expected %+v, got %+v", expected, result)
-	}
-}
+	Describe("convertToFileEntries", func() {
+		It("skal konvertere liste med path/content til FileEntry-struktur", func() {
+			input := []map[string]string{
+				{"path": "Dockerfile", "content": "FROM alpine"},
+				{"path": "build.sh", "content": "#!/bin/sh"},
+			}
+			forventet := []models.FileEntry{
+				{Path: "Dockerfile", Content: "FROM alpine"},
+				{Path: "build.sh", Content: "#!/bin/sh"},
+			}
+			Expect(fetcher.ConvertToFileEntries(input)).To(Equal(forventet))
+		})
+	})
 
-func TestBuildRepoQuery(t *testing.T) {
-	owner := "navikt"
-	repo := "arbeidsgiver"
-	query := buildRepoQuery(owner, repo)
+	Describe("convertFiles", func() {
+		It("skal konvertere nested map til map[string][]FileEntry", func() {
+			input := map[string][]map[string]string{
+				"dockerfile": {{"path": "Dockerfile", "content": "FROM alpine"}},
+				"scripts":    {{"path": "build.sh", "content": "#!/bin/sh"}},
+			}
+			forventet := map[string][]models.FileEntry{
+				"dockerfile": {{Path: "Dockerfile", Content: "FROM alpine"}},
+				"scripts":    {{Path: "build.sh", Content: "#!/bin/sh"}},
+			}
+			Expect(fetcher.ConvertFiles(input)).To(Equal(forventet))
+		})
+	})
 
-	if !strings.Contains(query, `repository(owner: "navikt", name: "arbeidsgiver")`) {
-		t.Errorf("buildRepoQuery() mangler korrekt owner/repo: %s", query)
-	}
-	if !strings.Contains(query, "defaultBranchRef") {
-		t.Errorf("buildRepoQuery() ser ikke ut til å inkludere forventet GraphQL-innhold")
-	}
-}
+	Describe("buildRepoQuery", func() {
+		It("skal bygge en GraphQL-spørring som inneholder riktig owner og repo", func() {
+			query := fetcher.BuildRepoQuery("navikt", "arbeidsgiver")
+			Expect(query).To(ContainSubstring(`repository(owner: "navikt", name: "arbeidsgiver")`))
+			Expect(query).To(ContainSubstring("defaultBranchRef"))
+		})
+	})
 
-func TestParseRepoData_Minimal(t *testing.T) {
-	data := map[string]interface{}{
-		"languages": map[string]interface{}{
-			"edges": []interface{}{
-				map[string]interface{}{
-					"size": float64(100),
-					"node": map[string]interface{}{"name": "Go"},
-				},
-			},
-		},
-		"README": map[string]interface{}{
-			"text": "Hello world",
-		},
-		"SECURITY":   map[string]interface{}{},
-		"dependabot": nil,
-		"codeql":     map[string]interface{}{},
-	}
-
-	base := models.RepoMeta{Name: "arbeidsgiver"}
-	entry := parseRepoData(data, base)
-
-	if entry == nil {
-		t.Fatal("parseRepoData() returnerte nil")
-	}
-	if entry.Repo.Name != "arbeidsgiver" {
-		t.Errorf("Repo.Name = %s, vil ha arbeidsgiver", entry.Repo.Name)
-	}
-	if entry.Readme != "Hello world" {
-		t.Errorf("Readme = %q, vil ha 'Hello world'", entry.Readme)
-	}
-	if entry.Languages["Go"] != 100 {
-		t.Errorf("Languages[Go] = %d, vil ha 100", entry.Languages["Go"])
-	}
-	if !entry.Security["has_security_md"] || entry.Security["has_dependabot"] {
-		t.Errorf("Security metadata feil: %+v", entry.Security)
-	}
-}
-
-func TestExtractLanguages(t *testing.T) {
-	tests := []struct {
-		name string
-		data map[string]interface{}
-		want map[string]int
-	}{
-		{
-			name: "valid languages",
-			data: map[string]interface{}{
+	Describe("parseRepoData", func() {
+		It("skal returnere strukturert RepoEntry fra minimal GraphQL-respons", func() {
+			data := map[string]interface{}{
 				"languages": map[string]interface{}{
 					"edges": []interface{}{
 						map[string]interface{}{
-							"size": float64(1234),
+							"size": float64(100),
 							"node": map[string]interface{}{"name": "Go"},
 						},
-						map[string]interface{}{
-							"size": float64(567),
-							"node": map[string]interface{}{"name": "Python"},
-						},
 					},
 				},
-			},
-			want: map[string]int{"Go": 1234, "Python": 567},
-		},
-		{
-			name: "missing node",
-			data: map[string]interface{}{
-				"languages": map[string]interface{}{
-					"edges": []interface{}{
-						map[string]interface{}{
-							"size": float64(100),
-						},
-					},
-				},
-			},
-			want: map[string]int{},
-		},
-		{
-			name: "missing name",
-			data: map[string]interface{}{
-				"languages": map[string]interface{}{
-					"edges": []interface{}{
-						map[string]interface{}{
-							"size": float64(100),
-							"node": map[string]interface{}{},
-						},
-					},
-				},
-			},
-			want: map[string]int{},
-		},
-		{
-			name: "missing size",
-			data: map[string]interface{}{
-				"languages": map[string]interface{}{
-					"edges": []interface{}{
-						map[string]interface{}{
-							"node": map[string]interface{}{"name": "Rust"},
-						},
-					},
-				},
-			},
-			want: map[string]int{},
-		},
-		{
-			name: "invalid edges type",
-			data: map[string]interface{}{
-				"languages": map[string]interface{}{
-					"edges": "not-a-list",
-				},
-			},
-			want: map[string]int{},
-		},
-		{
-			name: "missing languages field",
-			data: map[string]interface{}{},
-			want: map[string]int{},
-		},
-		{
-			name: "edge is not a map",
-			data: map[string]interface{}{
-				"languages": map[string]interface{}{
-					"edges": []interface{}{
-						"not-a-map",
-						map[string]interface{}{
-							"size": float64(200),
-							"node": map[string]interface{}{"name": "Java"},
-						},
-					},
-				},
-			},
-			want: map[string]int{"Java": 200},
-		},
-	}
+				"README":     map[string]interface{}{"text": "Hello world"},
+				"SECURITY":   map[string]interface{}{},
+				"dependabot": nil,
+				"codeql":     map[string]interface{}{},
+			}
+			base := models.RepoMeta{Name: "arbeidsgiver"}
+			entry := fetcher.ParseRepoData(data, base)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := extractLanguages(tt.data)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("extractLanguages() = %v, want %v", got, tt.want)
+			Expect(entry).NotTo(BeNil())
+			Expect(entry.Repo.Name).To(Equal("arbeidsgiver"))
+			Expect(entry.Readme).To(Equal("Hello world"))
+			Expect(entry.Languages["Go"]).To(Equal(100))
+			Expect(entry.Security["has_security_md"]).To(BeTrue())
+			Expect(entry.Security["has_dependabot"]).To(BeFalse())
+		})
+	})
+
+	Describe("extractLanguages", func() {
+		It("skal håndtere både gyldige og ugyldige strukturer", func() {
+			testcases := map[string]struct {
+				data map[string]interface{}
+				want map[string]int
+			}{
+				"gyldige språk": {
+					data: map[string]interface{}{
+						"languages": map[string]interface{}{
+							"edges": []interface{}{
+								map[string]interface{}{
+									"size": float64(1234),
+									"node": map[string]interface{}{"name": "Go"},
+								},
+								map[string]interface{}{
+									"size": float64(567),
+									"node": map[string]interface{}{"name": "Python"},
+								},
+							},
+						},
+					},
+					want: map[string]int{"Go": 1234, "Python": 567},
+				},
+				"mangler node": {
+					data: map[string]interface{}{
+						"languages": map[string]interface{}{
+							"edges": []interface{}{
+								map[string]interface{}{"size": float64(100)},
+							},
+						},
+					},
+					want: map[string]int{},
+				},
+				"edge er ikke et map": {
+					data: map[string]interface{}{
+						"languages": map[string]interface{}{
+							"edges": []interface{}{
+								"not-a-map",
+								map[string]interface{}{
+									"size": float64(200),
+									"node": map[string]interface{}{"name": "Java"},
+								},
+							},
+						},
+					},
+					want: map[string]int{"Java": 200},
+				},
+			}
+
+			for navn, tc := range testcases {
+				got := fetcher.ExtractLanguages(tc.data)
+				Expect(got).To(Equal(tc.want), "feilet for test: %s", navn)
 			}
 		})
-	}
-}
+	})
 
-func TestExtractCI(t *testing.T) {
-	tests := []struct {
-		name string
-		data map[string]interface{}
-		want []models.FileEntry
-	}{
-		{
-			name: "valid CI entry",
-			data: map[string]interface{}{
+	Describe("extractCI", func() {
+		It("skal hente ut CI-workflows med korrekt filsti og innhold", func() {
+			data := map[string]interface{}{
 				"workflows": map[string]interface{}{
 					"entries": []interface{}{
 						map[string]interface{}{
 							"name": "build.yml",
 							"object": map[string]interface{}{
-								"text": "name: Build\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest",
+								"text": "workflow-innhold",
 							},
 						},
 					},
 				},
-			},
-			want: []models.FileEntry{
-				{
-					Path:    ".github/workflows/build.yml",
-					Content: "name: Build\non: push\njobs:\n  build:\n    runs-on: ubuntu-latest",
-				},
-			},
-		},
-		{
-			name: "missing object",
-			data: map[string]interface{}{
+			}
+			got := fetcher.ExtractCI(data)
+			Expect(got).To(HaveLen(1))
+			Expect(got[0].Path).To(Equal(".github/workflows/build.yml"))
+			Expect(got[0].Content).To(Equal("workflow-innhold"))
+		})
+		It("skal ignorere CI-entries som ikke er maps", func() {
+			data := map[string]interface{}{
 				"workflows": map[string]interface{}{
 					"entries": []interface{}{
-						map[string]interface{}{
-							"name": "test.yml",
-						},
-					},
-				},
-			},
-			want: []models.FileEntry{},
-		},
-		{
-			name: "object without text",
-			data: map[string]interface{}{
-				"workflows": map[string]interface{}{
-					"entries": []interface{}{
-						map[string]interface{}{
-							"name": "deploy.yml",
+						"bare en streng",
+						42,
+						true,
+						nil,
+						map[string]interface{}{ // eneste gyldige entry
+							"name": "bygge.yml",
 							"object": map[string]interface{}{
-								"notText": "something else",
+								"text": "CI workflow",
 							},
 						},
 					},
 				},
-			},
-			want: []models.FileEntry{},
-		},
-		{
-			name: "entry is not a map",
-			data: map[string]interface{}{
-				"workflows": map[string]interface{}{
+			}
+			got := fetcher.ExtractCI(data)
+			Expect(got).To(HaveLen(1))
+			Expect(got[0].Path).To(Equal(".github/workflows/bygge.yml"))
+			Expect(got[0].Content).To(Equal("CI workflow"))
+		})
+	})
+
+	Describe("extractReadme", func() {
+		It("skal returnere README-tekst hvis den finnes", func() {
+			Expect(fetcher.ExtractReadme(map[string]interface{}{
+				"README": map[string]interface{}{"text": "Min README"},
+			})).To(Equal("Min README"))
+
+			Expect(fetcher.ExtractReadme(map[string]interface{}{})).To(Equal(""))
+			Expect(fetcher.ExtractReadme(map[string]interface{}{
+				"README": map[string]interface{}{},
+			})).To(Equal(""))
+		})
+	})
+
+	Describe("extractSecurity", func() {
+		It("skal detektere sikkerhetsmetadata fra GraphQL-responsen", func() {
+			data := map[string]interface{}{
+				"SECURITY":   map[string]interface{}{},
+				"dependabot": nil,
+				"codeql":     map[string]interface{}{},
+			}
+			got := fetcher.ExtractSecurity(data)
+			Expect(got["has_security_md"]).To(BeTrue())
+			Expect(got["has_dependabot"]).To(BeFalse())
+			Expect(got["has_codeql"]).To(BeTrue())
+		})
+	})
+
+	Describe("extractFiles", func() {
+		It("skal hente ut kun gyldige Dockerfile-objekter med innhold", func() {
+			data := map[string]interface{}{
+				"dependencies": map[string]interface{}{
 					"entries": []interface{}{
+						map[string]interface{}{
+							"name": "Dockerfile",
+							"object": map[string]interface{}{
+								"text": "FROM alpine",
+							},
+						},
+						map[string]interface{}{
+							"name": "README.md",
+							"object": map[string]interface{}{
+								"text": "irrelevant",
+							},
+						},
+						map[string]interface{}{
+							"name":   "Dockerfile.empty",
+							"object": map[string]interface{}{},
+						},
 						"not-a-map",
 					},
 				},
-			},
-			want: []models.FileEntry{},
-		},
-		{
-			name: "missing workflows",
-			data: map[string]interface{}{},
-			want: []models.FileEntry{},
-		},
-	}
-
-	for _, tt := range tests {
-
-		t.Run(tt.name, func(t *testing.T) {
-			got := extractCI(tt.data)
-			if got == nil {
-				got = []models.FileEntry{}
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("extractCI() = %#v, want %#v", got, tt.want)
-			}
+			got := fetcher.ExtractFiles(data)
+			Expect(got).To(HaveKey("dockerfile"))
+			Expect(got["dockerfile"]).To(HaveLen(1))
+			Expect(got["dockerfile"][0].Path).To(Equal("Dockerfile"))
+			Expect(got["dockerfile"][0].Content).To(Equal("FROM alpine"))
 		})
-
-	}
-}
-
-func TestExtractReadme(t *testing.T) {
-	tests := []struct {
-		name string
-		data map[string]interface{}
-		want string
-	}{
-		{
-			name: "README present with text",
-			data: map[string]interface{}{
-				"README": map[string]interface{}{
-					"text": "This is a README",
-				},
-			},
-			want: "This is a README",
-		},
-		{
-			name: "README missing",
-			data: map[string]interface{}{},
-			want: "",
-		},
-		{
-			name: "README present but no text",
-			data: map[string]interface{}{
-				"README": map[string]interface{}{},
-			},
-			want: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := extractReadme(tt.data)
-			if got != tt.want {
-				t.Errorf("extractReadme() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestExtractSecurity(t *testing.T) {
-	data := map[string]interface{}{
-		"SECURITY":   map[string]interface{}{},
-		"dependabot": nil,
-		"codeql":     map[string]interface{}{},
-	}
-
-	got := extractSecurity(data)
-	want := map[string]bool{
-		"has_security_md": true,
-		"has_dependabot":  false,
-		"has_codeql":      true,
-	}
-
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("extractSecurity() = %v, want %v", got, want)
-	}
-}
-
-func TestExtractFiles(t *testing.T) {
-	data := map[string]interface{}{
-		"dependencies": map[string]interface{}{
-			"entries": []interface{}{
-				// ✅ Gyldig Dockerfile med innhold
-				map[string]interface{}{
-					"name": "Dockerfile",
-					"object": map[string]interface{}{
-						"text": "FROM alpine",
-					},
-				},
-				// ❌ Ikke en dockerfil
-				map[string]interface{}{
-					"name": "README.md",
-					"object": map[string]interface{}{
-						"text": "This is not a Dockerfile",
-					},
-				},
-				// ❌ Dockerfile uten innhold
-				map[string]interface{}{
-					"name":   "Dockerfile.empty",
-					"object": map[string]interface{}{},
-				},
-				// ❌ Ugyldig struktur
-				"not-a-map",
-			},
-		},
-	}
-
-	got := extractFiles(data)
-
-	if len(got) != 1 {
-		t.Fatalf("expected 1 dockerfile entry, got %d", len(got))
-	}
-
-	dockerfiles, ok := got["dockerfile"]
-	if !ok {
-		t.Fatalf("expected key 'dockerfile' in result")
-	}
-
-	if len(dockerfiles) != 1 {
-		t.Errorf("expected 1 dockerfile entry, got %d", len(dockerfiles))
-	}
-
-	if dockerfiles[0].Path != "Dockerfile" || dockerfiles[0].Content != "FROM alpine" {
-		t.Errorf("unexpected dockerfile content: %+v", dockerfiles[0])
-	}
-}
+	})
+})
