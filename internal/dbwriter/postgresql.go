@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-	"runtime"
 	"strings"
 
 	"github.com/jonmartinstorm/reposnusern/internal/models"
@@ -25,23 +24,6 @@ func safeString(v interface{}) string {
 		return ""
 	}
 	return v.(string)
-}
-
-func ImportToPostgreSQLDB(dump models.OrgRepos, db *sql.DB) error {
-	ctx := context.Background()
-
-	for i, entry := range dump.Repos {
-
-		if err := ImportRepo(ctx, db, entry, i); err != nil {
-
-			return fmt.Errorf("import repo: %w", err)
-		}
-
-		if i%25 == 0 {
-			runtime.GC()
-		}
-	}
-	return nil
 }
 
 func ImportRepo(ctx context.Context, db *sql.DB, entry models.RepoEntry, index int) error {
