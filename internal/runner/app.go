@@ -9,12 +9,17 @@ import (
 	"time"
 
 	"github.com/jonmartinstorm/reposnusern/internal/config"
+	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
 )
 
 func RunApp(ctx context.Context, cfg config.Config) error {
 	start := time.Now()
 
-	err := Run(ctx, cfg, RealDeps{})
+	deps := RealDeps{
+		GitHub: &fetcher.GitHubAPI{},
+	}
+
+	err := Run(ctx, cfg, deps)
 	if err != nil {
 		slog.Error("Runner feilet", "error", err)
 		os.Exit(1)

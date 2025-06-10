@@ -22,9 +22,11 @@ func Run(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 	if err != nil {
 		return fmt.Errorf("DB-feil: %w", err)
 	}
-	if err := db.Close(); err != nil {
-		return fmt.Errorf("klarte ikke å close db: %w", err)
-	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			slog.Warn("⚠️ Klarte ikke å lukke databaseforbindelsen", "error", err)
+		}
+	}()
 
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
@@ -34,7 +36,7 @@ func Run(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 	repoIndex := 0
 
 	for {
-		repos, err := fetcher.GetRepoPage(cfg, page)
+		repos, err := deps.GetRepoPage(cfg, page)
 		if err != nil {
 			return fmt.Errorf("klarte ikke hente repo-side: %w", err)
 		}

@@ -17,13 +17,15 @@ type RunnerDeps interface {
 	ImportRepo(ctx context.Context, db *sql.DB, entry models.RepoEntry, index int) error
 }
 
-type RealDeps struct{}
+type RealDeps struct {
+	GitHub fetcher.GitHubClient
+}
 
 func (RealDeps) OpenDB(dsn string) (*sql.DB, error) {
 	return sql.Open("postgres", dsn)
 }
-func (RealDeps) GetRepoPage(cfg config.Config, page int) ([]models.RepoMeta, error) {
-	return fetcher.GetRepoPage(cfg, page)
+func (r RealDeps) GetRepoPage(cfg config.Config, page int) ([]models.RepoMeta, error) {
+	return r.GitHub.GetRepoPage(cfg, page)
 }
 func (RealDeps) FetchRepoGraphQL(org, name, token string, base models.RepoMeta) *models.RepoEntry {
 	return fetcher.FetchRepoGraphQL(org, name, token, base)
