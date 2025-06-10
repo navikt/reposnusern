@@ -32,3 +32,6 @@ temp.db
 
 /venv/
 /utils/
+
+cover.*
+cover.
