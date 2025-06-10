@@ -58,7 +58,6 @@ func GetRepoPage(cfg config.Config, page int) ([]models.RepoMeta, error) {
 	url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&type=all&page=%d", cfg.Org, page)
 	var pageRepos []models.RepoMeta
 	slog.Info("Henter repos", "page", page)
-	//err := GetJSONWithRateLimit(url, cfg.Token, &pageRepos)
 	err := doRequestWithRateLimit("GET", url, cfg.Token, nil, &pageRepos)
 	if err != nil {
 		return nil, err
