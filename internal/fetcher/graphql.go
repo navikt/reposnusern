@@ -1,11 +1,9 @@
 package fetcher
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"strings"
 
 	"github.com/jonmartinstorm/reposnusern/internal/models"
@@ -74,24 +72,28 @@ func FetchRepoGraphQL(owner, name, token string, baseRepo models.RepoMeta) *mode
 	}`, owner, name)
 
 	reqBody := map[string]string{"query": query}
-	bodyBytes, _ := json.Marshal(reqBody)
-
-	req, _ := http.NewRequest("POST", "https://api.github.com/graphql", bytes.NewReader(bodyBytes))
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != 200 {
-		slog.Error("GraphQL kall feilet", "repo", owner+"/"+name, "error", err)
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		slog.Error("Kunne ikke serialisere GraphQL-request", "repo", owner+"/"+name, "error", err)
 		return nil
 	}
-	defer resp.Body.Close()
 
 	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
+	err = doRequestWithRateLimit("POST", "https://api.github.com/graphql", token, bodyBytes, &result)
+	if err != nil {
+		slog.Error("GraphQL-kall feilet", "repo", owner+"/"+name, "error", err)
+		return nil
+	}
 
-	data := result["data"].(map[string]interface{})["repository"].(map[string]interface{})
+	if errs, ok := result["errors"]; ok {
+		slog.Warn("GraphQL-resultat har feil", "repo", owner+"/"+name, "errors", errs)
+	}
+
+	data, ok := result["data"].(map[string]interface{})
+	if !ok || data["repository"] == nil {
+		slog.Warn("Ingen repository-data fra GraphQL", "repo", owner+"/"+name)
+		return nil
+	}
 
 	// Pakker relevant ut
 	langs := map[string]int{}
@@ -222,25 +224,11 @@ func FetchRepoGraphQL(owner, name, token string, baseRepo models.RepoMeta) *mode
 
 func FetchSBOM(owner, repo, token string) map[string]interface{} {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/dependency-graph/sbom", owner, repo)
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/vnd.github+json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		slog.Warn("SBOM-kall feilet", "repo", owner+"/"+repo, "error", err)
-		return nil
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		slog.Warn("Ingen SBOM tilgjengelig", "repo", owner+"/"+repo, "status", resp.StatusCode)
-		return nil
-	}
 
 	var sbom map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&sbom); err != nil {
-		slog.Error("Kunne ikke parse SBOM", "repo", owner+"/"+repo, "error", err)
+	err := doRequestWithRateLimit("GET", url, token, nil, &sbom)
+	if err != nil {
+		slog.Warn("SBOM-kall feilet", "repo", owner+"/"+repo, "error", err)
 		return nil
 	}
 	return sbom
