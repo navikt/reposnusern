@@ -20,7 +20,7 @@ func FetchRepoGraphQL(owner, name, token string, baseRepo models.RepoMeta) *mode
 	}
 
 	var result map[string]interface{}
-	err = doRequestWithRateLimit("POST", "https://api.github.com/graphql", token, bodyBytes, &result)
+	err = DoRequestWithRateLimit("POST", "https://api.github.com/graphql", token, bodyBytes, &result)
 	if err != nil {
 		slog.Error("GraphQL-kall feilet", "repo", owner+"/"+name, "error", err)
 		return nil
@@ -47,7 +47,7 @@ func FetchSBOM(owner, repo, token string) map[string]interface{} {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/dependency-graph/sbom", owner, repo)
 
 	var sbom map[string]interface{}
-	err := doRequestWithRateLimit("GET", url, token, nil, &sbom)
+	err := DoRequestWithRateLimit("GET", url, token, nil, &sbom)
 	if err != nil {
 		slog.Warn("SBOM-kall feilet", "repo", owner+"/"+repo, "error", err)
 		return nil

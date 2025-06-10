@@ -22,9 +22,9 @@ type TreeFile struct {
 }
 
 // Injecter en klient (for testbarhet)
-var httpClient = http.DefaultClient
+var HttpClient = http.DefaultClient
 
-func doRequestWithRateLimit(method, url, token string, body []byte, out interface{}) error {
+func DoRequestWithRateLimit(method, url, token string, body []byte, out interface{}) error {
 	for {
 		slog.Info("Henter URL", "url", url)
 
@@ -38,7 +38,7 @@ func doRequestWithRateLimit(method, url, token string, body []byte, out interfac
 			req.Header.Set("Content-Type", "application/json")
 		}
 
-		resp, err := httpClient.Do(req)
+		resp, err := HttpClient.Do(req)
 		if err != nil {
 			return err
 		}
@@ -68,7 +68,7 @@ func GetRepoPage(cfg config.Config, page int) ([]models.RepoMeta, error) {
 	url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&type=all&page=%d", cfg.Org, page)
 	var pageRepos []models.RepoMeta
 	slog.Info("Henter repos", "page", page)
-	err := doRequestWithRateLimit("GET", url, cfg.Token, nil, &pageRepos)
+	err := DoRequestWithRateLimit("GET", url, cfg.Token, nil, &pageRepos)
 	if err != nil {
 		return nil, err
 	}

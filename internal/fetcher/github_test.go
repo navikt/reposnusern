@@ -1,90 +1,99 @@
-package fetcher
+package fetcher_test
 
 import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"testing"
 	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
 )
 
-func TestDoRequestWithRateLimit(t *testing.T) {
-	// Returnerer JSON + rate limit headers
-	callCount := 0
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		callCount++
-		if callCount == 1 {
-			// Simuler rate limit første gang
-			w.Header().Set("X-RateLimit-Remaining", "0")
-			w.Header().Set("X-RateLimit-Reset", fmt.Sprint(time.Now().Add(50*time.Millisecond).Unix()))
+var _ = Describe("doRequestWithRateLimit", func() {
+	var originalClient *http.Client
+
+	BeforeEach(func() {
+		originalClient = fetcher.HttpClient
+	})
+
+	AfterEach(func() {
+		fetcher.HttpClient = originalClient
+	})
+
+	It("skal håndtere rate limit og retry riktig", func() {
+		callCount := 0
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			callCount++
+			if callCount == 1 {
+				// Simuler at vi har truffet rate limit
+				w.Header().Set("X-RateLimit-Remaining", "0")
+				w.Header().Set("X-RateLimit-Reset", fmt.Sprint(time.Now().Add(50*time.Millisecond).Unix()))
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprintln(w, `{}`)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintln(w, `{}`)
-			return
-		}
+			fmt.Fprintln(w, `{"message": "ok"}`)
+		}))
+		defer ts.Close()
 
-		// Andre kall er suksess
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{"message": "ok"}`)
-	}))
-	defer ts.Close()
+		fetcher.HttpClient = ts.Client()
 
-	// Midlertidig bytt ut httpClient
-	orig := httpClient
-	httpClient = ts.Client()
-	defer func() { httpClient = orig }()
+		var result struct{ Message string }
+		err := fetcher.DoRequestWithRateLimit("GET", ts.URL, "dummy-token", nil, &result)
+		Expect(err).To(BeNil())
+		Expect(result.Message).To(Equal("ok"))
+		Expect(callCount).To(BeNumerically(">=", 2))
+	})
 
-	type response struct {
-		Message string `json:"message"`
-	}
-	var result response
+	It("skal sette Content-Type header for POST", func() {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			Expect(r.Method).To(Equal("POST"))
+			Expect(r.Header.Get("Content-Type")).To(Equal("application/json"))
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintln(w, `{"message": "ok"}`)
+		}))
+		defer ts.Close()
 
-	err := doRequestWithRateLimit("GET", ts.URL, "dummy-token", nil, &result)
-	if err != nil {
-		t.Fatalf("doRequestWithRateLimit failed: %v", err)
-	}
-	if result.Message != "ok" {
-		t.Errorf("unexpected result: %+v", result)
-	}
-	if callCount < 2 {
-		t.Errorf("expected 2 calls due to rate limit, got %d", callCount)
-	}
-}
+		fetcher.HttpClient = ts.Client()
 
-func TestDoRequestWithRateLimit_POSTContentType(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ct := r.Header.Get("Content-Type")
-		if ct != "application/json" {
-			t.Errorf("unexpected Content-Type: %s", ct)
-		}
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `{"message": "ok"}`)
-	}))
-	defer ts.Close()
+		var result struct{ Message string }
+		err := fetcher.DoRequestWithRateLimit("POST", ts.URL, "token", []byte(`{}`), &result)
+		Expect(err).To(BeNil())
+		Expect(result.Message).To(Equal("ok"))
+	})
 
-	orig := httpClient
-	httpClient = ts.Client()
-	defer func() { httpClient = orig }()
+	It("skal feile på ugyldig URL (DNS-feil)", func() {
+		var result any
+		err := fetcher.DoRequestWithRateLimit("GET", "http://invalid-url", "token", nil, &result)
+		Expect(err).To(HaveOccurred())
+	})
 
-	var result struct{ Message string }
-	err := doRequestWithRateLimit("POST", ts.URL, "token", []byte(`{}`), &result)
-	if err != nil {
-		t.Fatalf("POST request failed: %v", err)
-	}
-}
+	It("skal feile på ugyldig request-format (syntax)", func() {
+		var result any
+		err := fetcher.DoRequestWithRateLimit("GET", ":", "token", nil, &result)
+		Expect(err).To(HaveOccurred())
+	})
 
-func TestDoRequestWithRateLimit_RequestFail(t *testing.T) {
-	var out any
-	err := doRequestWithRateLimit("GET", "http://invalid-url", "token", nil, &out)
-	if err == nil {
-		t.Errorf("expected error, got nil")
-	}
-}
+	It("skal returnere feil hvis GitHub API svarer med status != 2xx", func() {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusForbidden) // 403
+			fmt.Fprint(w, `{"message":"access denied"}`)
+		}))
+		defer ts.Close()
 
-func TestDoRequestWithRateLimit_BadRequest(t *testing.T) {
-	var result any
-	err := doRequestWithRateLimit("GET", ":", "token", nil, &result)
-	if err == nil {
-		t.Errorf("expected error from bad request, got nil")
-	}
-}
+		fetcher.HttpClient = ts.Client()
+
+		var result any
+		err := fetcher.DoRequestWithRateLimit("GET", ts.URL, "token", nil, &result)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("GitHub API-feil"))
+		Expect(err.Error()).To(ContainSubstring("403"))
+		Expect(err.Error()).To(ContainSubstring("access denied"))
+	})
+})
