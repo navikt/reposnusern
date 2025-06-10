@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"os"
@@ -9,15 +10,10 @@ import (
 	"time"
 
 	"github.com/jonmartinstorm/reposnusern/internal/config"
-	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
 )
 
-func RunApp(ctx context.Context, cfg config.Config) error {
+func RunApp(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 	start := time.Now()
-
-	deps := RealDeps{
-		GitHub: &fetcher.GitHubAPI{},
-	}
 
 	err := Run(ctx, cfg, deps)
 	if err != nil {
@@ -54,4 +50,31 @@ func ByteSize(b uint64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
+}
+
+func SetupLogger() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level:     slog.LevelInfo,
+		AddSource: false,
+	}))
+	slog.SetDefault(logger)
+}
+
+func CheckDatabaseConnection(ctx context.Context, dsn string) {
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		slog.Error("Kunne ikke åpne DB-forbindelse", "error", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			slog.Warn("⚠️ Klarte ikke å lukke testDB", "error", err)
+		}
+	}()
+
+	if err := db.PingContext(ctx); err != nil {
+		slog.Error("❌ Klarte ikke å nå databasen", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("✅ DB-tilkobling OK")
 }

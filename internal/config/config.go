@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"log/slog"
 	"os"
 )
 
@@ -11,6 +12,15 @@ type Config struct {
 	PostgresDSN  string
 	Debug        bool
 	SkipArchived bool
+}
+
+func LoadAndValidateConfig() Config {
+	cfg := LoadConfig()
+	if err := ValidateConfig(cfg); err != nil {
+		slog.Error("❌ Ugyldig konfigurasjon", "error", err)
+		os.Exit(1)
+	}
+	return cfg
 }
 
 func LoadConfig() Config {
