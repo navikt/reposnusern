@@ -32,13 +32,13 @@ var _ = Describe("doRequestWithRateLimit", func() {
 				w.Header().Set("X-RateLimit-Remaining", "0")
 				w.Header().Set("X-RateLimit-Reset", fmt.Sprint(time.Now().Add(50*time.Millisecond).Unix()))
 				w.WriteHeader(http.StatusOK)
-				fmt.Fprintln(w, `{}`)
+				_, _ = fmt.Fprintln(w, `{}`)
 				return
 			}
 
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintln(w, `{"message": "ok"}`)
+			_, _ = fmt.Fprintln(w, `{"message": "ok"}`)
 		}))
 		defer ts.Close()
 
@@ -56,7 +56,7 @@ var _ = Describe("doRequestWithRateLimit", func() {
 			Expect(r.Method).To(Equal("POST"))
 			Expect(r.Header.Get("Content-Type")).To(Equal("application/json"))
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintln(w, `{"message": "ok"}`)
+			_, _ = fmt.Fprintln(w, `{"message": "ok"}`)
 		}))
 		defer ts.Close()
 
@@ -83,7 +83,7 @@ var _ = Describe("doRequestWithRateLimit", func() {
 	It("skal returnere feil hvis GitHub API svarer med status != 2xx", func() {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusForbidden) // 403
-			fmt.Fprint(w, `{"message":"access denied"}`)
+			_, _ = fmt.Fprint(w, `{"message":"access denied"}`)
 		}))
 		defer ts.Close()
 

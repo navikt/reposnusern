@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -42,7 +43,11 @@ func DoRequestWithRateLimit(method, url, token string, body []byte, out interfac
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				log.Printf("advarsel: klarte ikke å lukke body: %v", err)
+			}
+		}()
 
 		if rl := resp.Header.Get("X-RateLimit-Remaining"); rl == "0" {
 			reset := resp.Header.Get("X-RateLimit-Reset")

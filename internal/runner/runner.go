@@ -22,7 +22,9 @@ func Run(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 	if err != nil {
 		return fmt.Errorf("DB-feil: %w", err)
 	}
-	defer db.Close()
+	if err := db.Close(); err != nil {
+		return fmt.Errorf("klarte ikke å close db: %w", err)
+	}
 
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
@@ -67,7 +69,6 @@ func Run(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 				return fmt.Errorf("import repo: %w", err)
 			}
 
-			entry = nil
 			if repoIndex%25 == 0 {
 				runtime.GC()
 			}

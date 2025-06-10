@@ -62,9 +62,10 @@ func ImportRepo(ctx context.Context, db *sql.DB, entry models.RepoEntry, index i
 	}
 
 	if err := queries.InsertRepo(ctx, repo); err != nil {
-		tx.Rollback()
-		slog.Error("🚨 Feil ved InsertRepo – ruller tilbake", "repo", name, "error", err)
-		return fmt.Errorf("insert repo failed: %w", err)
+		if rbErr := tx.Rollback(); rbErr != nil {
+			return fmt.Errorf("InsertRepo feilet: %v (rollback feilet: %w)", err, rbErr)
+		}
+		return fmt.Errorf("InsertRepo feilet: %w", err)
 	}
 
 	insertLanguages(ctx, queries, id, name, entry.Languages)

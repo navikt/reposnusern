@@ -52,7 +52,10 @@ func main() {
 		slog.Error("❌ Klarte ikke å nå databasen", "error", err)
 		os.Exit(1)
 	}
-	testDB.Close()
+	if err := testDB.Close(); err != nil {
+		slog.Error("warning: failed to close testDB", "error", err)
+		os.Exit(1)
+	}
 	slog.Info("✅ DB-tilkobling OK")
 
 	if err := runner.RunApp(ctx, cfg); err != nil {
