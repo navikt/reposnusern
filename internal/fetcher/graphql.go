@@ -11,33 +11,6 @@ import (
 	"github.com/jonmartinstorm/reposnusern/internal/models"
 )
 
-func GetDetailsActiveReposGraphQL(org, token string, repos []models.RepoMeta) models.OrgRepos {
-	allData := models.OrgRepos{
-		Org:   org,
-		Repos: []models.RepoEntry{},
-	}
-
-	for i, r := range repos {
-		fullName := r.FullName
-		if r.Archived {
-			continue
-		}
-		slog.Info("Bearbeider repo (GraphQL)", "index", i+1, "total", len(repos), "repo", fullName)
-
-		parts := strings.Split(fullName, "/")
-		owner, name := parts[0], parts[1]
-
-		// Hent metadata via GraphQL
-		data := FetchRepoGraphQL(owner, name, token, r)
-		if data == nil {
-			slog.Warn("Hoppet over repo", "repo", fullName)
-			continue
-		}
-		allData.Repos = append(allData.Repos, *data)
-	}
-	return allData
-}
-
 func FetchRepoGraphQL(owner, name, token string, baseRepo models.RepoMeta) *models.RepoEntry {
 	query := fmt.Sprintf(`
 	{
