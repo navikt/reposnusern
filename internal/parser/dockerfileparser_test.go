@@ -1,19 +1,27 @@
-package parser
+package parser_test
 
 import (
 	"testing"
+
+	"github.com/jonmartinstorm/reposnusern/internal/parser"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func TestParseDockerfile(t *testing.T) {
-	tests := []struct {
-		name     string
-		content  string
-		expected DockerfileFeatures
-	}{
-		{
-			name: "Basic Dockerfile with latest tag",
-			content: `
-FROM ubuntu:latest
+func TestParser(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Dockerfile Parser Suite")
+}
+
+var _ = Describe("ParseDockerfile", func() {
+	DescribeTable("Basic parsing",
+		func(content string, expected parser.DockerfileFeatures) {
+			result := parser.ParseDockerfile(content)
+			Expect(result).To(Equal(expected))
+		},
+
+		Entry("Basic Dockerfile with latest tag",
+			`FROM ubuntu:latest
 USER appuser
 COPY . /app
 RUN apt-get update && apt-get install -y curl
@@ -21,7 +29,7 @@ ENV SECRET_TOKEN=abc123
 EXPOSE 8080
 ENTRYPOINT ["./start.sh"]
 `,
-			expected: DockerfileFeatures{
+			parser.DockerfileFeatures{
 				BaseImage:            "ubuntu",
 				BaseTag:              "latest",
 				UsesLatestTag:        true,
@@ -40,16 +48,15 @@ ENTRYPOINT ["./start.sh"]
 				WorldWritable:        false,
 				HasSecretsInEnvOrArg: true,
 			},
-		},
-		{
-			name: "Multistage with sensitive copy",
-			content: `
-FROM golang:1.20 AS builder
+		),
+
+		Entry("Multistage with sensitive copy",
+			`FROM golang:1.20 AS builder
 COPY .ssh /root/.ssh
 FROM alpine
 COPY --from=builder /app /app
 `,
-			expected: DockerfileFeatures{
+			parser.DockerfileFeatures{
 				BaseImage:            "golang",
 				BaseTag:              "1.20",
 				UsesLatestTag:        false,
@@ -68,68 +75,39 @@ COPY --from=builder /app /app
 				WorldWritable:        false,
 				HasSecretsInEnvOrArg: false,
 			},
-		},
-	}
+		),
+	)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := ParseDockerfile(tt.content)
-			if result != tt.expected {
-				t.Errorf("Expected %+v, got %+v", tt.expected, result)
-			}
-		})
-	}
-}
-
-func TestParseDockerfile_AdditionalFeatures(t *testing.T) {
-	content := `
+	It("should detect advanced features like add, curl, build tools, and apt clean", func() {
+		content := `
 FROM debian
 USER appuser
 ADD file.tar.gz /app
 RUN apt-get update && apt-get install -y gcc make curl && apt-get clean
 `
-	f := ParseDockerfile(content)
+		f := parser.ParseDockerfile(content)
 
-	if !f.HasUserInstruction {
-		t.Errorf("expected HasUserInstruction true")
-	}
-	if !f.UsesAddInstruction {
-		t.Errorf("expected UsesAddInstruction true")
-	}
-	if !f.HasPackageInstalls {
-		t.Errorf("expected HasPackageInstalls true")
-	}
-	if !f.InstallsCurlOrWget {
-		t.Errorf("expected InstallsCurlOrWget true")
-	}
-	if !f.InstallsBuildTools {
-		t.Errorf("expected InstallsBuildTools true")
-	}
-	if !f.HasAptGetClean {
-		t.Errorf("expected HasAptGetClean true")
-	}
-}
+		Expect(f.HasUserInstruction).To(BeTrue())
+		Expect(f.UsesAddInstruction).To(BeTrue())
+		Expect(f.HasPackageInstalls).To(BeTrue())
+		Expect(f.InstallsCurlOrWget).To(BeTrue())
+		Expect(f.InstallsBuildTools).To(BeTrue())
+		Expect(f.HasAptGetClean).To(BeTrue())
+	})
 
-func TestParseDockerfile_MissingBits(t *testing.T) {
-	content := `
+	It("should detect label, expose, healthcheck, and world writable", func() {
+		content := `
 FROM alpine
 LABEL version="1.0"
 EXPOSE 443
 HEALTHCHECK CMD curl -f http://localhost || exit 1
 RUN chmod 777 /tmp/file
 `
-	f := ParseDockerfile(content)
+		f := parser.ParseDockerfile(content)
 
-	if !f.HasLabelMetadata {
-		t.Errorf("expected HasLabelMetadata true")
-	}
-	if !f.HasExpose {
-		t.Errorf("expected HasExpose true")
-	}
-	if !f.HasHealthcheck {
-		t.Errorf("expected HasHealthcheck true")
-	}
-	if !f.WorldWritable {
-		t.Errorf("expected WorldWritable true")
-	}
-}
+		Expect(f.HasLabelMetadata).To(BeTrue())
+		Expect(f.HasExpose).To(BeTrue())
+		Expect(f.HasHealthcheck).To(BeTrue())
+		Expect(f.WorldWritable).To(BeTrue())
+	})
+})
