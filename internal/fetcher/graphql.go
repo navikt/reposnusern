@@ -9,6 +9,10 @@ import (
 	"github.com/jonmartinstorm/reposnusern/internal/models"
 )
 
+func (g *GitHubAPIClient) Fetch(owner, name, token string, baseRepo models.RepoMeta) *models.RepoEntry {
+	return FetchRepoGraphQL(owner, name, token, baseRepo)
+}
+
 func FetchRepoGraphQL(owner, name, token string, baseRepo models.RepoMeta) *models.RepoEntry {
 	query := BuildRepoQuery(owner, name)
 

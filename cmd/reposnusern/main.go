@@ -17,7 +17,7 @@ import (
 )
 
 type AppDeps struct {
-	GitHub fetcher.GitHubClient
+	GitHub fetcher.GitHubAPI
 }
 
 func (AppDeps) OpenDB(dsn string) (*sql.DB, error) {
@@ -28,8 +28,8 @@ func (a AppDeps) GetRepoPage(cfg config.Config, page int) ([]models.RepoMeta, er
 	return a.GitHub.GetRepoPage(cfg, page)
 }
 
-func (AppDeps) FetchRepoGraphQL(org, name, token string, base models.RepoMeta) *models.RepoEntry {
-	return fetcher.FetchRepoGraphQL(org, name, token, base)
+func (a AppDeps) Fetcher() fetcher.GraphQLFetcher {
+	return a.GitHub
 }
 
 func (AppDeps) ImportRepo(ctx context.Context, db *sql.DB, entry models.RepoEntry, index int) error {
@@ -58,7 +58,7 @@ func main() {
 	}
 
 	deps := AppDeps{
-		GitHub: &fetcher.GitHubAPI{},
+		GitHub: &fetcher.GitHubAPIClient{},
 	}
 
 	if err := runner.RunApp(ctx, cfg, deps); err != nil {

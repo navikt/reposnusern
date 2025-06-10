@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/jonmartinstorm/reposnusern/internal/config"
-	"github.com/jonmartinstorm/reposnusern/internal/dbwriter"
-	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
 )
 
 const MaxDebugRepos = 10
@@ -57,7 +55,7 @@ func Run(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 			}
 
 			slog.Info("📦 Henter detaljer via GraphQL", "repo", repo.FullName)
-			entry := fetcher.FetchRepoGraphQL(cfg.Org, repo.Name, cfg.Token, repo)
+			entry := deps.Fetcher().Fetch(cfg.Org, repo.Name, cfg.Token, repo)
 			if entry == nil {
 				slog.Warn("⚠️ Hopper over tomt repo", "repo", repo.FullName)
 				continue
@@ -66,7 +64,7 @@ func Run(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 			repoIndex++
 			slog.Info("⏳ Behandler repo", "nummer", repoIndex, "navn", repo.FullName)
 
-			if err := dbwriter.ImportRepo(ctx, db, *entry, repoIndex); err != nil {
+			if err := deps.ImportRepo(ctx, db, *entry, repoIndex); err != nil {
 				return fmt.Errorf("import repo: %w", err)
 			}
 

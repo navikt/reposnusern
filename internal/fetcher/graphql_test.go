@@ -57,18 +57,20 @@ var _ = Describe("GraphQL-relaterte hjelpefunksjoner", func() {
 	Describe("parseRepoData", func() {
 		It("skal returnere strukturert RepoEntry fra minimal GraphQL-respons", func() {
 			data := map[string]interface{}{
-				"languages": map[string]interface{}{
-					"edges": []interface{}{
-						map[string]interface{}{
-							"size": float64(100),
-							"node": map[string]interface{}{"name": "Go"},
+				"repository": map[string]interface{}{
+					"languages": map[string]interface{}{
+						"edges": []interface{}{
+							map[string]interface{}{
+								"size": float64(100),
+								"node": map[string]interface{}{"name": "Go"},
+							},
 						},
 					},
+					"README":     map[string]interface{}{"text": "Hello world"},
+					"SECURITY":   map[string]interface{}{},
+					"dependabot": nil,
+					"codeql":     map[string]interface{}{},
 				},
-				"README":     map[string]interface{}{"text": "Hello world"},
-				"SECURITY":   map[string]interface{}{},
-				"dependabot": nil,
-				"codeql":     map[string]interface{}{},
 			}
 			base := models.RepoMeta{Name: "arbeidsgiver"}
 			entry := fetcher.ParseRepoData(data, base)

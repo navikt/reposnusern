@@ -13,6 +13,7 @@ import (
 	"github.com/jonmartinstorm/reposnusern/internal/runner"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestRunApp(t *testing.T) {
@@ -22,10 +23,11 @@ func TestRunApp(t *testing.T) {
 
 var _ = Describe("RunAppSafe", func() {
 	var (
-		ctx  context.Context
-		cfg  config.Config
-		mock *mocks.MockRunnerDeps
-		db   *sql.DB
+		ctx   context.Context
+		cfg   config.Config
+		deps  *mocks.MockRunnerDeps
+		db    *sql.DB
+		smock sqlmock.Sqlmock
 	)
 
 	BeforeEach(func() {
@@ -36,49 +38,77 @@ var _ = Describe("RunAppSafe", func() {
 			Token:       "123",
 			PostgresDSN: "mockdb",
 		}
-		db, _, err = sqlmock.New()
+		db, smock, err = sqlmock.New()
 		Expect(err).To(BeNil())
 
-		mock = mocks.NewMockRunnerDeps(GinkgoT())
+		deps = mocks.NewMockRunnerDeps(GinkgoT())
 	})
 
 	AfterEach(func() {
-		db.Close()
+		if db != nil {
+			err := smock.ExpectationsWereMet()
+			Expect(err).To(BeNil())
+		}
 	})
 
 	It("returnerer nil når Run lykkes", func() {
-		mock.EXPECT().
+		mockFetcher := mocks.NewMockGraphQLFetcher(GinkgoT())
+
+		deps.EXPECT().
 			OpenDB(cfg.PostgresDSN).
 			Return(db, nil)
 
-		mock.EXPECT().
+		deps.EXPECT().
 			GetRepoPage(cfg, 1).
+			Return([]models.RepoMeta{
+				{FullName: "test/repo", Name: "repo"},
+			}, nil)
+
+		deps.EXPECT().
+			GetRepoPage(cfg, 2).
 			Return([]models.RepoMeta{}, nil)
 
-		err := runner.RunAppSafe(ctx, cfg, mock)
+		deps.EXPECT().
+			Fetcher().
+			Return(mockFetcher)
+
+		mockFetcher.EXPECT().
+			Fetch(cfg.Org, "repo", cfg.Token, mock.Anything).
+			Return(&models.RepoEntry{})
+
+		deps.EXPECT().
+			ImportRepo(ctx, db, mock.AnythingOfType("models.RepoEntry"), 1).
+			Return(nil)
+
+		smock.ExpectClose()
+		err := runner.RunAppSafe(ctx, cfg, deps)
+		Expect(err).To(BeNil())
+
+		// Verifiser at alle forventninger ble møtt
+		err = smock.ExpectationsWereMet()
 		Expect(err).To(BeNil())
 	})
 
 	It("returnerer feil når GetRepoPage feiler", func() {
-		mock.EXPECT().
+		deps.EXPECT().
 			OpenDB(cfg.PostgresDSN).
 			Return(db, nil)
 
-		mock.EXPECT().
+		deps.EXPECT().
 			GetRepoPage(cfg, 1).
 			Return(nil, errors.New("API fail"))
 
-		err := runner.RunAppSafe(ctx, cfg, mock)
+		err := runner.RunAppSafe(ctx, cfg, deps)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("API fail"))
 	})
 
 	It("returnerer feil når OpenDB feiler", func() {
-		mock.EXPECT().
+		deps.EXPECT().
 			OpenDB(cfg.PostgresDSN).
 			Return(nil, errors.New("DB nede"))
 
-		err := runner.RunAppSafe(ctx, cfg, mock)
+		err := runner.RunAppSafe(ctx, cfg, deps)
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("DB nede"))
 	})

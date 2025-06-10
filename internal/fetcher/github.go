@@ -69,9 +69,7 @@ func DoRequestWithRateLimit(method, url, token string, body []byte, out interfac
 	}
 }
 
-type GitHubAPI struct{}
-
-func (g *GitHubAPI) GetRepoPage(cfg config.Config, page int) ([]models.RepoMeta, error) {
+func (g *GitHubAPIClient) GetRepoPage(cfg config.Config, page int) ([]models.RepoMeta, error) {
 	url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&type=all&page=%d", cfg.Org, page)
 	var pageRepos []models.RepoMeta
 	slog.Info("Henter repos", "page", page)
