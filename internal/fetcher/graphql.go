@@ -10,66 +10,7 @@ import (
 )
 
 func FetchRepoGraphQL(owner, name, token string, baseRepo models.RepoMeta) *models.RepoEntry {
-	query := fmt.Sprintf(`
-	{
-		repository(owner: "%s", name: "%s") {
-			defaultBranchRef {
-				name
-			}
-			README: object(expression: "HEAD:README.md") {
-				... on Blob {
-					text
-				}
-			}
-			SECURITY: object(expression: "HEAD:SECURITY.md") {
-				... on Blob {
-					text
-				}
-			}
-			dependabot: object(expression: "HEAD:.github/dependabot.yml") {
-				... on Blob {
-					text
-				}
-			}
-			codeql: object(expression: "HEAD:.github/codeql.yml") {
-				... on Blob {
-					text
-				}
-			}
-			workflows: object(expression: "HEAD:.github/workflows") {
-				... on Tree {
-					entries {
-						name
-						object {
-							... on Blob {
-								text
-							}
-						}
-					}
-				}
-			}
-			dependencies: object(expression: "HEAD:") {
-				... on Tree {
-					entries {
-						name
-						object {
-							... on Blob {
-								text
-							}
-						}
-					}
-				}
-			}
-			languages(first: 10) {
-				edges {
-					size
-					node {
-						name
-					}
-				}
-			}
-		}
-	}`, owner, name)
+	query := buildRepoQuery(owner, name)
 
 	reqBody := map[string]string{"query": query}
 	bodyBytes, err := json.Marshal(reqBody)
@@ -220,6 +161,70 @@ func FetchRepoGraphQL(owner, name, token string, baseRepo models.RepoMeta) *mode
 		Security:  security,
 		SBOM:      sbom,
 	}
+}
+
+func buildRepoQuery(owner string, name string) string {
+	query := fmt.Sprintf(`
+	{
+		repository(owner: "%s", name: "%s") {
+			defaultBranchRef {
+				name
+			}
+			README: object(expression: "HEAD:README.md") {
+				... on Blob {
+					text
+				}
+			}
+			SECURITY: object(expression: "HEAD:SECURITY.md") {
+				... on Blob {
+					text
+				}
+			}
+			dependabot: object(expression: "HEAD:.github/dependabot.yml") {
+				... on Blob {
+					text
+				}
+			}
+			codeql: object(expression: "HEAD:.github/codeql.yml") {
+				... on Blob {
+					text
+				}
+			}
+			workflows: object(expression: "HEAD:.github/workflows") {
+				... on Tree {
+					entries {
+						name
+						object {
+							... on Blob {
+								text
+							}
+						}
+					}
+				}
+			}
+			dependencies: object(expression: "HEAD:") {
+				... on Tree {
+					entries {
+						name
+						object {
+							... on Blob {
+								text
+							}
+						}
+					}
+				}
+			}
+			languages(first: 10) {
+				edges {
+					size
+					node {
+						name
+					}
+				}
+			}
+		}
+	}`, owner, name)
+	return query
 }
 
 func FetchSBOM(owner, repo, token string) map[string]interface{} {

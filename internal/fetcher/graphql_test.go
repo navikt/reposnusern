@@ -2,6 +2,7 @@ package fetcher
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/jonmartinstorm/reposnusern/internal/models"
@@ -44,5 +45,18 @@ func TestConvertFiles(t *testing.T) {
 	result := convertFiles(input)
 	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("expected %+v, got %+v", expected, result)
+	}
+}
+
+func TestBuildRepoQuery(t *testing.T) {
+	owner := "navikt"
+	repo := "arbeidsgiver"
+	query := buildRepoQuery(owner, repo)
+
+	if !strings.Contains(query, `repository(owner: "navikt", name: "arbeidsgiver")`) {
+		t.Errorf("buildRepoQuery() mangler korrekt owner/repo: %s", query)
+	}
+	if !strings.Contains(query, "defaultBranchRef") {
+		t.Errorf("buildRepoQuery() ser ikke ut til å inkludere forventet GraphQL-innhold")
 	}
 }
