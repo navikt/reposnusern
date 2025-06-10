@@ -15,7 +15,7 @@ import (
 
 const MaxDebugRepos = 10
 
-func Run(ctx context.Context, cfg config.Config) error {
+func Run(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 	slog.Info("🔁 Starter repo-import én og én")
 
 	db, err := sql.Open("postgres", cfg.PostgresDSN)

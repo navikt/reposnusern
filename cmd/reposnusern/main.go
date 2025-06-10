@@ -3,14 +3,11 @@ package main
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
 	"log/slog"
 	"os"
 	"os/signal"
-	"runtime"
 	"syscall"
-	"time"
 
 	"github.com/jonmartinstorm/reposnusern/internal/config"
 	"github.com/jonmartinstorm/reposnusern/internal/runner"
@@ -58,41 +55,9 @@ func main() {
 	testDB.Close()
 	slog.Info("✅ DB-tilkobling OK")
 
-	start := time.Now()
-
-	// Kjør runner
-	err = runner.Run(ctx, cfg)
-	if err != nil {
-		slog.Error("Runner feilet", "error", err)
+	if err := runner.RunApp(ctx, cfg); err != nil {
+		slog.Error("🚨 Applikasjonen feilet", "error", err)
 		os.Exit(1)
 	}
 
-	logMemoryStats()
-
-	elapsed := time.Since(start)
-	slog.Info("✅ Ferdig!", "varighet", elapsed.String())
-}
-
-// Logger topp minnebruk
-func logMemoryStats() {
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	slog.Info("📊 Minnebruk",
-		"alloc", byteSize(m.Alloc),
-		"totalAlloc", byteSize(m.TotalAlloc),
-		"sys", byteSize(m.Sys),
-		"numGC", m.NumGC)
-}
-
-func byteSize(b uint64) string {
-	const unit = 1024
-	if b < unit {
-		return fmt.Sprintf("%d B", b)
-	}
-	div, exp := unit, 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
 }
