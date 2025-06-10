@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -51,6 +52,12 @@ func doRequestWithRateLimit(method, url, token string, body []byte, out interfac
 				time.Sleep(wait)
 				continue
 			}
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			slog.Error("GitHub-feil", "status", resp.StatusCode, "body", string(bodyBytes))
+			return fmt.Errorf("GitHub API-feil: status %d – %s", resp.StatusCode, string(bodyBytes))
 		}
 
 		return json.NewDecoder(resp.Body).Decode(out)
