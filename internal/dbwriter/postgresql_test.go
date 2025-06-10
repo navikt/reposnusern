@@ -1,43 +1,39 @@
-package dbwriter
+package dbwriter_test
 
-import "testing"
+import (
+	"testing"
 
-func TestSafeLicense(t *testing.T) {
-	tests := []struct {
-		name string
-		in   *struct{ SpdxID string }
-		want string
-	}{
-		{"nil input", nil, ""},
-		{"valid license", &struct{ SpdxID string }{SpdxID: "MIT"}, "MIT"},
-	}
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := safeLicense(tt.in)
-			if got != tt.want {
-				t.Errorf("safeLicense() = %q, want %q", got, tt.want)
-			}
-		})
-	}
+	"github.com/jonmartinstorm/reposnusern/internal/dbwriter"
+)
+
+func TestDbwriter(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "DBWriter – Utils")
 }
 
-func TestSafeString(t *testing.T) {
-	tests := []struct {
-		name string
-		in   interface{}
-		want string
-	}{
-		{"nil input", nil, ""},
-		{"valid string", "hello", "hello"},
-	}
+var _ = Describe("Utils-funksjoner for trygg konvertering", func() {
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := safeString(tt.in)
-			if got != tt.want {
-				t.Errorf("safeString() = %q, want %q", got, tt.want)
-			}
+	Describe("safeLicense", func() {
+		It("skal returnere tom streng ved nil input", func() {
+			Expect(dbwriter.SafeLicense(nil)).To(Equal(""))
 		})
-	}
-}
+
+		It("skal returnere riktig SPDX-ID når input er gyldig", func() {
+			license := &struct{ SpdxID string }{SpdxID: "MIT"}
+			Expect(dbwriter.SafeLicense(license)).To(Equal("MIT"))
+		})
+	})
+
+	Describe("safeString", func() {
+		It("skal returnere tom streng for nil", func() {
+			Expect(dbwriter.SafeString(nil)).To(Equal(""))
+		})
+
+		It("skal returnere original tekst når input er en string", func() {
+			Expect(dbwriter.SafeString("hello")).To(Equal("hello"))
+		})
+	})
+})

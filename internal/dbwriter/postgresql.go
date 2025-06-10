@@ -12,14 +12,14 @@ import (
 	"github.com/jonmartinstorm/reposnusern/internal/storage"
 )
 
-func safeLicense(lic *struct{ SpdxID string }) string {
+func SafeLicense(lic *struct{ SpdxID string }) string {
 	if lic == nil {
 		return ""
 	}
 	return lic.SpdxID
 }
 
-func safeString(v interface{}) string {
+func SafeString(v interface{}) string {
 	if v == nil {
 		return ""
 	}
@@ -56,7 +56,7 @@ func ImportRepo(ctx context.Context, db *sql.DB, entry models.RepoEntry, index i
 		HtmlUrl:      r.HtmlUrl,
 		Topics:       strings.Join(r.Topics, ","),
 		Visibility:   r.Visibility,
-		License:      safeLicense((*struct{ SpdxID string })(r.License)),
+		License:      SafeLicense((*struct{ SpdxID string })(r.License)),
 		OpenIssues:   r.OpenIssues,
 		LanguagesUrl: r.LanguagesURL,
 	}
@@ -230,9 +230,9 @@ func insertSBOMPackagesGithub(
 			continue
 		}
 
-		nameVal := safeString(pkg["name"])
-		version := safeString(pkg["versionInfo"])
-		license := safeString(pkg["licenseConcluded"])
+		nameVal := SafeString(pkg["name"])
+		version := SafeString(pkg["versionInfo"])
+		license := SafeString(pkg["licenseConcluded"])
 
 		// Prøv å hente ut PURL (Package URL) fra externalRefs
 		var purl string
@@ -243,7 +243,7 @@ func insertSBOMPackagesGithub(
 					continue
 				}
 				if refMap["referenceType"] == "purl" {
-					purl = safeString(refMap["referenceLocator"])
+					purl = SafeString(refMap["referenceLocator"])
 					break
 				}
 			}
