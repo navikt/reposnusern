@@ -25,3 +25,6 @@ go-test-with-cover:
 	@cat $(COVER_OUT) $(EXCLUDE_GREP) > $(COVER_FILTERED)
 	@go tool cover -html=$(COVER_FILTERED) -o cover.html
 	@open cover.html || xdg-open cover.html || echo "Åpne cover.html manuelt"
+
+generate-mocks:
+	@mockery --all --with-expecter --keeptree
