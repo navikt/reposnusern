@@ -54,7 +54,8 @@ tidy:
 	@go mod tidy
 
 lint:
-	@golangci-lint run
+	@command -v golangci-lint >/dev/null 2>&1 && golangci-lint run
+
 
 check-secrets:
 	@! grep -r "ghp_" . || (echo "🚨 GitHub token funnet i kode!"; exit 1)
@@ -64,4 +65,4 @@ check-secrets:
 # -------------------------------
 
 generate-mocks:
-	@mockery --all --with-expecter --keeptree
+	@command -v mockery >/dev/null 2>&1 && mockery --all --with-expecter --keeptree 
