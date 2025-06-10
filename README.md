@@ -87,16 +87,17 @@ Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. 
 - [x] Parsing av forskjellige dependency filer
 - [x] Også hente REST API endpoints for software bill of materials (SBOM)
 - [x] 🔐 Hindre at passord og secrets utilsiktet havner i logger
-- [x] ✅ Legge til noen enkle tester (det var jo bare en PoC 😅)
+- [x] ✅ Legge til noen enkle tester
 - [x] 🧹 Refaktorering og deling av logikk
+- [ ] Gjøre om alle testene til Ginko/gomega
 - [ ] Bedre logging
-- [ ] ☁️ Gjøre klart for K8s-deploy (config, secrets, jobs)
+- [x] ☁️ Gjøre klart for K8s-deploy (config, secrets, jobs)
 - [ ] Sørge for at GraphQL versjonen også parser lenger ned enn toppnivå mappen.
-- [ ] Vurdere om sbom direkte har fjernet behovet for dependency files
+- [x] Vurdere om sbom direkte har fjernet behovet for dependency files
 - [ ] Optimalisering
   - [ ] Lage en bulk insert til db for relevante objekter
-  - [ ] Fortsette å optimalisere på minne
-- [ ] Forbedre dockerfile features parseren for mer info
+  - [x] Fortsette å optimalisere på minne
+- [x] Forbedre dockerfile features parseren for mer info
 - [ ] Oppdatere schema så vi tar vare på dato vi har hentet informasjonen fra. (Så vi kan ta vare på trenden.)
 
 ## Annen inspirasjon

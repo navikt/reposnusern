@@ -36,7 +36,38 @@ func FetchRepoGraphQL(owner, name, token string, baseRepo models.RepoMeta) *mode
 		return nil
 	}
 
-	// Pakker relevant ut
+	sbom := fetchSBOM(owner, name, token)
+	entry := parseRepoData(data, baseRepo)
+
+	entry.SBOM = sbom
+	return entry
+}
+
+func fetchSBOM(owner, repo, token string) map[string]interface{} {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/dependency-graph/sbom", owner, repo)
+
+	var sbom map[string]interface{}
+	err := doRequestWithRateLimit("GET", url, token, nil, &sbom)
+	if err != nil {
+		slog.Warn("SBOM-kall feilet", "repo", owner+"/"+repo, "error", err)
+		return nil
+	}
+	return sbom
+}
+
+func parseRepoData(data map[string]interface{}, baseRepo models.RepoMeta) *models.RepoEntry {
+
+	return &models.RepoEntry{
+		Repo:      baseRepo,
+		Languages: extractLanguages(data),
+		Files:     extractFiles(data),
+		CIConfig:  extractCI(data),
+		Readme:    extractReadme(data),
+		Security:  extractSecurity(data),
+	}
+}
+
+func extractLanguages(data map[string]interface{}) map[string]int {
 	langs := map[string]int{}
 
 	if langsData, ok := data["languages"].(map[string]interface{}); ok {
@@ -65,10 +96,11 @@ func FetchRepoGraphQL(owner, name, token string, baseRepo models.RepoMeta) *mode
 			}
 		}
 	}
+	return langs
+}
 
+func extractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 	files := map[string][]map[string]string{}
-	ci := []map[string]string{}
-	security := map[string]bool{}
 
 	// Dependency files
 	if deps, ok := data["dependencies"].(map[string]interface{}); ok {
@@ -82,12 +114,10 @@ func FetchRepoGraphQL(owner, name, token string, baseRepo models.RepoMeta) *mode
 				name, _ := entry["name"].(string)
 				lowerName := strings.ToLower(name)
 
-				// 🚫 Ikke hent innhold med mindre det er en dockerfile
 				if !strings.Contains(lowerName, "dockerfile") {
 					continue
 				}
 
-				// ✅ Nå vet vi det er relevant → hent .object.text
 				var content string
 				if obj, ok := entry["object"].(map[string]interface{}); ok {
 					if text, ok := obj["text"].(string); ok {
@@ -104,7 +134,11 @@ func FetchRepoGraphQL(owner, name, token string, baseRepo models.RepoMeta) *mode
 			}
 		}
 	}
+	return convertFiles(files)
+}
 
+func extractCI(data map[string]interface{}) []models.FileEntry {
+	ci := []map[string]string{}
 	// CI config
 	if workflows, ok := data["workflows"].(map[string]interface{}); ok {
 		if entries, ok := workflows["entries"].([]interface{}); ok {
@@ -133,34 +167,24 @@ func FetchRepoGraphQL(owner, name, token string, baseRepo models.RepoMeta) *mode
 			}
 		}
 	}
+	return convertToFileEntries(ci)
+}
 
-	// Security metadata
+func extractSecurity(data map[string]interface{}) map[string]bool {
+	security := map[string]bool{}
 	security["has_security_md"] = data["SECURITY"] != nil
 	security["has_dependabot"] = data["dependabot"] != nil
 	security["has_codeql"] = data["codeql"] != nil
+	return security
+}
 
-	readme := ""
+func extractReadme(data map[string]interface{}) string {
 	if val, ok := data["README"].(map[string]interface{}); ok {
 		if text, ok := val["text"].(string); ok {
-			readme = text
+			return text
 		}
 	}
-
-	if result["errors"] != nil {
-		slog.Warn("GraphQL-resultat har feil", "repo", owner+"/"+name, "errors", result["errors"])
-	}
-
-	sbom := FetchSBOM(owner, name, token)
-
-	return &models.RepoEntry{
-		Repo:      baseRepo,
-		Languages: langs,
-		Files:     convertFiles(files),
-		CIConfig:  convertToFileEntries(ci),
-		Readme:    readme,
-		Security:  security,
-		SBOM:      sbom,
-	}
+	return ""
 }
 
 func buildRepoQuery(owner string, name string) string {
@@ -225,18 +249,6 @@ func buildRepoQuery(owner string, name string) string {
 		}
 	}`, owner, name)
 	return query
-}
-
-func FetchSBOM(owner, repo, token string) map[string]interface{} {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/dependency-graph/sbom", owner, repo)
-
-	var sbom map[string]interface{}
-	err := doRequestWithRateLimit("GET", url, token, nil, &sbom)
-	if err != nil {
-		slog.Warn("SBOM-kall feilet", "repo", owner+"/"+repo, "error", err)
-		return nil
-	}
-	return sbom
 }
 
 func convertToFileEntries(entries []map[string]string) []models.FileEntry {
