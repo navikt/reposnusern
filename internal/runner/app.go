@@ -13,19 +13,23 @@ import (
 )
 
 func RunApp(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
+	if err := RunAppSafe(ctx, cfg, deps); err != nil {
+		os.Exit(1)
+	}
+	return nil
+}
+
+func RunAppSafe(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 	start := time.Now()
 
 	err := Run(ctx, cfg, deps)
 	if err != nil {
 		slog.Error("Runner feilet", "error", err)
-		os.Exit(1)
+		return err
 	}
 
 	LogMemoryStats()
-
-	elapsed := time.Since(start)
-	slog.Info("✅ Ferdig!", "varighet", elapsed.String())
-
+	slog.Info("✅ Ferdig!", "varighet", time.Since(start).String())
 	return nil
 }
 

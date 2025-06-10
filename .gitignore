@@ -57,3 +57,4 @@ temp.db
 # Hvis du bruker --keeptree, vil mocks ligge i samme struktur som pakkene.
 # Eksempel: `internal/service/mocks/ServiceMock.go`
 **/mocks/
+**/mock_*.go

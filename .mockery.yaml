@@ -1,0 +1,12 @@
+all: true
+template: testify
+formatter: goimports
+log-level: warn
+pkgname: mocks
+dir: internal/mocks
+filename: "mock_{{.InterfaceName}}.go"
+structname: "Mock{{.InterfaceName}}"
+packages:
+  github.com/jonmartinstorm/reposnusern/internal:
+    config:
+      recursive: true

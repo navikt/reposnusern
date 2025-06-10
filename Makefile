@@ -65,4 +65,4 @@ check-secrets:
 # -------------------------------
 
 generate-mocks:
-	@command -v mockery >/dev/null 2>&1 && mockery --all --with-expecter --keeptree 
+	@command -v mockery >/dev/null 2>&1 && mockery

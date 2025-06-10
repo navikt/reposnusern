@@ -2,7 +2,6 @@ package runner
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"runtime"
@@ -18,7 +17,7 @@ const MaxDebugRepos = 10
 func Run(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 	slog.Info("🔁 Starter repo-import én og én")
 
-	db, err := sql.Open("postgres", cfg.PostgresDSN)
+	db, err := deps.OpenDB(cfg.PostgresDSN)
 	if err != nil {
 		return fmt.Errorf("DB-feil: %w", err)
 	}
