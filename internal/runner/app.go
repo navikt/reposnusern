@@ -15,10 +15,7 @@ import (
 var OpenSQL = sql.Open
 
 func RunApp(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
-	if err := RunAppSafe(ctx, cfg, deps); err != nil {
-		os.Exit(1)
-	}
-	return nil
+	return RunAppSafe(ctx, cfg, deps)
 }
 
 func RunAppSafe(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
@@ -26,7 +23,7 @@ func RunAppSafe(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 
 	err := Run(ctx, cfg, deps)
 	if err != nil {
-		slog.Error("Runner feilet", "error", err)
+		slog.Debug("Runner feilet", "error", err)
 		return err
 	}
 
@@ -38,7 +35,7 @@ func RunAppSafe(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 func LogMemoryStats() {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	slog.Info("📊 Minnebruk",
+	slog.Debug("📊 Minnebruk",
 		"alloc", ByteSize(m.Alloc),
 		"totalAlloc", ByteSize(m.TotalAlloc),
 		"sys", ByteSize(m.Sys),
@@ -74,6 +71,8 @@ func SetupLogger(debug bool) {
 func CheckDatabaseConnection(ctx context.Context, dsn string) error {
 	db, err := OpenSQL("postgres", dsn)
 	if err != nil {
+		slog.Debug("❌ Klarte ikke å åpne databaseforbindelse", "dsn", dsn, "error", err)
+
 		return fmt.Errorf("DB open-feil: %w", err)
 	}
 	if err := db.PingContext(ctx); err != nil {
@@ -81,6 +80,8 @@ func CheckDatabaseConnection(ctx context.Context, dsn string) error {
 		if cerr := db.Close(); cerr != nil {
 			slog.Warn("⚠️ Klarte ikke å lukke testDB", "error", cerr)
 		}
+		slog.Debug("❌ Ping mot database feilet", "dsn", dsn, "error", err)
+
 		return fmt.Errorf("DB ping-feil: %w", err)
 	}
 
