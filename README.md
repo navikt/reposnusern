@@ -35,26 +35,45 @@ Dette gir et godt grunnlag for å bygge videre analyser, inkludert rammeverksdet
 ## 📁 Prosjektstruktur
 ```
 reposnusern/
-├── cmd/
-│   ├── fetch/      # Henter og lagrer data fra GitHub
-│   ├── migrate/    # Importerer JSON-data til PostgreSQL
-│   └── full/       # Kjører først fetch og så migrate.
+├── .github/workflows/         # CI-workflows (GitHub Actions)
+│   └── ci.yml
 │
-├── internal/
-│   ├── fetcher/    # GitHub-klient og mellomlagring
-│   ├── dbwriter/   # Analyse av Dockerfiles og dependencies
-│   ├── storage/    # sqlc-basert tilgang til databasen
-│   └── parser/     # Parsing av filer
+├── cmd/                       # Entry points 
+│   └── full/                  # Kjører fetch + db-import
+│
+├── covdata/                   # Coverage-data (nytt med Go 1.20+)
+├── cover.out                  # Flat profil for dekning
+├── cover.filtered.out         # Renset versjon av dekning
+├── cover.html                 # Visuell visning av dekning
 │
 ├── db/
-│   ├── queries/    # sqlc-spørringer
-│   └── schema.sql  # PostgreSQL-schema
+│   ├── queries/               # sqlc-spørringer
+│   └── schema.sql             # Manuell migrering (foreløpig)
 │
-├── data/           # Midlertidige JSON-filer
-├── sqlc.yaml       # sqlc-konfigurasjon
-├── go.mod / go.sum # Go-moduldefinisjoner
-├── Dockerfile      # Bygging og kjøring i container
+├── internal/
+│   ├── config/                # App-konfig og validering
+│   ├── dbwriter/              # DB-import og analyse av filer
+│   ├── fetcher/               # GitHub API-klient (REST + GraphQL)
+│   ├── mocks/                 # Mockery-genererte mocks
+│   ├── models/                # Delte datastrukturer
+│   ├── parser/                # Dockerfile-parser og lignende
+│   ├── runner/                # Orkestrering av app-flyt
+│   └── storage/               # sqlc-wrapper for DB-kall
+│
+├── test/                      # Integrasjonstester (testcontainers)
+│   └── testutils/             # PostgreSQL-testcontainer og verktøy
+│
+├── utils/                     # Evt. fremtidige hjelpepakker
+│
+├── .golangci.yml              # Konfig for statisk analyse
+├── .mockery.yaml              # Konfig for mock-generering
+├── sqlc.yaml                  # sqlc-konfig for generering av Go-kode fra SQL
+│
+├── Dockerfile                 # To-trinns containerbuild
+├── go.mod / go.sum            # Moduldefinisjoner og avhengigheter
+├── Makefile                   # Utviklerkommandoer og CI-mål
 └── README.md
+
 ```
 
 ## Kjøring
