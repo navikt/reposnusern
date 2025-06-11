@@ -82,6 +82,44 @@ REPOSNUSERARCHIVE=true vil sette at arkiverte repos også blir hentet, ellers bl
 
 Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. Koden håndterer dette automatisk ved å pause og fortsette når grensen er nådd.
 
+## 💪 Testing
+
+Prosjektet har støtte for både enhetstester og integrasjonstester:
+
+### Enhetstester
+
+* Skrevet med [Ginkgo](https://onsi.github.io/ginkgo/) og [Gomega](https://onsi.github.io/gomega/) for BDD-stil
+* Bruker `mockery` for generering av mocks
+* Testbare komponenter bruker interfaces og dependency injection der det gir mening
+
+Kjør enhetstester:
+
+```bash
+make unit
+```
+
+### Integrasjonstester
+
+* Ligger i `test/`-mappen
+* Kjøres mot en ekte PostgreSQL-database i container via [testcontainers-go](https://github.com/testcontainers/testcontainers-go)
+* Initialiseres med `schema.sql`
+
+Kjør integrasjonstester:
+
+```bash
+make integration
+```
+
+> Merk: Du må ha støtte for Podman eller Docker for å kjøre integrasjonstestene.
+
+### Samlet testkjøring og linting
+
+```bash
+make test     # Kjører både unit og integration (hvis mulig)
+make ci       # Kjører hygiene + test: tidy, vet, lint, test
+```
+
+
 ## TODO
 
 - [x] Parsing av forskjellige dependency filer
