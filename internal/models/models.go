@@ -5,6 +5,10 @@ type FileEntry struct {
 	Content string `json:"content"`
 }
 
+type License struct {
+	SpdxID string `json:"spdx_id"`
+}
+
 type RepoMeta struct {
 	ID           int64    `json:"id"`
 	Name         string   `json:"name"`
@@ -25,9 +29,7 @@ type RepoMeta struct {
 	Visibility   string   `json:"visibility"`
 	OpenIssues   int64    `json:"open_issues_count"`
 	LanguagesURL string   `json:"languages_url"`
-	License      *struct {
-		SpdxID string `json:"spdx_id"`
-	} `json:"license"`
+	License      *License `json:"license"`
 }
 
 type RepoEntry struct {
