@@ -1,9 +1,12 @@
 package fetcher
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -19,44 +22,59 @@ type TreeFile struct {
 	Type string `json:"type"`
 }
 
-// GetJSONWithRateLimit henter JSON fra en URL og respekterer GitHub rate-limiting.
-func GetJSONWithRateLimit(url, token string, out interface{}) error {
+// Injecter en klient (for testbarhet)
+var HttpClient = http.DefaultClient
+
+func DoRequestWithRateLimit(method, url, token string, body []byte, out interface{}) error {
 	for {
 		slog.Info("Henter URL", "url", url)
-		req, err := http.NewRequestWithContext(context.Background(), "GET", url, nil)
+
+		req, err := http.NewRequestWithContext(context.Background(), method, url, bytes.NewReader(body))
 		if err != nil {
 			return err
 		}
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Accept", "application/vnd.github+json")
+		if method == "POST" {
+			req.Header.Set("Content-Type", "application/json")
+		}
 
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := HttpClient.Do(req)
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				log.Printf("advarsel: klarte ikke å lukke body: %v", err)
+			}
+		}()
 
 		if rl := resp.Header.Get("X-RateLimit-Remaining"); rl == "0" {
 			reset := resp.Header.Get("X-RateLimit-Reset")
-			if reset != "" {
-				if ts, err := strconv.ParseInt(reset, 10, 64); err == nil {
-					wait := time.Until(time.Unix(ts, 0)) + time.Second
-					slog.Warn("Rate limit nådd", "venter", wait.Truncate(time.Second))
-					time.Sleep(wait)
-					continue
-				}
+			if ts, err := strconv.ParseInt(reset, 10, 64); err == nil {
+				wait := time.Until(time.Unix(ts, 0)) + time.Second
+				slog.Warn("Rate limit nådd", "venter", wait.Truncate(time.Second))
+				time.Sleep(wait)
+				continue
 			}
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			slog.Error("GitHub-feil", "status", resp.StatusCode, "body", string(bodyBytes))
+			return fmt.Errorf("GitHub API-feil: status %d – %s", resp.StatusCode, string(bodyBytes))
 		}
 
 		return json.NewDecoder(resp.Body).Decode(out)
 	}
 }
 
-func GetRepoPage(cfg config.Config, page int) ([]models.RepoMeta, error) {
+func (g *GitHubAPIClient) GetRepoPage(cfg config.Config, page int) ([]models.RepoMeta, error) {
 	url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&type=all&page=%d", cfg.Org, page)
 	var pageRepos []models.RepoMeta
 	slog.Info("Henter repos", "page", page)
-	err := GetJSONWithRateLimit(url, cfg.Token, &pageRepos)
+
+	err := DoRequestWithRateLimit("GET", url, cfg.Token, nil, &pageRepos)
 	if err != nil {
 		return nil, err
 	}

@@ -11,11 +11,11 @@ RUN go mod download
 COPY . .
 
 # Bygg binæren
-RUN go build -o full ./cmd/full
+RUN go build -o reposnusern ./cmd/reposnusern
 
 # --- Runtime stage ---
 FROM gcr.io/distroless/static-debian12
 
-COPY --from=builder /app/full /full
+COPY --from=builder /app/reposnusern /reposnusern
 
-CMD ["/full"]
+CMD ["/reposnusern"]

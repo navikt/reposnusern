@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-	"runtime"
 	"strings"
 
 	"github.com/jonmartinstorm/reposnusern/internal/models"
@@ -13,35 +12,18 @@ import (
 	"github.com/jonmartinstorm/reposnusern/internal/storage"
 )
 
-func safeLicense(lic *struct{ SpdxID string }) string {
+func SafeLicense(lic *struct{ SpdxID string }) string {
 	if lic == nil {
 		return ""
 	}
 	return lic.SpdxID
 }
 
-func safeString(v interface{}) string {
+func SafeString(v interface{}) string {
 	if v == nil {
 		return ""
 	}
 	return v.(string)
-}
-
-func ImportToPostgreSQLDB(dump models.OrgRepos, db *sql.DB) error {
-	ctx := context.Background()
-
-	for i, entry := range dump.Repos {
-
-		if err := ImportRepo(ctx, db, entry, i); err != nil {
-
-			return fmt.Errorf("import repo: %w", err)
-		}
-
-		if i%25 == 0 {
-			runtime.GC()
-		}
-	}
-	return nil
 }
 
 func ImportRepo(ctx context.Context, db *sql.DB, entry models.RepoEntry, index int) error {
@@ -74,15 +56,16 @@ func ImportRepo(ctx context.Context, db *sql.DB, entry models.RepoEntry, index i
 		HtmlUrl:      r.HtmlUrl,
 		Topics:       strings.Join(r.Topics, ","),
 		Visibility:   r.Visibility,
-		License:      safeLicense((*struct{ SpdxID string })(r.License)),
+		License:      SafeLicense((*struct{ SpdxID string })(r.License)),
 		OpenIssues:   r.OpenIssues,
 		LanguagesUrl: r.LanguagesURL,
 	}
 
 	if err := queries.InsertRepo(ctx, repo); err != nil {
-		tx.Rollback()
-		slog.Error("🚨 Feil ved InsertRepo – ruller tilbake", "repo", name, "error", err)
-		return fmt.Errorf("insert repo failed: %w", err)
+		if rbErr := tx.Rollback(); rbErr != nil {
+			return fmt.Errorf("InsertRepo feilet: %v (rollback feilet: %w)", err, rbErr)
+		}
+		return fmt.Errorf("InsertRepo feilet: %w", err)
 	}
 
 	insertLanguages(ctx, queries, id, name, entry.Languages)
@@ -248,9 +231,9 @@ func insertSBOMPackagesGithub(
 			continue
 		}
 
-		nameVal := safeString(pkg["name"])
-		version := safeString(pkg["versionInfo"])
-		license := safeString(pkg["licenseConcluded"])
+		nameVal := SafeString(pkg["name"])
+		version := SafeString(pkg["versionInfo"])
+		license := SafeString(pkg["licenseConcluded"])
 
 		// Prøv å hente ut PURL (Package URL) fra externalRefs
 		var purl string
@@ -261,7 +244,7 @@ func insertSBOMPackagesGithub(
 					continue
 				}
 				if refMap["referenceType"] == "purl" {
-					purl = safeString(refMap["referenceLocator"])
+					purl = SafeString(refMap["referenceLocator"])
 					break
 				}
 			}

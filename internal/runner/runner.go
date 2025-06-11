@@ -2,27 +2,28 @@ package runner
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"runtime"
 	"time"
 
 	"github.com/jonmartinstorm/reposnusern/internal/config"
-	"github.com/jonmartinstorm/reposnusern/internal/dbwriter"
-	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
 )
 
 const MaxDebugRepos = 10
 
-func Run(ctx context.Context, cfg config.Config) error {
+func Run(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 	slog.Info("🔁 Starter repo-import én og én")
 
-	db, err := sql.Open("postgres", cfg.PostgresDSN)
+	db, err := deps.OpenDB(cfg.PostgresDSN)
 	if err != nil {
 		return fmt.Errorf("DB-feil: %w", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			slog.Warn("⚠️ Klarte ikke å lukke databaseforbindelsen", "error", err)
+		}
+	}()
 
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
@@ -32,7 +33,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 	repoIndex := 0
 
 	for {
-		repos, err := fetcher.GetRepoPage(cfg, page)
+		repos, err := deps.GetRepoPage(cfg, page)
 		if err != nil {
 			return fmt.Errorf("klarte ikke hente repo-side: %w", err)
 		}
@@ -54,7 +55,7 @@ func Run(ctx context.Context, cfg config.Config) error {
 			}
 
 			slog.Info("📦 Henter detaljer via GraphQL", "repo", repo.FullName)
-			entry := fetcher.FetchRepoGraphQL(cfg.Org, repo.Name, cfg.Token, repo)
+			entry := deps.Fetcher().Fetch(cfg.Org, repo.Name, cfg.Token, repo)
 			if entry == nil {
 				slog.Warn("⚠️ Hopper over tomt repo", "repo", repo.FullName)
 				continue
@@ -63,11 +64,10 @@ func Run(ctx context.Context, cfg config.Config) error {
 			repoIndex++
 			slog.Info("⏳ Behandler repo", "nummer", repoIndex, "navn", repo.FullName)
 
-			if err := dbwriter.ImportRepo(ctx, db, *entry, repoIndex); err != nil {
+			if err := deps.ImportRepo(ctx, db, *entry, repoIndex); err != nil {
 				return fmt.Errorf("import repo: %w", err)
 			}
 
-			entry = nil
 			if repoIndex%25 == 0 {
 				runtime.GC()
 			}

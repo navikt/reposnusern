@@ -35,26 +35,45 @@ Dette gir et godt grunnlag for å bygge videre analyser, inkludert rammeverksdet
 ## 📁 Prosjektstruktur
 ```
 reposnusern/
-├── cmd/
-│   ├── fetch/      # Henter og lagrer data fra GitHub
-│   ├── migrate/    # Importerer JSON-data til PostgreSQL
-│   └── full/       # Kjører først fetch og så migrate.
+├── .github/workflows/         # CI-workflows (GitHub Actions)
+│   └── ci.yml
 │
-├── internal/
-│   ├── fetcher/    # GitHub-klient og mellomlagring
-│   ├── dbwriter/   # Analyse av Dockerfiles og dependencies
-│   ├── storage/    # sqlc-basert tilgang til databasen
-│   └── parser/     # Parsing av filer
+├── cmd/                       # Entry points 
+│   └── full/                  # Kjører fetch + db-import
+│
+├── covdata/                   # Coverage-data (nytt med Go 1.20+)
+├── cover.out                  # Flat profil for dekning
+├── cover.filtered.out         # Renset versjon av dekning
+├── cover.html                 # Visuell visning av dekning
 │
 ├── db/
-│   ├── queries/    # sqlc-spørringer
-│   └── schema.sql  # PostgreSQL-schema
+│   ├── queries/               # sqlc-spørringer
+│   └── schema.sql             # Manuell migrering (foreløpig)
 │
-├── data/           # Midlertidige JSON-filer
-├── sqlc.yaml       # sqlc-konfigurasjon
-├── go.mod / go.sum # Go-moduldefinisjoner
-├── Dockerfile      # Bygging og kjøring i container
+├── internal/
+│   ├── config/                # App-konfig og validering
+│   ├── dbwriter/              # DB-import og analyse av filer
+│   ├── fetcher/               # GitHub API-klient (REST + GraphQL)
+│   ├── mocks/                 # Mockery-genererte mocks
+│   ├── models/                # Delte datastrukturer
+│   ├── parser/                # Dockerfile-parser og lignende
+│   ├── runner/                # Orkestrering av app-flyt
+│   └── storage/               # sqlc-wrapper for DB-kall
+│
+├── test/                      # Integrasjonstester (testcontainers)
+│   └── testutils/             # PostgreSQL-testcontainer og verktøy
+│
+├── utils/                     # Evt. fremtidige hjelpepakker
+│
+├── .golangci.yml              # Konfig for statisk analyse
+├── .mockery.yaml              # Konfig for mock-generering
+├── sqlc.yaml                  # sqlc-konfig for generering av Go-kode fra SQL
+│
+├── Dockerfile                 # To-trinns containerbuild
+├── go.mod / go.sum            # Moduldefinisjoner og avhengigheter
+├── Makefile                   # Utviklerkommandoer og CI-mål
 └── README.md
+
 ```
 
 ## Kjøring
@@ -82,21 +101,60 @@ REPOSNUSERARCHIVE=true vil sette at arkiverte repos også blir hentet, ellers bl
 
 Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. Koden håndterer dette automatisk ved å pause og fortsette når grensen er nådd.
 
+## 💪 Testing
+
+Prosjektet har støtte for både enhetstester og integrasjonstester:
+
+### Enhetstester
+
+* Skrevet med [Ginkgo](https://onsi.github.io/ginkgo/) og [Gomega](https://onsi.github.io/gomega/) for BDD-stil
+* Bruker `mockery` for generering av mocks
+* Testbare komponenter bruker interfaces og dependency injection der det gir mening
+
+Kjør enhetstester:
+
+```bash
+make unit
+```
+
+### Integrasjonstester
+
+* Ligger i `test/`-mappen
+* Kjøres mot en ekte PostgreSQL-database i container via [testcontainers-go](https://github.com/testcontainers/testcontainers-go)
+* Initialiseres med `schema.sql`
+
+Kjør integrasjonstester:
+
+```bash
+make integration
+```
+
+> Merk: Du må ha støtte for Podman eller Docker for å kjøre integrasjonstestene.
+
+### Samlet testkjøring og linting
+
+```bash
+make test     # Kjører både unit og integration (hvis mulig)
+make ci       # Kjører hygiene + test: tidy, vet, lint, test
+```
+
+
 ## TODO
 
 - [x] Parsing av forskjellige dependency filer
 - [x] Også hente REST API endpoints for software bill of materials (SBOM)
 - [x] 🔐 Hindre at passord og secrets utilsiktet havner i logger
-- [x] ✅ Legge til noen enkle tester (det var jo bare en PoC 😅)
+- [x] ✅ Legge til noen enkle tester
 - [x] 🧹 Refaktorering og deling av logikk
+- [ ] Gjøre om alle testene til Ginko/gomega
 - [ ] Bedre logging
-- [ ] ☁️ Gjøre klart for K8s-deploy (config, secrets, jobs)
+- [x] ☁️ Gjøre klart for K8s-deploy (config, secrets, jobs)
 - [ ] Sørge for at GraphQL versjonen også parser lenger ned enn toppnivå mappen.
-- [ ] Vurdere om sbom direkte har fjernet behovet for dependency files
+- [x] Vurdere om sbom direkte har fjernet behovet for dependency files
 - [ ] Optimalisering
   - [ ] Lage en bulk insert til db for relevante objekter
-  - [ ] Fortsette å optimalisere på minne
-- [ ] Forbedre dockerfile features parseren for mer info
+  - [x] Fortsette å optimalisere på minne
+- [x] Forbedre dockerfile features parseren for mer info
 - [ ] Oppdatere schema så vi tar vare på dato vi har hentet informasjonen fra. (Så vi kan ta vare på trenden.)
 
 ## Annen inspirasjon

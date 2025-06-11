@@ -30,8 +30,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: 📦 Installer mockery
-        run: go install github.com/vektra/mockery/v2@latest
+      - name: 📦 Installer mockery v3
+        run: go install github.com/vektra/mockery/v3@latest
+
 
       - name: 🧼 Installer golangci-lint
         run: |

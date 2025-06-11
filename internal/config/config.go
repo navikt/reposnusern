@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 )
 
@@ -13,14 +14,29 @@ type Config struct {
 	SkipArchived bool
 }
 
-func LoadConfig() Config {
-	return Config{
-		Org:          os.Getenv("ORG"),
-		Token:        os.Getenv("GITHUB_TOKEN"),
-		PostgresDSN:  os.Getenv("POSTGRES_DSN"),
-		Debug:        os.Getenv("REPOSNUSERDEBUG") == "true",
-		SkipArchived: os.Getenv("REPOSNUSERARCHIVED") != "true",
+func LoadAndValidateConfig() Config {
+	cfg := LoadConfig()
+	if err := ValidateConfig(cfg); err != nil {
+		// kan ikke bruke slog før vi har satt opp logging, se main.
+		fmt.Fprintln(os.Stderr, "❌ Ugyldig konfigurasjon:", err)
+		os.Exit(1)
 	}
+	return cfg
+}
+
+func LoadConfig() Config {
+	return LoadConfigWithEnv(os.Getenv)
+}
+
+func LoadConfigWithEnv(getenv func(string) string) Config {
+	cfg := Config{
+		Org:          getenv("ORG"),
+		Token:        getenv("GITHUB_TOKEN"),
+		PostgresDSN:  getenv("POSTGRES_DSN"),
+		Debug:        getenv("REPOSNUSERDEBUG") == "true",
+		SkipArchived: getenv("REPOSNUSERARCHIVED") != "true",
+	}
+	return cfg
 }
 
 func ValidateConfig(cfg Config) error {
