@@ -2,7 +2,7 @@ package config
 
 import (
 	"errors"
-	"log/slog"
+	"fmt"
 	"os"
 )
 
@@ -17,7 +17,8 @@ type Config struct {
 func LoadAndValidateConfig() Config {
 	cfg := LoadConfig()
 	if err := ValidateConfig(cfg); err != nil {
-		slog.Error("❌ Ugyldig konfigurasjon", "error", err)
+		// kan ikke bruke slog før vi har satt opp logging, se main.
+		fmt.Fprintln(os.Stderr, "❌ Ugyldig konfigurasjon:", err)
 		os.Exit(1)
 	}
 	return cfg

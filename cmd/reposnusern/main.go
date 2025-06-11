@@ -48,8 +48,8 @@ func main() {
 		// TODO sende context til dbcall og skriving av filer.
 	}()
 
-	runner.SetupLogger()
 	cfg := config.LoadAndValidateConfig()
+	runner.SetupLogger(cfg.Debug)
 
 	if err := runner.CheckDatabaseConnection(ctx, cfg.PostgresDSN); err != nil {
 		slog.Error("❌ Klarte ikke å nå databasen", "error", err)
