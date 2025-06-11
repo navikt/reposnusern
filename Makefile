@@ -6,6 +6,12 @@ build:
 run:
 	@go run cmd/${ARTIFACT_NAME}/main.go 
 
+podman:
+	@echo "🐳 Bygger container med Podman..."
+	podman build -t $(ARTIFACT_NAME):latest .
+
+
+
 ci: tidy vet lint test
 
 # -------------------------------
@@ -33,6 +39,7 @@ COVER_FILTERED = cover.filtered.out
 EXCLUDE_FILES = \
     cmd/$(ARTIFACT_NAME)/main.go \
     internal/storage/ \
+	internal/mocks/ \
     internal/models/
 
 EXCLUDE_GREP := $(foreach f,$(EXCLUDE_FILES),| grep -v $(f))

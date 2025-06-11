@@ -1,0 +1,45 @@
+# Go build og cache
+bin/
+*.exe
+*.out
+*.test
+*.tmp
+*.log
+
+# Moddata
+/vendor/
+go.work
+go.work.sum
+
+# Test- og coverage-filer
+*.coverprofile
+*.cov
+*.prof
+*.html
+cover/
+covdata/
+covmerged/
+testdata/
+utils/
+
+# Miljøfiler og secrets
+.env
+*.pem
+*.key
+*.crt
+
+# Git og editorfiler
+.git
+.gitignore
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Mock-generator
+**/mocks/
+**/mock_*.go
+
+# Datafiler og tilbakestillbare ting
+/data/
+temp.db
