@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Sjekk ut kode
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # viktig for Gitleaks
+
+      - name: 🧰 Sett opp Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: ⚡ Cache Go mod
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: 📦 Installer mockery
+        run: go install github.com/vektra/mockery/v2@latest
+
+      - name: 🧼 Installer golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.1.6
+
+      - name: 🧼 Kjør Make CI
+        run: make ci
+
+
+      - name: 🔎 Secret scanning (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # ← kreves for organisasjons-repo
+
+      - name: 🧪 Generer SBOM (Syft)
+        uses: anchore/sbom-action@v0
+        with:
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: 📤 Last opp SBOM som artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.spdx.json

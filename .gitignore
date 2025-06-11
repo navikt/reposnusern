@@ -1,34 +1,60 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
-# Binaries for programs and plugins
+# ----------------------------------------
+# 📦 Go-prosjekt: Ignorerte filer og mapper
+# ----------------------------------------
+
+# ----------------------------------------
+# 🛠️ Bygg- og kjørbare filer
+# ----------------------------------------
+
+# Binaries for programmer og plugins
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
 
-# Test binary, built with `go test -c`
+# Test-binary generert med `go test -c`
 *.test
 
-# Output of the go coverage tool, specifically when used with LiteIDE
+# Dekningsrapporter fra `go test -cover`
 *.out
+cover.*
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
+# ----------------------------------------
+# 📁 Avhengigheter og arbeidsfiler
+# ----------------------------------------
 
-# Go workspace file
+# Go workspace-filer
 go.work
 go.work.sum
 
-# env file
+# Vendordir (fjern kommentaren hvis du bruker vendoring)
+# vendor/
+
+# ----------------------------------------
+# 🔐 Miljøfiler og midlertidige data
+# ----------------------------------------
+
+# Miljøvariabler
 .env
 
+# Midlertidige datafiler og mapper
 /tempdata/
 temp.db
 .DS_Store
 
+# Datafiler og virtuelle miljøer
 /data/*
-
 /venv/
 /utils/
+
+# ----------------------------------------
+# 🤖 Genererte mocks
+# ----------------------------------------
+
+# Ignorer alle genererte mocks fra mockery eller lignende verktøy.
+# Dette holder Git-historikken ren og unngår å sjekke inn kode som kan regenereres.
+# Hvis du bruker --keeptree, vil mocks ligge i samme struktur som pakkene.
+# Eksempel: `internal/service/mocks/ServiceMock.go`
+**/mocks/
+**/mock_*.go
