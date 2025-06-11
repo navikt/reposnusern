@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: 📥 Sjekk ut kode
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # viktig for Gitleaks
 
       - name: 🧰 Sett opp Go
         uses: actions/setup-go@v5
