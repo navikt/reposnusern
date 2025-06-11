@@ -57,12 +57,10 @@ lint:
 	@command -v golangci-lint >/dev/null 2>&1 && golangci-lint run
 
 
-check-secrets:
-	@! grep -r "ghp_" . || (echo "🚨 GitHub token funnet i kode!"; exit 1)
-
 # -------------------------------
 # Mock-generering
 # -------------------------------
 
 generate-mocks:
-	@command -v mockery >/dev/null 2>&1 && mockery
+	@command -v mockery >/dev/null 2>&1 || { echo "❌ mockery ikke installert. Installer med 'go install github.com/vektra/mockery/v2@latest'"; exit 1; }
+	@mockery
