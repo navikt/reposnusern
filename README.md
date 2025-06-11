@@ -138,6 +138,19 @@ make test     # Kjører både unit og integration (hvis mulig)
 make ci       # Kjører hygiene + test: tidy, vet, lint, test
 ```
 
+## Inspirasjon
+ - [Fuck it, ship it - Stine Mølgaard og Jacob Bøtter](https://fuckitshipit.dk/)
+ - [Codin' Dirty - Carson Gross](https://htmx.org/essays/codin-dirty/)
+ - 差不多 (chà bù duō) - «godt nok» altså at noe ikke er perfekt, men tilstrekkelig.
+
+## Benchmark
+Med ca 1600 repos:
+
+![Benchmark: minne og CPU](utils/benchmark.png)
+
+## 🤖 Erklæring om bruk av generativ KI
+
+Under utviklingen av dette innholdet har forfatter(e) benyttet generativ KI – inkludert M365 Copilot og ChatGPT – til å omformulere og effektivisere tekst og kode. Alt innhold er deretter gjennomgått og en del redigert manuelt. 
 
 ## TODO
 
@@ -146,7 +159,7 @@ make ci       # Kjører hygiene + test: tidy, vet, lint, test
 - [x] 🔐 Hindre at passord og secrets utilsiktet havner i logger
 - [x] ✅ Legge til noen enkle tester
 - [x] 🧹 Refaktorering og deling av logikk
-- [ ] Gjøre om alle testene til Ginko/gomega
+- [x] Gjøre om alle testene til Ginko/gomega
 - [ ] Bedre logging
 - [x] ☁️ Gjøre klart for K8s-deploy (config, secrets, jobs)
 - [ ] Sørge for at GraphQL versjonen også parser lenger ned enn toppnivå mappen.
@@ -156,19 +169,3 @@ make ci       # Kjører hygiene + test: tidy, vet, lint, test
   - [x] Fortsette å optimalisere på minne
 - [x] Forbedre dockerfile features parseren for mer info
 - [ ] Oppdatere schema så vi tar vare på dato vi har hentet informasjonen fra. (Så vi kan ta vare på trenden.)
-
-## Annen inspirasjon
- - [Fuck it, ship it - Stine Mølgaard og Jacob Bøtter](https://fuckitshipit.dk/)
- - [Codin' Dirty - Carson Gross](https://htmx.org/essays/codin-dirty/)
-
-## Benchmark
-Med ca 1600 repos:
-
-```
-{"time":"2025-06-09T19:40:24.731770893Z","level":"INFO","msg":"📊 Minnebruk","alloc":"1.1 GiB","totalAlloc":"3.6 GiB","sys":"1.4 GiB","numGC":38}
-{"time":"2025-06-09T19:40:24.73178756Z","level":"INFO","msg":"✅ Ferdig!","varighet":"42m47.74474624s"}
-```
-
-## 🤖 Erklæring om bruk av generativ KI
-
-Under utviklingen av dette innholdet har forfatter(e) benyttet generativ KI – inkludert M365 Copilot og ChatGPT – til å omformulere og effektivisere tekst og kode. Alt innhold er deretter gjennomgått og en del redigert manuelt. 

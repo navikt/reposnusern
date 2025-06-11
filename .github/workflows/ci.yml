@@ -6,14 +6,12 @@ on:
     branches: [main]
 
 jobs:
-  build-test:
+  ci:
     runs-on: ubuntu-latest
 
     steps:
       - name: 📥 Sjekk ut kode
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # viktig for Gitleaks
 
       - name: 🧰 Sett opp Go
         uses: actions/setup-go@v5
@@ -41,13 +39,6 @@ jobs:
       - name: 🧼 Kjør Make CI
         run: make ci
 
-
-      - name: 🔎 Secret scanning (Gitleaks)
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # ← kreves for organisasjons-repo
-
       - name: 🧪 Generer SBOM (Syft)
         uses: anchore/sbom-action@v0
         with:
@@ -59,3 +50,16 @@ jobs:
         with:
           name: sbom
           path: sbom.spdx.json
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔎 Secret scanning (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # ← kreves for organisasjons-repo

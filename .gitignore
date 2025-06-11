@@ -46,7 +46,6 @@ temp.db
 # Datafiler og virtuelle miljøer
 /data/*
 /venv/
-/utils/
 
 # ----------------------------------------
 # 🤖 Genererte mocks
