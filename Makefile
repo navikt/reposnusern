@@ -56,6 +56,7 @@ tidy:
 lint:
 	@command -v golangci-lint >/dev/null 2>&1 && golangci-lint run
 
+
 # -------------------------------
 # Mock-generering
 # -------------------------------
