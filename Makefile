@@ -21,7 +21,7 @@ integration:
 e2e:
 	@go test -v -tags=e2e ./tests/e2e/...
 
-test: unit integration
+test: generate-mocks unit integration
 
 # -------------------------------
 # Coverage
