@@ -12,7 +12,7 @@ podman:
 
 
 
-ci: tidy vet lint test
+ci: generate-mocks tidy vet lint test
 
 # -------------------------------
 # Test targets
@@ -27,7 +27,7 @@ integration:
 e2e:
 	@go test -v -tags=e2e ./tests/e2e/...
 
-test: generate-mocks unit integration
+test: unit integration
 
 # -------------------------------
 # Coverage
