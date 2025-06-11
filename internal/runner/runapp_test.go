@@ -113,3 +113,36 @@ var _ = Describe("RunAppSafe", func() {
 		Expect(err.Error()).To(ContainSubstring("DB nede"))
 	})
 })
+
+var _ = Describe("CheckDatabaseConnection", func() {
+	It("returnerer nil for en vellykket tilkobling", func() {
+		db, smock, err := sqlmock.New()
+		Expect(err).To(BeNil())
+
+		smock.ExpectPing()
+		smock.ExpectClose()
+
+		originalOpenSQL := runner.OpenSQL
+		runner.OpenSQL = func(driver, dsn string) (*sql.DB, error) {
+			return db, nil
+		}
+		defer func() { runner.OpenSQL = originalOpenSQL }()
+
+		err = runner.CheckDatabaseConnection(context.Background(), "mock-dsn")
+		Expect(err).To(BeNil())
+
+		Expect(smock.ExpectationsWereMet()).To(Succeed())
+	})
+
+	It("returnerer feil ved åpningsfeil", func() {
+		originalOpenSQL := runner.OpenSQL
+		runner.OpenSQL = func(driver, dsn string) (*sql.DB, error) {
+			return nil, errors.New("kan ikke åpne DB")
+		}
+		defer func() { runner.OpenSQL = originalOpenSQL }()
+
+		err := runner.CheckDatabaseConnection(context.Background(), "mock-dsn")
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("DB open-feil"))
+	})
+})

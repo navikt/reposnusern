@@ -51,7 +51,10 @@ func main() {
 	runner.SetupLogger()
 	cfg := config.LoadAndValidateConfig()
 
-	runner.CheckDatabaseConnection(ctx, cfg.PostgresDSN)
+	if err := runner.CheckDatabaseConnection(ctx, cfg.PostgresDSN); err != nil {
+		slog.Error("❌ Klarte ikke å nå databasen", "error", err)
+		os.Exit(1)
+	}
 
 	if !cfg.SkipArchived {
 		slog.Info("📦 Inkluderer arkiverte repositories")

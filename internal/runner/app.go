@@ -12,6 +12,8 @@ import (
 	"github.com/jonmartinstorm/reposnusern/internal/config"
 )
 
+var OpenSQL = sql.Open
+
 func RunApp(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 	if err := RunAppSafe(ctx, cfg, deps); err != nil {
 		os.Exit(1)
@@ -64,21 +66,26 @@ func SetupLogger() {
 	slog.SetDefault(logger)
 }
 
-func CheckDatabaseConnection(ctx context.Context, dsn string) {
-	db, err := sql.Open("postgres", dsn)
+func CheckDatabaseConnection(ctx context.Context, dsn string) error {
+	db, err := OpenSQL("postgres", dsn)
 	if err != nil {
-		slog.Error("Kunne ikke åpne DB-forbindelse", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("DB open-feil: %w", err)
 	}
+	if err := db.PingContext(ctx); err != nil {
+		// Lukker eksplisitt på feil, og returnerer
+		if cerr := db.Close(); cerr != nil {
+			slog.Warn("⚠️ Klarte ikke å lukke testDB", "error", cerr)
+		}
+		return fmt.Errorf("DB ping-feil: %w", err)
+	}
+
+	// Normal defer for clean exit
 	defer func() {
-		if err := db.Close(); err != nil {
-			slog.Warn("⚠️ Klarte ikke å lukke testDB", "error", err)
+		if cerr := db.Close(); cerr != nil {
+			slog.Warn("⚠️ Klarte ikke å lukke testDB", "error", cerr)
 		}
 	}()
 
-	if err := db.PingContext(ctx); err != nil {
-		slog.Error("❌ Klarte ikke å nå databasen", "error", err)
-		os.Exit(1)
-	}
 	slog.Info("✅ DB-tilkobling OK")
+	return nil
 }
