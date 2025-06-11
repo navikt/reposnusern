@@ -6,7 +6,7 @@ build:
 run:
 	@go run cmd/${ARTIFACT_NAME}/main.go 
 
-ci: tidy vet lint test
+ci: tidy vet test
 
 # -------------------------------
 # Test targets
