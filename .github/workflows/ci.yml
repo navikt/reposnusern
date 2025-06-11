@@ -39,8 +39,11 @@ jobs:
         run: make ci
 
 
-      - name: 🔎 Secret scanning
+      - name: 🔎 Secret scanning (Gitleaks)
         uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # ← kreves for organisasjons-repo
 
       - name: 🧪 Generer SBOM (Syft)
         uses: anchore/sbom-action@v0
