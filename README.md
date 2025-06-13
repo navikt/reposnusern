@@ -1,8 +1,8 @@
-# 🕵️ reposnusern (POC)
+# Reposnusern
 
-**reposnusern** er et verktøy for å analysere GitHub-repositorier i en organisasjon – med nysgjerrighet, struktur og en dæsj AI.
+**Reposnusern** er et verktøy for å analysere GitHub-repositorier i en organisasjon – med nysgjerrighet, struktur og en dæsj AI.
 
-## 🎯 Ambisjon
+## Ambisjon
 
 Målet med dette prosjektet er å lage et fleksibelt og utvidbart analyseverktøy for utviklingsmiljøer som ønsker innsikt i kodebasen sin. Prosjektet utvikles stegvis:
 
@@ -14,11 +14,11 @@ Målet med dette prosjektet er å lage et fleksibelt og utvidbart analyseverktø
 
 ### Teknologier og oppsett
 
-- 🧠 Språk: Go
-- 🗃️ Database: PostgreSQL (sqlc brukt for typesikker tilgang)
-- 📦 Strukturelt monorepo – men med tydelig inndeling
+- Språk: Go
+- Database: PostgreSQL (sqlc brukt for typesikker tilgang)
+- Strukturelt monorepo – men med tydelig inndeling
 
-## 🧪 PoC-status
+## PoC-status
 
 Proof-of-Concept bruker følgende:
 - `go + sqlc + PostgreSQL` 
@@ -101,7 +101,7 @@ REPOSNUSERARCHIVE=true vil sette at arkiverte repos også blir hentet, ellers bl
 
 Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. Koden håndterer dette automatisk ved å pause og fortsette når grensen er nådd.
 
-## 💪 Testing
+## Testing
 
 Prosjektet har støtte for både enhetstester og integrasjonstester:
 
@@ -148,24 +148,26 @@ Med ca 1600 repos:
 
 ![Benchmark: minne og CPU](utils/benchmark.png)
 
-## 🤖 Erklæring om bruk av generativ KI
+## Erklæring om bruk av generativ KI
 
 Under utviklingen av dette innholdet har forfatter(e) benyttet generativ KI – inkludert M365 Copilot og ChatGPT – til å omformulere og effektivisere tekst og kode. Alt innhold er deretter gjennomgått og en del redigert manuelt. 
 
 ## TODO
 
-- [x] Parsing av forskjellige dependency filer
-- [x] Også hente REST API endpoints for software bill of materials (SBOM)
-- [x] 🔐 Hindre at passord og secrets utilsiktet havner i logger
-- [x] ✅ Legge til noen enkle tester
-- [x] 🧹 Refaktorering og deling av logikk
-- [x] Gjøre om alle testene til Ginko/gomega
+- [ ] Refaktorere til ideomatisk go
 - [ ] Bedre logging
-- [x] ☁️ Gjøre klart for K8s-deploy (config, secrets, jobs)
 - [ ] Sørge for at GraphQL versjonen også parser lenger ned enn toppnivå mappen.
-- [x] Vurdere om sbom direkte har fjernet behovet for dependency files
 - [ ] Optimalisering
   - [ ] Lage en bulk insert til db for relevante objekter
   - [x] Fortsette å optimalisere på minne
-- [x] Forbedre dockerfile features parseren for mer info
 - [ ] Oppdatere schema så vi tar vare på dato vi har hentet informasjonen fra. (Så vi kan ta vare på trenden.)
+
+- [x] Parsing av forskjellige dependency filer
+- [x] Også hente REST API endpoints for software bill of materials (SBOM)
+- [x] Hindre at passord og secrets utilsiktet havner i logger
+- [x] Legge til noen enkle tester
+- [x] Refaktorering og deling av logikk
+- [x] Gjøre om alle testene til Ginko/gomega
+- [x] Gjøre klart for K8s-deploy (config, secrets, jobs)
+- [x] Vurdere om sbom direkte har fjernet behovet for dependency files
+- [x] Forbedre dockerfile features parseren for mer info

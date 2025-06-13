@@ -52,12 +52,12 @@ func main() {
 	runner.SetupLogger(cfg.Debug)
 
 	if err := runner.CheckDatabaseConnection(ctx, cfg.PostgresDSN); err != nil {
-		slog.Error("❌ Klarte ikke å nå databasen", "error", err)
+		slog.Error("Klarte ikke å nå databasen", "error", err)
 		os.Exit(1)
 	}
 
 	if !cfg.SkipArchived {
-		slog.Info("📦 Inkluderer arkiverte repositories")
+		slog.Info("Inkluderer arkiverte repositories")
 	}
 
 	deps := AppDeps{
@@ -65,7 +65,7 @@ func main() {
 	}
 
 	if err := runner.RunApp(ctx, cfg, deps); err != nil {
-		slog.Error("🚨 Applikasjonen feilet", "error", err)
+		slog.Error("Applikasjonen feilet", "error", err)
 		os.Exit(1)
 	}
 

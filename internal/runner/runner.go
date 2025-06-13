@@ -13,7 +13,7 @@ import (
 const MaxDebugRepos = 10
 
 func Run(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
-	slog.Info("🔁 Starter repo-import én og én")
+	slog.Info("Starter repo-import én og én")
 
 	db, err := deps.OpenDB(cfg.PostgresDSN)
 	if err != nil {
@@ -21,7 +21,7 @@ func Run(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			slog.Warn("⚠️ Klarte ikke å lukke databaseforbindelsen", "error", err)
+			slog.Warn("Klarte ikke å lukke databaseforbindelsen", "error", err)
 		}
 	}()
 
@@ -44,25 +44,25 @@ func Run(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 		for _, repo := range repos {
 			if cfg.SkipArchived && repo.Archived {
 				if cfg.Debug {
-					slog.Info("⏭️ Skipper arkivert repo", "repo", repo.FullName)
+					slog.Info("Skipper arkivert repo", "repo", repo.FullName)
 				}
 				continue
 			}
 
 			if cfg.Debug && repoIndex >= MaxDebugRepos {
-				slog.Info("🛑 Debug-modus: stopper etter 10 repoer")
+				slog.Info("Debug-modus: stopper etter 10 repoer")
 				return nil
 			}
 
-			slog.Info("📦 Henter detaljer via GraphQL", "repo", repo.FullName)
+			slog.Info("Henter detaljer via GraphQL", "repo", repo.FullName)
 			entry := deps.Fetcher().Fetch(cfg.Org, repo.Name, cfg.Token, repo)
 			if entry == nil {
-				slog.Warn("⚠️ Hopper over tomt repo", "repo", repo.FullName)
+				slog.Warn("Hopper over tomt repo", "repo", repo.FullName)
 				continue
 			}
 
 			repoIndex++
-			slog.Info("⏳ Behandler repo", "nummer", repoIndex, "navn", repo.FullName)
+			slog.Info("Behandler repo", "nummer", repoIndex, "navn", repo.FullName)
 
 			if err := deps.ImportRepo(ctx, db, *entry, repoIndex); err != nil {
 				return fmt.Errorf("import repo: %w", err)
@@ -76,6 +76,6 @@ func Run(ctx context.Context, cfg config.Config, deps RunnerDeps) error {
 		page++
 	}
 
-	slog.Info("✅ Ferdig med alle repos!")
+	slog.Info("Ferdig med alle repos!")
 	return nil
 }

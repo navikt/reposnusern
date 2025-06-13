@@ -76,7 +76,7 @@ func ImportRepo(ctx context.Context, db *sql.DB, entry models.RepoEntry, index i
 	insertSBOMPackagesGithub(ctx, queries, id, name, entry.SBOM)
 
 	if err := tx.Commit(); err != nil {
-		slog.Error("🚨 Commit-feil – ruller tilbake", "repo", name, "error", err)
+		slog.Error("Commit-feil – ruller tilbake", "repo", name, "error", err)
 		return fmt.Errorf("commit failed: %w", err)
 	}
 
@@ -91,7 +91,7 @@ func insertLanguages(ctx context.Context, queries *storage.Queries, repoID int64
 			Bytes:    int64(size),
 		})
 		if err != nil {
-			slog.Warn("❗️Språkfeil", "repo", name, "language", lang, "error", err)
+			slog.Warn("Språkfeil", "repo", name, "language", lang, "error", err)
 		}
 	}
 }
@@ -115,7 +115,7 @@ func insertDockerfiles(
 				Content:  f.Content,
 			})
 			if err != nil {
-				slog.Warn("🚨 Dockerfile-feil", "repo", name, "fil", f.Path, "error", err)
+				slog.Warn("Dockerfile-feil", "repo", name, "fil", f.Path, "error", err)
 				continue
 			}
 
@@ -142,7 +142,7 @@ func insertDockerfiles(
 				HasSecretsInEnvOrArg: sql.NullBool{Bool: features.HasSecretsInEnvOrArg, Valid: true},
 			})
 			if err != nil {
-				slog.Warn("⚠️ Dockerfile-feature-feil", "repo", name, "fil", f.Path, "error", err)
+				slog.Warn("Dockerfile-feature-feil", "repo", name, "fil", f.Path, "error", err)
 			}
 		}
 	}
@@ -215,13 +215,13 @@ func insertSBOMPackagesGithub(
 
 	sbomInner, ok := sbomRaw["sbom"].(map[string]interface{})
 	if !ok {
-		slog.Warn("❗️Ugyldig sbom-format", "repo", name)
+		slog.Warn("Ugyldig sbom-format", "repo", name)
 		return
 	}
 
 	packages, ok := sbomInner["packages"].([]interface{})
 	if !ok {
-		slog.Warn("❗️Ingen pakker i sbom", "repo", name)
+		slog.Warn("Ingen pakker i sbom", "repo", name)
 		return
 	}
 
@@ -258,7 +258,7 @@ func insertSBOMPackagesGithub(
 			Purl:    sql.NullString{String: purl, Valid: purl != ""},
 		})
 		if err != nil {
-			slog.Warn("🚨 SBOM-insert-feil", "repo", name, "package", nameVal, "error", err)
+			slog.Warn("SBOM-insert-feil", "repo", name, "package", nameVal, "error", err)
 		}
 	}
 }

@@ -14,7 +14,7 @@ if [ -z "$CPU_LIMIT" ]; then
   exit 1
 fi
 
-echo "🚀 Kjører benchmark med --cpus=$CPU_LIMIT"
+echo "Kjører benchmark med --cpus=$CPU_LIMIT"
 
 # CSV-header
 if [ ! -f "$CSV_FILE" ]; then
@@ -40,7 +40,7 @@ for i in {1..30}; do
   sleep 1
 done
 
-echo "📈 Starter JSON-måling til $RAW_STATS_FILE ..."
+echo "Starter JSON-måling til $RAW_STATS_FILE ..."
 
 # Samle raw stats som JSON hvert sekund
 while [[ "$(podman inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null)" == "true" ]]; do
@@ -63,5 +63,5 @@ fi
 
 # Bruk python for å hente peak mem fra JSON senere, men vi placeholder nå
 echo "$(date -Iseconds),$CPU_LIMIT,0,$VARIGHET_SEC,$NUM_GC" >> "$CSV_FILE"
-echo "✅ Logget (uten peak ennå): varighet=$VARIGHET_SEC sek, GC=$NUM_GC"
-echo "📊 JSON-logg for parsing: $RAW_STATS_FILE"
+echo "Logget (uten peak ennå): varighet=$VARIGHET_SEC sek, GC=$NUM_GC"
+echo "JSON-logg for parsing: $RAW_STATS_FILE"
