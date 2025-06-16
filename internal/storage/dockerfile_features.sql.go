@@ -8,11 +8,13 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"time"
 )
 
 const insertDockerfileFeatures = `-- name: InsertDockerfileFeatures :exec
 INSERT INTO dockerfile_features (
   dockerfile_id,
+  hentet_dato,
   base_image,
   base_tag,
   uses_latest_tag,
@@ -32,12 +34,13 @@ INSERT INTO dockerfile_features (
   has_secrets_in_env_or_arg
 ) VALUES (
   $1, $2, $3, $4, $5, $6, $7, $8,
-  $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+  $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
 )
 `
 
 type InsertDockerfileFeaturesParams struct {
 	DockerfileID         int32
+	HentetDato           time.Time
 	BaseImage            sql.NullString
 	BaseTag              sql.NullString
 	UsesLatestTag        sql.NullBool
@@ -60,6 +63,7 @@ type InsertDockerfileFeaturesParams struct {
 func (q *Queries) InsertDockerfileFeatures(ctx context.Context, arg InsertDockerfileFeaturesParams) error {
 	_, err := q.db.ExecContext(ctx, insertDockerfileFeatures,
 		arg.DockerfileID,
+		arg.HentetDato,
 		arg.BaseImage,
 		arg.BaseTag,
 		arg.UsesLatestTag,

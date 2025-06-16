@@ -1,7 +1,12 @@
 package fetcher_test
 
 import (
+	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -10,7 +15,7 @@ import (
 	"github.com/jonmartinstorm/reposnusern/internal/models"
 )
 
-// 🔁 Ginkgo sin test-runner. Denne trengs for at "go test" skal vite hvor den skal starte.
+// Ginkgo sin test-runner. Denne trengs for at "go test" skal vite hvor den skal starte.
 func TestFetcher(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Fetcher – GraphQL-funksjoner")
@@ -77,10 +82,10 @@ var _ = Describe("GraphQL-relaterte hjelpefunksjoner", func() {
 
 			Expect(entry).NotTo(BeNil())
 			Expect(entry.Repo.Name).To(Equal("arbeidsgiver"))
-			Expect(entry.Readme).To(Equal("Hello world"))
+			Expect(entry.Repo.Readme).To(Equal("Hello world"))
 			Expect(entry.Languages["Go"]).To(Equal(100))
-			Expect(entry.Security["has_security_md"]).To(BeTrue())
-			Expect(entry.Security["has_dependabot"]).To(BeFalse())
+			Expect(entry.Repo.Security["has_security_md"]).To(BeTrue())
+			Expect(entry.Repo.Security["has_dependabot"]).To(BeFalse())
 		})
 	})
 
@@ -241,5 +246,95 @@ var _ = Describe("GraphQL-relaterte hjelpefunksjoner", func() {
 			Expect(got["dockerfile"][0].Path).To(Equal("Dockerfile"))
 			Expect(got["dockerfile"][0].Content).To(Equal("FROM alpine"))
 		})
+	})
+})
+
+var _ = Describe("doRequestWithRateLimit", func() {
+	var originalClient *http.Client
+
+	BeforeEach(func() {
+		originalClient = fetcher.HttpClient
+	})
+
+	AfterEach(func() {
+		fetcher.HttpClient = originalClient
+	})
+
+	It("skal håndtere rate limit og retry riktig", func() {
+		callCount := 0
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			callCount++
+			if callCount == 1 {
+				// Simuler at vi har truffet rate limit
+				w.Header().Set("X-RateLimit-Remaining", "0")
+				w.Header().Set("X-RateLimit-Reset", fmt.Sprint(time.Now().Add(50*time.Millisecond).Unix()))
+				w.WriteHeader(http.StatusOK)
+				_, _ = fmt.Fprintln(w, `{}`)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintln(w, `{"message": "ok"}`)
+		}))
+		defer ts.Close()
+
+		fetcher.HttpClient = ts.Client()
+		ctx := context.Background()
+		var result struct{ Message string }
+		err := fetcher.DoRequestWithRateLimit(ctx, "GET", ts.URL, "dummy-token", nil, &result)
+		Expect(err).To(BeNil())
+		Expect(result.Message).To(Equal("ok"))
+		Expect(callCount).To(BeNumerically(">=", 2))
+	})
+
+	It("skal sette Content-Type header for POST", func() {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			Expect(r.Method).To(Equal("POST"))
+			Expect(r.Header.Get("Content-Type")).To(Equal("application/json"))
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintln(w, `{"message": "ok"}`)
+		}))
+		defer ts.Close()
+
+		fetcher.HttpClient = ts.Client()
+		ctx := context.Background()
+
+		var result struct{ Message string }
+		err := fetcher.DoRequestWithRateLimit(ctx, "POST", ts.URL, "token", []byte(`{}`), &result)
+		Expect(err).To(BeNil())
+		Expect(result.Message).To(Equal("ok"))
+	})
+
+	It("skal feile på ugyldig URL (DNS-feil)", func() {
+		var result any
+		ctx := context.Background()
+		err := fetcher.DoRequestWithRateLimit(ctx, "GET", "http://invalid-url", "token", nil, &result)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("skal feile på ugyldig request-format (syntax)", func() {
+		var result any
+		ctx := context.Background()
+		err := fetcher.DoRequestWithRateLimit(ctx, "GET", ":", "token", nil, &result)
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("skal returnere feil hvis GitHub API svarer med status != 2xx", func() {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusForbidden) // 403
+			_, _ = fmt.Fprint(w, `{"message":"access denied"}`)
+		}))
+		defer ts.Close()
+
+		fetcher.HttpClient = ts.Client()
+		ctx := context.Background()
+
+		var result any
+		err := fetcher.DoRequestWithRateLimit(ctx, "GET", ts.URL, "token", nil, &result)
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("GitHub API-feil"))
+		Expect(err.Error()).To(ContainSubstring("403"))
+		Expect(err.Error()).To(ContainSubstring("access denied"))
 	})
 })

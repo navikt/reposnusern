@@ -1,5 +1,7 @@
 CREATE TABLE IF NOT EXISTS repos (
-    id BIGINT PRIMARY KEY,
+    id BIGINT,
+    hentet_dato DATE NOT NULL,
+
     name TEXT NOT NULL,
     full_name TEXT NOT NULL,
     description TEXT NOT NULL,
@@ -18,54 +20,31 @@ CREATE TABLE IF NOT EXISTS repos (
     visibility TEXT NOT NULL,
     license TEXT NOT NULL,
     open_issues BIGINT NOT NULL,
-    languages_url TEXT NOT NULL
+    languages_url TEXT NOT NULL,
+
+    -- readme og security
+    readme_content TEXT,
+    has_security_md BOOLEAN NOT NULL DEFAULT FALSE,
+    has_dependabot BOOLEAN NOT NULL DEFAULT FALSE,
+    has_codeql BOOLEAN NOT NULL DEFAULT FALSE,
+
+    PRIMARY KEY (id, hentet_dato)
 );
 
 CREATE TABLE IF NOT EXISTS dockerfiles (
     id SERIAL PRIMARY KEY,
-    repo_id BIGINT NOT NULL REFERENCES repos(id),
+    repo_id BIGINT NOT NULL,
+    hentet_dato DATE NOT NULL,
+
     full_name TEXT NOT NULL,
     path TEXT NOT NULL,
     content TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS repo_languages (
-    id SERIAL PRIMARY KEY,
-    repo_id BIGINT NOT NULL REFERENCES repos(id),
-    language TEXT NOT NULL,
-    bytes BIGINT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS ci_configs (
-    id SERIAL PRIMARY KEY,
-    repo_id BIGINT NOT NULL REFERENCES repos(id),
-    path TEXT NOT NULL,
-    content TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS readmes (
-    repo_id BIGINT PRIMARY KEY REFERENCES repos(id),
-    content TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS repo_security_features (
-    repo_id BIGINT PRIMARY KEY REFERENCES repos(id),
-    has_security_md BOOLEAN NOT NULL DEFAULT FALSE,
-    has_dependabot BOOLEAN NOT NULL DEFAULT FALSE,
-    has_codeql BOOLEAN NOT NULL DEFAULT FALSE
-);
-
-CREATE TABLE IF NOT EXISTS sbom_github_packages (
-    id SERIAL PRIMARY KEY,
-    repo_id BIGINT NOT NULL REFERENCES repos(id),
-    name TEXT NOT NULL,
-    version TEXT,
-    license TEXT,
-    purl TEXT
-);
-
 CREATE TABLE IF NOT EXISTS dockerfile_features (
-    dockerfile_id INTEGER PRIMARY KEY REFERENCES dockerfiles(id),
+    dockerfile_id INTEGER PRIMARY KEY,
+    hentet_dato DATE NOT NULL,
+
     base_image TEXT,
     base_tag TEXT,
     uses_latest_tag BOOLEAN,
@@ -83,4 +62,33 @@ CREATE TABLE IF NOT EXISTS dockerfile_features (
     has_apt_get_clean BOOLEAN,
     world_writable BOOLEAN,
     has_secrets_in_env_or_arg BOOLEAN
+);
+
+CREATE TABLE IF NOT EXISTS repo_languages (
+    id SERIAL PRIMARY KEY,
+    repo_id BIGINT NOT NULL,
+    hentet_dato DATE NOT NULL,
+
+    language TEXT NOT NULL,
+    bytes BIGINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ci_configs (
+    id SERIAL PRIMARY KEY,
+    repo_id BIGINT NOT NULL,
+    hentet_dato DATE NOT NULL,
+
+    path TEXT NOT NULL,
+    content TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sbom_github_packages (
+    id SERIAL PRIMARY KEY,
+    repo_id BIGINT NOT NULL,
+    hentet_dato DATE NOT NULL,
+
+    name TEXT NOT NULL,
+    version TEXT,
+    license TEXT,
+    purl TEXT
 );

@@ -7,24 +7,27 @@ package storage
 
 import (
 	"context"
+	"time"
 )
 
 const insertDockerfile = `-- name: InsertDockerfile :one
-INSERT INTO dockerfiles (repo_id, full_name, path, content)
-VALUES ($1, $2, $3, $4)
+INSERT INTO dockerfiles (repo_id, hentet_dato, full_name, path, content)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING id
 `
 
 type InsertDockerfileParams struct {
-	RepoID   int64
-	FullName string
-	Path     string
-	Content  string
+	RepoID     int64
+	HentetDato time.Time
+	FullName   string
+	Path       string
+	Content    string
 }
 
 func (q *Queries) InsertDockerfile(ctx context.Context, arg InsertDockerfileParams) (int32, error) {
 	row := q.db.QueryRowContext(ctx, insertDockerfile,
 		arg.RepoID,
+		arg.HentetDato,
 		arg.FullName,
 		arg.Path,
 		arg.Content,

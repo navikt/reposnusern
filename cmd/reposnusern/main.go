@@ -2,69 +2,55 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"log/slog"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/jonmartinstorm/reposnusern/internal/config"
 	"github.com/jonmartinstorm/reposnusern/internal/dbwriter"
 	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
-	"github.com/jonmartinstorm/reposnusern/internal/models"
+	"github.com/jonmartinstorm/reposnusern/internal/logger"
 	"github.com/jonmartinstorm/reposnusern/internal/runner"
-	_ "github.com/lib/pq"
 )
 
-type AppDeps struct {
-	GitHub fetcher.GitHubAPI
-}
-
-func (AppDeps) OpenDB(dsn string) (*sql.DB, error) {
-	return sql.Open("postgres", dsn)
-}
-
-func (a AppDeps) GetRepoPage(cfg config.Config, page int) ([]models.RepoMeta, error) {
-	return a.GitHub.GetRepoPage(cfg, page)
-}
-
-func (a AppDeps) Fetcher() fetcher.GraphQLFetcher {
-	return a.GitHub
-}
-
-func (AppDeps) ImportRepo(ctx context.Context, db *sql.DB, entry models.RepoEntry, index int) error {
-	return dbwriter.ImportRepo(ctx, db, entry, index)
-}
-
 func main() {
-	// Context for graceful shutdown
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer cancel()
+	ctx := context.Background()
 
-	go func() {
-		<-ctx.Done()
-		slog.Info("SIGTERM mottatt – rydder opp...")
-		// Her kan vi legge til ekstra rydding om vi trenger det
-		// TODO sende context til dbcall og skriving av filer.
-	}()
+	logger.SetupLogger()
 
-	cfg := config.LoadAndValidateConfig()
-	runner.SetupLogger(cfg.Debug)
-
-	if err := runner.CheckDatabaseConnection(ctx, cfg.PostgresDSN); err != nil {
-		slog.Error("Klarte ikke å nå databasen", "error", err)
+	cfg, err := config.NewConfig()
+	if err != nil {
+		slog.Error("Ugyldig konfigurasjon:", "error", err)
 		os.Exit(1)
 	}
+
+	logger.SetDebug(cfg.Debug)
 
 	if !cfg.SkipArchived {
 		slog.Info("Inkluderer arkiverte repositories")
 	}
 
-	deps := AppDeps{
-		GitHub: &fetcher.GitHubAPIClient{},
-	}
+	slog.Info("Starter reposnusern...", "org", cfg.Org)
 
-	if err := runner.RunApp(ctx, cfg, deps); err != nil {
+	// Initialiser writer for PostgreSQL
+	slog.Info("Setter opp writer for PostgreSQL-database")
+	writer, err := dbwriter.NewPostgresWriter(cfg.PostgresDSN)
+	if err != nil {
+		slog.Error("Kunne ikke opprette databaseforbindelse", "error", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := writer.DB.Close(); err != nil {
+			slog.Warn("Klarte ikke å lukke databaseforbindelsen", "error", err)
+		}
+	}()
+
+	// Initialiserer fetcher for GitHub API
+	slog.Info("Setter opp fetcher med GitHub API for å hente repositories")
+	getter := fetcher.NewRepoFetcher(cfg)
+
+	app := runner.NewApp(cfg, writer, getter)
+
+	if err := app.Run(ctx); err != nil {
 		slog.Error("Applikasjonen feilet", "error", err)
 		os.Exit(1)
 	}

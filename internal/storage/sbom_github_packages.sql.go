@@ -8,25 +8,28 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"time"
 )
 
 const insertGithubSBOM = `-- name: InsertGithubSBOM :exec
 INSERT INTO sbom_github_packages (
-  repo_id, name, version, license, purl
-) VALUES ($1, $2, $3, $4, $5)
+  repo_id, hentet_dato, name, version, license, purl
+) VALUES ($1, $2, $3, $4, $5, $6)
 `
 
 type InsertGithubSBOMParams struct {
-	RepoID  int64
-	Name    string
-	Version sql.NullString
-	License sql.NullString
-	Purl    sql.NullString
+	RepoID     int64
+	HentetDato time.Time
+	Name       string
+	Version    sql.NullString
+	License    sql.NullString
+	Purl       sql.NullString
 }
 
 func (q *Queries) InsertGithubSBOM(ctx context.Context, arg InsertGithubSBOMParams) error {
 	_, err := q.db.ExecContext(ctx, insertGithubSBOM,
 		arg.RepoID,
+		arg.HentetDato,
 		arg.Name,
 		arg.Version,
 		arg.License,

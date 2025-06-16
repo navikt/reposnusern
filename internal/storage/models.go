@@ -6,25 +6,29 @@ package storage
 
 import (
 	"database/sql"
+	"time"
 )
 
 type CiConfig struct {
-	ID      int32
-	RepoID  int64
-	Path    string
-	Content string
+	ID         int32
+	RepoID     int64
+	HentetDato time.Time
+	Path       string
+	Content    string
 }
 
 type Dockerfile struct {
-	ID       int32
-	RepoID   int64
-	FullName string
-	Path     string
-	Content  string
+	ID         int32
+	RepoID     int64
+	HentetDato time.Time
+	FullName   string
+	Path       string
+	Content    string
 }
 
 type DockerfileFeature struct {
 	DockerfileID         int32
+	HentetDato           time.Time
 	BaseImage            sql.NullString
 	BaseTag              sql.NullString
 	UsesLatestTag        sql.NullBool
@@ -44,53 +48,48 @@ type DockerfileFeature struct {
 	HasSecretsInEnvOrArg sql.NullBool
 }
 
-type Readme struct {
-	RepoID  int64
-	Content string
-}
-
 type Repo struct {
-	ID           int64
-	Name         string
-	FullName     string
-	Description  string
-	Stars        int64
-	Forks        int64
-	Archived     bool
-	Private      bool
-	IsFork       bool
-	Language     string
-	SizeMb       float32
-	UpdatedAt    string
-	PushedAt     string
-	CreatedAt    string
-	HtmlUrl      string
-	Topics       string
-	Visibility   string
-	License      string
-	OpenIssues   int64
-	LanguagesUrl string
-}
-
-type RepoLanguage struct {
-	ID       int32
-	RepoID   int64
-	Language string
-	Bytes    int64
-}
-
-type RepoSecurityFeature struct {
-	RepoID        int64
+	ID            int64
+	HentetDato    time.Time
+	Name          string
+	FullName      string
+	Description   string
+	Stars         int64
+	Forks         int64
+	Archived      bool
+	Private       bool
+	IsFork        bool
+	Language      string
+	SizeMb        float32
+	UpdatedAt     string
+	PushedAt      string
+	CreatedAt     string
+	HtmlUrl       string
+	Topics        string
+	Visibility    string
+	License       string
+	OpenIssues    int64
+	LanguagesUrl  string
+	ReadmeContent sql.NullString
 	HasSecurityMd bool
 	HasDependabot bool
 	HasCodeql     bool
 }
 
+type RepoLanguage struct {
+	ID         int32
+	RepoID     int64
+	HentetDato time.Time
+	Language   string
+	Bytes      int64
+}
+
 type SbomGithubPackage struct {
-	ID      int32
-	RepoID  int64
-	Name    string
-	Version sql.NullString
-	License sql.NullString
-	Purl    sql.NullString
+	ID         int32
+	RepoID     int64
+	HentetDato time.Time
+	Name       string
+	Version    sql.NullString
+	License    sql.NullString
+	Purl       sql.NullString
 }

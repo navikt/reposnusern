@@ -7,21 +7,28 @@ package storage
 
 import (
 	"context"
+	"time"
 )
 
 const insertRepoLanguage = `-- name: InsertRepoLanguage :exec
 INSERT INTO repo_languages (
-  repo_id, language, bytes
-) VALUES ($1, $2, $3)
+  repo_id, hentet_dato, language, bytes
+) VALUES ($1, $2, $3, $4)
 `
 
 type InsertRepoLanguageParams struct {
-	RepoID   int64
-	Language string
-	Bytes    int64
+	RepoID     int64
+	HentetDato time.Time
+	Language   string
+	Bytes      int64
 }
 
 func (q *Queries) InsertRepoLanguage(ctx context.Context, arg InsertRepoLanguageParams) error {
-	_, err := q.db.ExecContext(ctx, insertRepoLanguage, arg.RepoID, arg.Language, arg.Bytes)
+	_, err := q.db.ExecContext(ctx, insertRepoLanguage,
+		arg.RepoID,
+		arg.HentetDato,
+		arg.Language,
+		arg.Bytes,
+	)
 	return err
 }

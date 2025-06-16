@@ -6,28 +6,35 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/jonmartinstorm/reposnusern/internal/models"
 	"github.com/jonmartinstorm/reposnusern/internal/parser"
 	"github.com/jonmartinstorm/reposnusern/internal/storage"
 )
 
-func SafeLicense(lic *struct{ SpdxID string }) string {
-	if lic == nil {
-		return ""
-	}
-	return lic.SpdxID
+type PostgresWriter struct {
+	DB *sql.DB
 }
 
-func SafeString(v interface{}) string {
-	if v == nil {
-		return ""
+func NewPostgresWriter(postgresdsn string) (*PostgresWriter, error) {
+	db, err := sql.Open("postgres", postgresdsn)
+	if err != nil {
+		slog.Error("Kunne ikke åpne PostgreSQL-database", "dsn", postgresdsn, "error", err)
+		return nil, fmt.Errorf("kunne ikke åpne PostgreSQL-database: %w", err)
 	}
-	return v.(string)
+
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	db.SetConnMaxLifetime(10 * time.Minute)
+
+	return &PostgresWriter{
+		DB: db,
+	}, nil
 }
 
-func ImportRepo(ctx context.Context, db *sql.DB, entry models.RepoEntry, index int) error {
-	tx, err := db.BeginTx(ctx, nil)
+func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry, index int, snapshotDate time.Time) error {
+	tx, err := p.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("start tx: %w", err)
 	}
@@ -40,6 +47,7 @@ func ImportRepo(ctx context.Context, db *sql.DB, entry models.RepoEntry, index i
 
 	repo := storage.InsertRepoParams{
 		ID:           id,
+		HentetDato:   snapshotDate,
 		Name:         r.Name,
 		FullName:     name,
 		Description:  r.Description,
@@ -68,12 +76,10 @@ func ImportRepo(ctx context.Context, db *sql.DB, entry models.RepoEntry, index i
 		return fmt.Errorf("InsertRepo feilet: %w", err)
 	}
 
-	insertLanguages(ctx, queries, id, name, entry.Languages)
-	insertDockerfiles(ctx, queries, id, name, entry.Files)
-	insertCIConfig(ctx, queries, id, name, entry.CIConfig)
-	insertReadme(ctx, queries, id, name, entry.Readme)
-	insertSecurityFeatures(ctx, queries, id, name, entry.Security)
-	insertSBOMPackagesGithub(ctx, queries, id, name, entry.SBOM)
+	insertLanguages(ctx, queries, id, name, entry.Languages, snapshotDate)
+	insertDockerfiles(ctx, queries, id, name, entry.Files, snapshotDate)
+	insertCIConfig(ctx, queries, id, name, entry.CIConfig, snapshotDate)
+	insertSBOMPackagesGithub(ctx, queries, id, name, entry.SBOM, snapshotDate)
 
 	if err := tx.Commit(); err != nil {
 		slog.Error("Commit-feil – ruller tilbake", "repo", name, "error", err)
@@ -83,12 +89,13 @@ func ImportRepo(ctx context.Context, db *sql.DB, entry models.RepoEntry, index i
 	return nil
 }
 
-func insertLanguages(ctx context.Context, queries *storage.Queries, repoID int64, name string, langs map[string]int) {
+func insertLanguages(ctx context.Context, queries *storage.Queries, repoID int64, name string, langs map[string]int, snapshotDate time.Time) {
 	for lang, size := range langs {
 		err := queries.InsertRepoLanguage(ctx, storage.InsertRepoLanguageParams{
-			RepoID:   repoID,
-			Language: lang,
-			Bytes:    int64(size),
+			RepoID:     repoID,
+			HentetDato: snapshotDate,
+			Language:   lang,
+			Bytes:      int64(size),
 		})
 		if err != nil {
 			slog.Warn("Språkfeil", "repo", name, "language", lang, "error", err)
@@ -102,6 +109,7 @@ func insertDockerfiles(
 	repoID int64,
 	name string,
 	files map[string][]models.FileEntry,
+	snapshotDate time.Time,
 ) {
 	for filetype, fileEntries := range files {
 		if !strings.HasPrefix(strings.ToLower(filetype), "dockerfile") {
@@ -109,10 +117,11 @@ func insertDockerfiles(
 		}
 		for _, f := range fileEntries {
 			dockerfileID, err := queries.InsertDockerfile(ctx, storage.InsertDockerfileParams{
-				RepoID:   repoID,
-				FullName: name,
-				Path:     f.Path,
-				Content:  f.Content,
+				RepoID:     repoID,
+				HentetDato: snapshotDate,
+				FullName:   name,
+				Path:       f.Path,
+				Content:    f.Content,
 			})
 			if err != nil {
 				slog.Warn("Dockerfile-feil", "repo", name, "fil", f.Path, "error", err)
@@ -123,6 +132,7 @@ func insertDockerfiles(
 
 			err = queries.InsertDockerfileFeatures(ctx, storage.InsertDockerfileFeaturesParams{
 				DockerfileID:         dockerfileID,
+				HentetDato:           snapshotDate,
 				BaseImage:            sql.NullString{String: features.BaseImage, Valid: features.BaseImage != ""},
 				BaseTag:              sql.NullString{String: features.BaseTag, Valid: features.BaseTag != ""},
 				UsesLatestTag:        sql.NullBool{Bool: features.UsesLatestTag, Valid: true},
@@ -154,51 +164,17 @@ func insertCIConfig(
 	repoID int64,
 	name string,
 	files []models.FileEntry,
+	snapshotDate time.Time,
 ) {
 	for _, f := range files {
 		if err := queries.InsertCIConfig(ctx, storage.InsertCIConfigParams{
-			RepoID:  repoID,
-			Path:    f.Path,
-			Content: f.Content,
+			RepoID:     repoID,
+			HentetDato: snapshotDate,
+			Path:       f.Path,
+			Content:    f.Content,
 		}); err != nil {
 			slog.Warn("CI-feil", "repo", name, "fil", f.Path, "error", err)
 		}
-	}
-}
-
-func insertReadme(
-	ctx context.Context,
-	queries *storage.Queries,
-	repoID int64,
-	name string,
-	content string,
-) {
-	if content == "" {
-		return
-	}
-
-	if err := queries.InsertReadme(ctx, storage.InsertReadmeParams{
-		RepoID:  repoID,
-		Content: content,
-	}); err != nil {
-		slog.Warn("README-feil", "repo", name, "error", err)
-	}
-}
-
-func insertSecurityFeatures(
-	ctx context.Context,
-	queries *storage.Queries,
-	repoID int64,
-	name string,
-	security map[string]bool,
-) {
-	if err := queries.InsertSecurityFeatures(ctx, storage.InsertSecurityFeaturesParams{
-		RepoID:        repoID,
-		HasSecurityMd: security["has_security_md"],
-		HasDependabot: security["has_dependabot"],
-		HasCodeql:     security["has_codeql"],
-	}); err != nil {
-		slog.Warn("Security-feil", "repo", name, "error", err)
 	}
 }
 
@@ -208,6 +184,7 @@ func insertSBOMPackagesGithub(
 	repoID int64,
 	name string,
 	sbomRaw map[string]interface{},
+	snapshotDate time.Time,
 ) {
 	if sbomRaw == nil {
 		return
@@ -251,14 +228,29 @@ func insertSBOMPackagesGithub(
 		}
 
 		err := queries.InsertGithubSBOM(ctx, storage.InsertGithubSBOMParams{
-			RepoID:  repoID,
-			Name:    nameVal,
-			Version: sql.NullString{String: version, Valid: version != ""},
-			License: sql.NullString{String: license, Valid: license != ""},
-			Purl:    sql.NullString{String: purl, Valid: purl != ""},
+			RepoID:     repoID,
+			HentetDato: snapshotDate,
+			Name:       nameVal,
+			Version:    sql.NullString{String: version, Valid: version != ""},
+			License:    sql.NullString{String: license, Valid: license != ""},
+			Purl:       sql.NullString{String: purl, Valid: purl != ""},
 		})
 		if err != nil {
 			slog.Warn("SBOM-insert-feil", "repo", name, "package", nameVal, "error", err)
 		}
 	}
+}
+
+func SafeLicense(lic *struct{ SpdxID string }) string {
+	if lic == nil {
+		return ""
+	}
+	return lic.SpdxID
+}
+
+func SafeString(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	return v.(string)
 }

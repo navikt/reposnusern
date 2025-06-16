@@ -7,45 +7,58 @@ package storage
 
 import (
 	"context"
+	"database/sql"
+	"time"
 )
 
 const insertRepo = `-- name: InsertRepo :exec
 INSERT INTO repos (
-  id, name, full_name, description, stars, forks, archived, private, is_fork,
+  id, hentet_dato,
+  name, full_name, description, stars, forks, archived, private, is_fork,
   language, size_mb, updated_at, pushed_at, created_at, html_url, topics,
-  visibility, license, open_issues, languages_url
+  visibility, license, open_issues, languages_url,
+  has_security_md, has_dependabot, has_codeql, readme_content
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-  $11, $12, $13, $14, $15, $16, $17, $18, $19, $20
+  $1, $2,
+  $3, $4, $5, $6, $7, $8, $9, $10,
+  $11, $12, $13, $14, $15, $16, $17,
+  $18, $19, $20, $21,
+  $22, $23, $24, $25
 )
 `
 
 type InsertRepoParams struct {
-	ID           int64
-	Name         string
-	FullName     string
-	Description  string
-	Stars        int64
-	Forks        int64
-	Archived     bool
-	Private      bool
-	IsFork       bool
-	Language     string
-	SizeMb       float32
-	UpdatedAt    string
-	PushedAt     string
-	CreatedAt    string
-	HtmlUrl      string
-	Topics       string
-	Visibility   string
-	License      string
-	OpenIssues   int64
-	LanguagesUrl string
+	ID            int64
+	HentetDato    time.Time
+	Name          string
+	FullName      string
+	Description   string
+	Stars         int64
+	Forks         int64
+	Archived      bool
+	Private       bool
+	IsFork        bool
+	Language      string
+	SizeMb        float32
+	UpdatedAt     string
+	PushedAt      string
+	CreatedAt     string
+	HtmlUrl       string
+	Topics        string
+	Visibility    string
+	License       string
+	OpenIssues    int64
+	LanguagesUrl  string
+	HasSecurityMd bool
+	HasDependabot bool
+	HasCodeql     bool
+	ReadmeContent sql.NullString
 }
 
 func (q *Queries) InsertRepo(ctx context.Context, arg InsertRepoParams) error {
 	_, err := q.db.ExecContext(ctx, insertRepo,
 		arg.ID,
+		arg.HentetDato,
 		arg.Name,
 		arg.FullName,
 		arg.Description,
@@ -65,6 +78,10 @@ func (q *Queries) InsertRepo(ctx context.Context, arg InsertRepoParams) error {
 		arg.License,
 		arg.OpenIssues,
 		arg.LanguagesUrl,
+		arg.HasSecurityMd,
+		arg.HasDependabot,
+		arg.HasCodeql,
+		arg.ReadmeContent,
 	)
 	return err
 }

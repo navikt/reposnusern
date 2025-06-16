@@ -7,21 +7,28 @@ package storage
 
 import (
 	"context"
+	"time"
 )
 
 const insertCIConfig = `-- name: InsertCIConfig :exec
 INSERT INTO ci_configs (
-  repo_id, path, content
-) VALUES ($1, $2, $3)
+  repo_id, hentet_dato, path, content
+) VALUES ($1, $2, $3, $4)
 `
 
 type InsertCIConfigParams struct {
-	RepoID  int64
-	Path    string
-	Content string
+	RepoID     int64
+	HentetDato time.Time
+	Path       string
+	Content    string
 }
 
 func (q *Queries) InsertCIConfig(ctx context.Context, arg InsertCIConfigParams) error {
-	_, err := q.db.ExecContext(ctx, insertCIConfig, arg.RepoID, arg.Path, arg.Content)
+	_, err := q.db.ExecContext(ctx, insertCIConfig,
+		arg.RepoID,
+		arg.HentetDato,
+		arg.Path,
+		arg.Content,
+	)
 	return err
 }

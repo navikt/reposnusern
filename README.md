@@ -154,7 +154,6 @@ Under utviklingen av dette innholdet har forfatter(e) benyttet generativ KI – 
 
 ## TODO
 
-- [ ] Refaktorere til ideomatisk go
 - [ ] Bedre logging
 - [ ] Sørge for at GraphQL versjonen også parser lenger ned enn toppnivå mappen.
 - [ ] Optimalisering
@@ -162,6 +161,7 @@ Under utviklingen av dette innholdet har forfatter(e) benyttet generativ KI – 
   - [x] Fortsette å optimalisere på minne
 - [ ] Oppdatere schema så vi tar vare på dato vi har hentet informasjonen fra. (Så vi kan ta vare på trenden.)
 
+- [x] Refaktorere til ideomatisk go
 - [x] Parsing av forskjellige dependency filer
 - [x] Også hente REST API endpoints for software bill of materials (SBOM)
 - [x] Hindre at passord og secrets utilsiktet havner i logger

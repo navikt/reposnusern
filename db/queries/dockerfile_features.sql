@@ -1,6 +1,7 @@
 -- name: InsertDockerfileFeatures :exec
 INSERT INTO dockerfile_features (
   dockerfile_id,
+  hentet_dato,
   base_image,
   base_tag,
   uses_latest_tag,
@@ -20,5 +21,5 @@ INSERT INTO dockerfile_features (
   has_secrets_in_env_or_arg
 ) VALUES (
   $1, $2, $3, $4, $5, $6, $7, $8,
-  $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+  $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
 );
