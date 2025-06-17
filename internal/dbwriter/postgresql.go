@@ -33,11 +33,13 @@ func NewPostgresWriter(postgresdsn string) (*PostgresWriter, error) {
 	}, nil
 }
 
-func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry, index int, snapshotDate time.Time) error {
+func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry, snapshotTime time.Time) error {
 	tx, err := p.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("start tx: %w", err)
 	}
+
+	snapshotDate := snapshotTime.Truncate(24 * time.Hour)
 
 	queries := storage.New(tx)
 
@@ -45,7 +47,7 @@ func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry,
 	id := int64(r.ID)
 	name := r.FullName
 
-	repo := storage.InsertRepoParams{
+	repo := storage.InsertOrUpdateRepoParams{
 		ID:           id,
 		HentetDato:   snapshotDate,
 		Name:         r.Name,
@@ -67,9 +69,16 @@ func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry,
 		License:      SafeLicense((*struct{ SpdxID string })(r.License)),
 		OpenIssues:   r.OpenIssues,
 		LanguagesUrl: r.LanguagesURL,
+		ReadmeContent: sql.NullString{
+			String: r.Readme,
+			Valid:  r.Readme != "",
+		},
+		HasSecurityMd: r.Security["has_security_md"],
+		HasDependabot: r.Security["has_dependabot"],
+		HasCodeql:     r.Security["has_codeql"],
 	}
 
-	if err := queries.InsertRepo(ctx, repo); err != nil {
+	if err := queries.InsertOrUpdateRepo(ctx, repo); err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
 			return fmt.Errorf("InsertRepo feilet: %v (rollback feilet: %w)", err, rbErr)
 		}
@@ -91,7 +100,7 @@ func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry,
 
 func insertLanguages(ctx context.Context, queries *storage.Queries, repoID int64, name string, langs map[string]int, snapshotDate time.Time) {
 	for lang, size := range langs {
-		err := queries.InsertRepoLanguage(ctx, storage.InsertRepoLanguageParams{
+		err := queries.InsertOrUpdateRepoLanguage(ctx, storage.InsertOrUpdateRepoLanguageParams{
 			RepoID:     repoID,
 			HentetDato: snapshotDate,
 			Language:   lang,
@@ -116,23 +125,13 @@ func insertDockerfiles(
 			continue
 		}
 		for _, f := range fileEntries {
-			dockerfileID, err := queries.InsertDockerfile(ctx, storage.InsertDockerfileParams{
-				RepoID:     repoID,
-				HentetDato: snapshotDate,
-				FullName:   name,
-				Path:       f.Path,
-				Content:    f.Content,
-			})
-			if err != nil {
-				slog.Warn("Dockerfile-feil", "repo", name, "fil", f.Path, "error", err)
-				continue
-			}
-
-			features := parser.ParseDockerfile(f.Content)
-
-			err = queries.InsertDockerfileFeatures(ctx, storage.InsertDockerfileFeaturesParams{
-				DockerfileID:         dockerfileID,
+			features, _ := parser.ParseDockerfile(f.Content)
+			_, err := queries.InsertOrUpdateDockerfile(ctx, storage.InsertOrUpdateDockerfileParams{
+				RepoID:               repoID,
 				HentetDato:           snapshotDate,
+				FullName:             name,
+				Path:                 f.Path,
+				Content:              f.Content,
 				BaseImage:            sql.NullString{String: features.BaseImage, Valid: features.BaseImage != ""},
 				BaseTag:              sql.NullString{String: features.BaseTag, Valid: features.BaseTag != ""},
 				UsesLatestTag:        sql.NullBool{Bool: features.UsesLatestTag, Valid: true},
@@ -152,8 +151,10 @@ func insertDockerfiles(
 				HasSecretsInEnvOrArg: sql.NullBool{Bool: features.HasSecretsInEnvOrArg, Valid: true},
 			})
 			if err != nil {
-				slog.Warn("Dockerfile-feature-feil", "repo", name, "fil", f.Path, "error", err)
+				slog.Warn("Dockerfile-feil", "repo", name, "fil", f.Path, "error", err)
+				continue
 			}
+
 		}
 	}
 }
@@ -167,7 +168,7 @@ func insertCIConfig(
 	snapshotDate time.Time,
 ) {
 	for _, f := range files {
-		if err := queries.InsertCIConfig(ctx, storage.InsertCIConfigParams{
+		if err := queries.InsertOrUpdateCIConfig(ctx, storage.InsertOrUpdateCIConfigParams{
 			RepoID:     repoID,
 			HentetDato: snapshotDate,
 			Path:       f.Path,
@@ -227,7 +228,7 @@ func insertSBOMPackagesGithub(
 			}
 		}
 
-		err := queries.InsertGithubSBOM(ctx, storage.InsertGithubSBOMParams{
+		err := queries.InsertOrUpdateGithubSBOM(ctx, storage.InsertOrUpdateGithubSBOMParams{
 			RepoID:     repoID,
 			HentetDato: snapshotDate,
 			Name:       nameVal,

@@ -1,4 +1,4 @@
-package test
+package postgres_test
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"github.com/jonmartinstorm/reposnusern/test/testutils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestAppIntegration(t *testing.T) {
@@ -38,19 +39,20 @@ var _ = Describe("runner.App", Ordered, func() {
 			Org:         "testorg",
 			Token:       "123",
 			Debug:       true,
+			Parallelism: 2,
 			PostgresDSN: "ignored-in-test",
 		}
 
-		// Returner 2 dummy repos
 		mockRepos := []models.RepoMeta{
 			{ID: 1, Name: "demo", FullName: "testorg/demo"},
 			{ID: 2, Name: "lib", FullName: "testorg/lib"},
 		}
 
 		fetcher = &testutils.MockFetcher{}
-		fetcher.On("GetReposPage", ctx, cfg, 1).Return(mockRepos, nil)
-		fetcher.On("GetReposPage", ctx, cfg, 2).Return([]models.RepoMeta{}, nil)
+		fetcher.On("GetReposPage", mock.Anything, cfg, 1).Return(mockRepos, nil)
+		fetcher.On("GetReposPage", mock.Anything, cfg, 2).Return([]models.RepoMeta{}, nil)
 
+		// Én forventning per repo – tryggere enn dynamisk Return
 		for i, repo := range mockRepos {
 			entry := &models.RepoEntry{
 				Repo: models.RepoMeta{
@@ -63,7 +65,7 @@ var _ = Describe("runner.App", Ordered, func() {
 				},
 				Languages: map[string]int{"Go": 1000 + i},
 			}
-			fetcher.On("FetchRepoGraphQL", ctx, repo).Return(entry, nil)
+			fetcher.On("FetchRepoGraphQL", mock.Anything, repo).Return(entry, nil)
 		}
 
 		app = runner.NewApp(cfg, writer, fetcher)

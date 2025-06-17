@@ -3,6 +3,7 @@ package fetcher
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -80,6 +81,14 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 	entry := ParseRepoData(data, baseRepo)
 
 	entry.SBOM = sbom
+
+	if IsMonorepoCandidate(entry) {
+		slog.Info("Monorepo-kandidat – henter dype Dockerfiles", "repo", baseRepo.FullName)
+
+		files := FetchDockerfilesFromRepoREST(ctx, r.Cfg.Org, baseRepo.Name, r.Cfg.Token)
+		entry.Files["dockerfile"] = append(entry.Files["dockerfile"], files...)
+	}
+
 	return entry, nil
 }
 
@@ -156,6 +165,30 @@ func ParseRepoData(data map[string]interface{}, baseRepo models.RepoMeta) *model
 		Files:     ExtractFiles(repoData),
 		CIConfig:  ExtractCI(repoData),
 	}
+}
+
+func IsMonorepoCandidate(entry *models.RepoEntry) bool {
+	langs := 0
+	for lang := range entry.Languages {
+		switch lang {
+		case "Go", "Java", "Python", "JavaScript", "TypeScript", "Rust":
+			langs++
+		}
+	}
+
+	hasMatrix := false
+	for _, ci := range entry.CIConfig {
+		if strings.Contains(ci.Content, "matrix:") {
+			hasMatrix = true
+			break
+		}
+	}
+
+	hasSecuritySignals := entry.Repo.Security["has_codeql"] || entry.Repo.Security["has_dependabot"]
+
+	noDockerfiles := len(entry.Files["dockerfile"]) == 0
+
+	return noDockerfiles && (langs > 0 || hasMatrix || hasSecuritySignals)
 }
 
 func ExtractLanguages(data map[string]interface{}) map[string]int {
@@ -359,4 +392,63 @@ func ConvertFiles(input map[string][]map[string]string) map[string][]models.File
 		out[k] = ConvertToFileEntries(v)
 	}
 	return out
+}
+
+func FetchDockerfilesFromRepoREST(ctx context.Context, owner, repo, token string) []models.FileEntry {
+	var results []models.FileEntry
+
+	treeURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/trees/HEAD?recursive=1", owner, repo)
+
+	var tree struct {
+		Tree []struct {
+			Path string `json:"path"`
+			Type string `json:"type"`
+		} `json:"tree"`
+	}
+
+	err := DoRequestWithRateLimit(ctx, "GET", treeURL, token, nil, &tree)
+	if err != nil {
+		slog.Warn("Klarte ikke hente repo-tree", "repo", owner+"/"+repo, "error", err)
+		return results
+	}
+
+	for _, entry := range tree.Tree {
+		if entry.Type != "blob" {
+			continue
+		}
+		if !strings.Contains(strings.ToLower(entry.Path), "dockerfile") {
+			continue
+		}
+
+		content := fetchFileContent(ctx, owner, repo, token, entry.Path)
+		if content != "" {
+			results = append(results, models.FileEntry{
+				Path:    entry.Path,
+				Content: content,
+			})
+		}
+	}
+	return results
+}
+
+func fetchFileContent(ctx context.Context, owner, repo, token, path string) string {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s", owner, repo, path)
+
+	var file struct {
+		Content  string `json:"content"`
+		Encoding string `json:"encoding"`
+	}
+	err := DoRequestWithRateLimit(ctx, "GET", url, token, nil, &file)
+	if err != nil {
+		slog.Warn("Klarte ikke hente filinnhold", "repo", owner+"/"+repo, "path", path, "error", err)
+		return ""
+	}
+
+	if file.Encoding == "base64" {
+		decoded, err := base64.StdEncoding.DecodeString(file.Content)
+		if err == nil {
+			return string(decoded)
+		}
+	}
+	return ""
 }

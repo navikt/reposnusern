@@ -35,7 +35,8 @@ var _ = Describe("App.Run", func() {
 			Org:         "testorg",
 			Token:       "fake-token",
 			PostgresDSN: "mockdsn",
-			Debug:       true, // så vi stopper etter 10 repo
+			Debug:       true,
+			Parallelism: 2,
 		}
 
 		writer = &mocks.MockDBWriter{}
@@ -44,7 +45,7 @@ var _ = Describe("App.Run", func() {
 	})
 
 	It("returnerer feil hvis GetReposPage feiler", func() {
-		fetcher.On("GetReposPage", ctx, cfg, 1).
+		fetcher.On("GetReposPage", mock.Anything, cfg, 1).
 			Return(nil, errors.New("API-feil"))
 
 		err := app.Run(ctx)
@@ -56,32 +57,35 @@ var _ = Describe("App.Run", func() {
 		app = runner.NewApp(cfg, writer, fetcher)
 
 		archived := models.RepoMeta{FullName: "repo1", Archived: true}
-		fetcher.On("GetReposPage", ctx, cfg, 1).Return([]models.RepoMeta{archived}, nil)
-		fetcher.On("GetReposPage", ctx, cfg, 2).Return([]models.RepoMeta{}, nil)
+		fetcher.On("GetReposPage", mock.Anything, cfg, 1).Return([]models.RepoMeta{archived}, nil)
+		fetcher.On("GetReposPage", mock.Anything, cfg, 2).Return([]models.RepoMeta{}, nil)
 
 		err := app.Run(ctx)
 		Expect(err).To(BeNil())
 	})
 
 	It("stopper etter maks 10 repo i debug-modus", func() {
-		// Returner 10 ikke-arkiverte repos
+		cfg.Parallelism = 2
+		app = runner.NewApp(cfg, writer, fetcher)
+
 		var repos []models.RepoMeta
 		for i := 0; i < 10; i++ {
 			repos = append(repos, models.RepoMeta{FullName: "repo", Name: "name"})
 		}
-		fetcher.On("GetReposPage", ctx, cfg, 1).Return(repos, nil)
+		fetcher.On("GetReposPage", mock.Anything, cfg, 1).Return(repos, nil)
 
-		// Return en tom page etterpå
-		fetcher.On("GetReposPage", ctx, cfg, 2).Return([]models.RepoMeta{}, nil)
+		// Vi forventer at side 2 aldri blir hentet
+		fetcher.On("GetReposPage", mock.Anything, cfg, 2).Return([]models.RepoMeta{}, nil)
 
-		// Returner dummy data for GraphQL og ImportRepo
 		for i := 0; i < 10; i++ {
 			entry := &models.RepoEntry{}
-			fetcher.On("FetchRepoGraphQL", ctx, repos[i]).Return(entry, nil)
-			writer.On("ImportRepo", ctx, *entry, i+1, mock.AnythingOfType("time.Time")).Return(nil)
+			fetcher.On("FetchRepoGraphQL", mock.Anything, repos[i]).Return(entry, nil)
+			writer.On("ImportRepo", mock.Anything, *entry, mock.AnythingOfType("time.Time")).Return(nil)
+
 		}
 
 		err := app.Run(ctx)
 		Expect(err).To(BeNil())
+		Expect(writer.Calls).To(HaveLen(10))
 	})
 })

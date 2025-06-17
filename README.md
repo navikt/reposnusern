@@ -22,7 +22,7 @@ Målet med dette prosjektet er å lage et fleksibelt og utvidbart analyseverktø
 
 Proof-of-Concept bruker følgende:
 - `go + sqlc + PostgreSQL` 
-- GitHub-API med mellomlagring i JSON
+- nå også med bigquery
 - Støtte for:
   - Repo-metadata og språk
   - Dockerfiles og dependency-filer
@@ -85,19 +85,38 @@ For å hente data fra GitHub må du angi organisasjonsnavn og et gyldig GitHub-t
 podman build -t reposnusnern .
 
 # Kjør med nødvendige miljøvariabler og bind-mount for å se utdata
+
+#Postgres
 podman run --rm \
   -e ORG=dinorg \
   -e GITHUB_TOKEN=ghp_dintokenher \
   -e POSTGRES_DSN="postgres://<bruker>:<passord>@<fqdn>:5432/reposnusern?sslmode=require" \
+  -e REPO_STORAGE=postgres \
+  -e REPOSNUSERN_PARALL=4 \
   -e REPOSNUSERDEBUG=true \
   -e REPOSNUSERARCHIVE=false \
   -v "$PWD/data":/data \
   reposnusnern
 
+
+#BigQuery
+podman run --rm \
+  -e ORG=dinorg \
+  -e GITHUB_TOKEN=ghp_dintokenher \
+  -e BQ_CREDENTIALS=./credentials.json \
+  -e BQ_DATASET=reposnusern_data \
+  -e BQ_DATASET=reposnusern_data \
+  -e REPO_STORAGE=bigquery \
+  -e REPOSNUSERN_PARALL=4 \
+  -e REPOSNUSERDEBUG=true \
+  -e REPOSNUSERARCHIVE=false \
+  -v "$PWD/data":/data \
+  reposnusnern
 ```
 
 REPOSNUSERDEBUG=true gjør at maks 10 repos blir hentet, for å teste ut uten å spamme github apiet.
 REPOSNUSERARCHIVE=true vil sette at arkiverte repos også blir hentet, ellers blir kun aktive hentet.
+REPOSNUSERN_PARALL=4 setter antall parallele kjøring, kan ikke love at det fungerer bra over 4. 
 
 Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. Koden håndterer dette automatisk ved å pause og fortsette når grensen er nådd.
 
@@ -155,12 +174,13 @@ Under utviklingen av dette innholdet har forfatter(e) benyttet generativ KI – 
 ## TODO
 
 - [ ] Bedre logging
-- [ ] Sørge for at GraphQL versjonen også parser lenger ned enn toppnivå mappen.
 - [ ] Optimalisering
   - [ ] Lage en bulk insert til db for relevante objekter
   - [x] Fortsette å optimalisere på minne
-- [ ] Oppdatere schema så vi tar vare på dato vi har hentet informasjonen fra. (Så vi kan ta vare på trenden.)
 
+- [x] Oppdatere schema så vi tar vare på dato vi har hentet informasjonen fra. (Så vi kan ta vare på trenden.)
+- [x] Sørge for at GraphQL versjonen også parser lenger ned enn toppnivå mappen.
+- [x] Kan lagre til BigQuery også
 - [x] Refaktorere til ideomatisk go
 - [x] Parsing av forskjellige dependency filer
 - [x] Også hente REST API endpoints for software bill of materials (SBOM)

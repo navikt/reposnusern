@@ -14,21 +14,20 @@ func TestParser(t *testing.T) {
 }
 
 var _ = Describe("ParseDockerfile", func() {
-	DescribeTable("Basic parsing",
+	DescribeTable("Dockerfile parsing produces correct features",
 		func(content string, expected parser.DockerfileFeatures) {
-			result := parser.ParseDockerfile(content)
+			result, _ := parser.ParseDockerfile(content)
 			Expect(result).To(Equal(expected))
 		},
 
-		Entry("Basic Dockerfile with latest tag",
+		Entry("Basic latest image and user/copy/install",
 			`FROM ubuntu:latest
 USER appuser
 COPY . /app
 RUN apt-get update && apt-get install -y curl
 ENV SECRET_TOKEN=abc123
 EXPOSE 8080
-ENTRYPOINT ["./start.sh"]
-`,
+ENTRYPOINT ["./start.sh"]`,
 			parser.DockerfileFeatures{
 				BaseImage:            "ubuntu",
 				BaseTag:              "latest",
@@ -50,16 +49,15 @@ ENTRYPOINT ["./start.sh"]
 			},
 		),
 
-		Entry("Multistage with sensitive copy",
-			`FROM golang:1.20 AS builder
+		Entry("Multistage build with alias and sensitive copy",
+			`FROM golang:1.19 AS builder
 COPY .ssh /root/.ssh
 FROM alpine
-COPY --from=builder /app /app
-`,
+COPY --from=builder /app /app`,
 			parser.DockerfileFeatures{
 				BaseImage:            "golang",
-				BaseTag:              "1.20",
-				UsesLatestTag:        false,
+				BaseTag:              "1.19",
+				UsesLatestTag:        true,
 				HasUserInstruction:   false,
 				HasCopySensitive:     true,
 				HasPackageInstalls:   false,
@@ -76,38 +74,87 @@ COPY --from=builder /app /app
 				HasSecretsInEnvOrArg: false,
 			},
 		),
-	)
 
-	It("should detect advanced features like add, curl, build tools, and apt clean", func() {
-		content := `
-FROM debian
-USER appuser
-ADD file.tar.gz /app
-RUN apt-get update && apt-get install -y gcc make curl && apt-get clean
-`
-		f := parser.ParseDockerfile(content)
+		Entry("Complex RUN with build tools and curl",
+			`FROM debian
+RUN apt-get update && apt-get install -y gcc make curl && apt-get clean`,
+			parser.DockerfileFeatures{
+				BaseImage:            "debian",
+				BaseTag:              "latest",
+				UsesLatestTag:        true,
+				HasPackageInstalls:   true,
+				UsesMultistage:       false,
+				HasHealthcheck:       false,
+				UsesAddInstruction:   false,
+				HasLabelMetadata:     false,
+				HasExpose:            false,
+				HasEntrypointOrCmd:   false,
+				InstallsCurlOrWget:   true,
+				InstallsBuildTools:   true,
+				HasAptGetClean:       true,
+				WorldWritable:        false,
+				HasSecretsInEnvOrArg: false,
+			},
+		),
 
-		Expect(f.HasUserInstruction).To(BeTrue())
-		Expect(f.UsesAddInstruction).To(BeTrue())
-		Expect(f.HasPackageInstalls).To(BeTrue())
-		Expect(f.InstallsCurlOrWget).To(BeTrue())
-		Expect(f.InstallsBuildTools).To(BeTrue())
-		Expect(f.HasAptGetClean).To(BeTrue())
-	})
+		Entry("ARG secret triggers detection",
+			`FROM alpine
+ARG SECRET_TOKEN`,
+			parser.DockerfileFeatures{
+				BaseImage:            "alpine",
+				BaseTag:              "latest",
+				UsesLatestTag:        true,
+				HasSecretsInEnvOrArg: true,
+			},
+		),
 
-	It("should detect label, expose, healthcheck, and world writable", func() {
-		content := `
-FROM alpine
+		Entry("ENV secret triggers detection",
+			`FROM alpine
+ENV DB_PASSWORD=supersecret`,
+			parser.DockerfileFeatures{
+				BaseImage:            "alpine",
+				BaseTag:              "latest",
+				UsesLatestTag:        true,
+				HasSecretsInEnvOrArg: true,
+			},
+		),
+
+		Entry("World writable detected with chmod 777",
+			`FROM busybox
+RUN chmod 777 /data/file`,
+			parser.DockerfileFeatures{
+				BaseImage:     "busybox",
+				BaseTag:       "latest",
+				UsesLatestTag: true,
+				WorldWritable: true,
+			},
+		),
+
+		Entry("Label, expose and healthcheck",
+			`FROM alpine
 LABEL version="1.0"
 EXPOSE 443
-HEALTHCHECK CMD curl -f http://localhost || exit 1
-RUN chmod 777 /tmp/file
-`
-		f := parser.ParseDockerfile(content)
+HEALTHCHECK CMD curl -f http://localhost || exit 1`,
+			parser.DockerfileFeatures{
+				BaseImage:          "alpine",
+				BaseTag:            "latest",
+				UsesLatestTag:      true,
+				HasLabelMetadata:   true,
+				HasExpose:          true,
+				HasHealthcheck:     true,
+				InstallsCurlOrWget: true,
+			},
+		),
 
-		Expect(f.HasLabelMetadata).To(BeTrue())
-		Expect(f.HasExpose).To(BeTrue())
-		Expect(f.HasHealthcheck).To(BeTrue())
-		Expect(f.WorldWritable).To(BeTrue())
-	})
+		Entry("Add instruction is detected",
+			`FROM debian
+ADD file.tar.gz /opt/`,
+			parser.DockerfileFeatures{
+				BaseImage:          "debian",
+				BaseTag:            "latest",
+				UsesLatestTag:      true,
+				UsesAddInstruction: true,
+			},
+		),
+	)
 })

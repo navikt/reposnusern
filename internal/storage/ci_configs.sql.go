@@ -10,21 +10,25 @@ import (
 	"time"
 )
 
-const insertCIConfig = `-- name: InsertCIConfig :exec
+const insertOrUpdateCIConfig = `-- name: InsertOrUpdateCIConfig :exec
 INSERT INTO ci_configs (
   repo_id, hentet_dato, path, content
-) VALUES ($1, $2, $3, $4)
+) VALUES (
+  $1, $2, $3, $4
+)
+ON CONFLICT (repo_id, hentet_dato, path) DO UPDATE SET
+  content = EXCLUDED.content
 `
 
-type InsertCIConfigParams struct {
+type InsertOrUpdateCIConfigParams struct {
 	RepoID     int64
 	HentetDato time.Time
 	Path       string
 	Content    string
 }
 
-func (q *Queries) InsertCIConfig(ctx context.Context, arg InsertCIConfigParams) error {
-	_, err := q.db.ExecContext(ctx, insertCIConfig,
+func (q *Queries) InsertOrUpdateCIConfig(ctx context.Context, arg InsertOrUpdateCIConfigParams) error {
+	_, err := q.db.ExecContext(ctx, insertOrUpdateCIConfig,
 		arg.RepoID,
 		arg.HentetDato,
 		arg.Path,

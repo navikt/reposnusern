@@ -19,7 +19,8 @@ ci: generate-mocks tidy vet lint test
 # -------------------------------
 
 unit:
-	@go test -v $(shell go list ./... | grep -v /test/)
+	@go test -v $(shell go list ./... | grep -Ev '(^.*\/test($$|/))|(/internal/mocks$$)')
+
 
 integration:
 	@go test -v -tags=integration $(shell go list ./... | grep -v /test/)

@@ -35,16 +35,11 @@ CREATE TABLE IF NOT EXISTS dockerfiles (
     id SERIAL PRIMARY KEY,
     repo_id BIGINT NOT NULL,
     hentet_dato DATE NOT NULL,
-
     full_name TEXT NOT NULL,
     path TEXT NOT NULL,
-    content TEXT NOT NULL
-);
+    content TEXT NOT NULL,
 
-CREATE TABLE IF NOT EXISTS dockerfile_features (
-    dockerfile_id INTEGER PRIMARY KEY,
-    hentet_dato DATE NOT NULL,
-
+    -- Features
     base_image TEXT,
     base_tag TEXT,
     uses_latest_tag BOOLEAN,
@@ -61,7 +56,9 @@ CREATE TABLE IF NOT EXISTS dockerfile_features (
     installs_build_tools BOOLEAN,
     has_apt_get_clean BOOLEAN,
     world_writable BOOLEAN,
-    has_secrets_in_env_or_arg BOOLEAN
+    has_secrets_in_env_or_arg BOOLEAN,
+
+    UNIQUE (repo_id, hentet_dato, path)
 );
 
 CREATE TABLE IF NOT EXISTS repo_languages (
@@ -70,7 +67,9 @@ CREATE TABLE IF NOT EXISTS repo_languages (
     hentet_dato DATE NOT NULL,
 
     language TEXT NOT NULL,
-    bytes BIGINT NOT NULL
+    bytes BIGINT NOT NULL,
+
+    UNIQUE (repo_id, hentet_dato, language)
 );
 
 CREATE TABLE IF NOT EXISTS ci_configs (
@@ -79,7 +78,9 @@ CREATE TABLE IF NOT EXISTS ci_configs (
     hentet_dato DATE NOT NULL,
 
     path TEXT NOT NULL,
-    content TEXT NOT NULL
+    content TEXT NOT NULL,
+
+    UNIQUE (repo_id, hentet_dato, path)
 );
 
 CREATE TABLE IF NOT EXISTS sbom_github_packages (
@@ -90,5 +91,7 @@ CREATE TABLE IF NOT EXISTS sbom_github_packages (
     name TEXT NOT NULL,
     version TEXT,
     license TEXT,
-    purl TEXT
+    purl TEXT,
+
+    UNIQUE (repo_id, hentet_dato, name, version)
 );

@@ -10,21 +10,25 @@ import (
 	"time"
 )
 
-const insertRepoLanguage = `-- name: InsertRepoLanguage :exec
+const insertOrUpdateRepoLanguage = `-- name: InsertOrUpdateRepoLanguage :exec
 INSERT INTO repo_languages (
   repo_id, hentet_dato, language, bytes
-) VALUES ($1, $2, $3, $4)
+) VALUES (
+  $1, $2, $3, $4
+)
+ON CONFLICT (repo_id, hentet_dato, language) DO UPDATE SET
+  bytes = EXCLUDED.bytes
 `
 
-type InsertRepoLanguageParams struct {
+type InsertOrUpdateRepoLanguageParams struct {
 	RepoID     int64
 	HentetDato time.Time
 	Language   string
 	Bytes      int64
 }
 
-func (q *Queries) InsertRepoLanguage(ctx context.Context, arg InsertRepoLanguageParams) error {
-	_, err := q.db.ExecContext(ctx, insertRepoLanguage,
+func (q *Queries) InsertOrUpdateRepoLanguage(ctx context.Context, arg InsertOrUpdateRepoLanguageParams) error {
+	_, err := q.db.ExecContext(ctx, insertOrUpdateRepoLanguage,
 		arg.RepoID,
 		arg.HentetDato,
 		arg.Language,

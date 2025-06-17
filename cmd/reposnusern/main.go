@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/jonmartinstorm/reposnusern/internal/bqwriter"
 	"github.com/jonmartinstorm/reposnusern/internal/config"
 	"github.com/jonmartinstorm/reposnusern/internal/dbwriter"
 	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
@@ -31,18 +32,36 @@ func main() {
 
 	slog.Info("Starter reposnusern...", "org", cfg.Org)
 
-	// Initialiser writer for PostgreSQL
-	slog.Info("Setter opp writer for PostgreSQL-database")
-	writer, err := dbwriter.NewPostgresWriter(cfg.PostgresDSN)
-	if err != nil {
-		slog.Error("Kunne ikke opprette databaseforbindelse", "error", err)
+	var writer runner.DBWriter
+	// Velger lagringsmetode basert på konfigurasjon
+	switch cfg.Storage {
+	case config.StoragePostgres:
+		slog.Info("Setter opp writer for PostgreSQL-database")
+		pgWriter, err := dbwriter.NewPostgresWriter(cfg.PostgresDSN)
+		if err != nil {
+			slog.Error("Kunne ikke opprette databaseforbindelse til PostgreSQL", "error", err)
+			os.Exit(1)
+		}
+		writer = pgWriter
+		defer func() {
+			if err := pgWriter.DB.Close(); err != nil {
+				slog.Warn("Klarte ikke å lukke PostgreSQL-tilkoblingen", "error", err)
+			}
+		}()
+
+	case config.StorageBigQuery:
+		slog.Info("Setter opp writer for BigQuery")
+		bqWriter, err := bqwriter.NewBigQueryWriter(ctx, &cfg)
+		if err != nil {
+			slog.Error("Kunne ikke opprette BigQuery-klient", "error", err)
+			os.Exit(1)
+		}
+		writer = bqWriter
+
+	default:
+		slog.Error("Ugyldig lagringstype angitt", "storage", cfg.Storage)
 		os.Exit(1)
 	}
-	defer func() {
-		if err := writer.DB.Close(); err != nil {
-			slog.Warn("Klarte ikke å lukke databaseforbindelsen", "error", err)
-		}
-	}()
 
 	// Initialiserer fetcher for GitHub API
 	slog.Info("Setter opp fetcher med GitHub API for å hente repositories")

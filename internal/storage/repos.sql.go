@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const insertRepo = `-- name: InsertRepo :exec
+const insertOrUpdateRepo = `-- name: InsertOrUpdateRepo :exec
 INSERT INTO repos (
   id, hentet_dato,
   name, full_name, description, stars, forks, archived, private, is_fork,
@@ -25,9 +25,33 @@ INSERT INTO repos (
   $18, $19, $20, $21,
   $22, $23, $24, $25
 )
+ON CONFLICT (id, hentet_dato) DO UPDATE SET
+  name = EXCLUDED.name,
+  full_name = EXCLUDED.full_name,
+  description = EXCLUDED.description,
+  stars = EXCLUDED.stars,
+  forks = EXCLUDED.forks,
+  archived = EXCLUDED.archived,
+  private = EXCLUDED.private,
+  is_fork = EXCLUDED.is_fork,
+  language = EXCLUDED.language,
+  size_mb = EXCLUDED.size_mb,
+  updated_at = EXCLUDED.updated_at,
+  pushed_at = EXCLUDED.pushed_at,
+  created_at = EXCLUDED.created_at,
+  html_url = EXCLUDED.html_url,
+  topics = EXCLUDED.topics,
+  visibility = EXCLUDED.visibility,
+  license = EXCLUDED.license,
+  open_issues = EXCLUDED.open_issues,
+  languages_url = EXCLUDED.languages_url,
+  has_security_md = EXCLUDED.has_security_md,
+  has_dependabot = EXCLUDED.has_dependabot,
+  has_codeql = EXCLUDED.has_codeql,
+  readme_content = EXCLUDED.readme_content
 `
 
-type InsertRepoParams struct {
+type InsertOrUpdateRepoParams struct {
 	ID            int64
 	HentetDato    time.Time
 	Name          string
@@ -55,8 +79,8 @@ type InsertRepoParams struct {
 	ReadmeContent sql.NullString
 }
 
-func (q *Queries) InsertRepo(ctx context.Context, arg InsertRepoParams) error {
-	_, err := q.db.ExecContext(ctx, insertRepo,
+func (q *Queries) InsertOrUpdateRepo(ctx context.Context, arg InsertOrUpdateRepoParams) error {
+	_, err := q.db.ExecContext(ctx, insertOrUpdateRepo,
 		arg.ID,
 		arg.HentetDato,
 		arg.Name,

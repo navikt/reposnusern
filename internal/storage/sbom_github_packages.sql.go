@@ -11,13 +11,18 @@ import (
 	"time"
 )
 
-const insertGithubSBOM = `-- name: InsertGithubSBOM :exec
+const insertOrUpdateGithubSBOM = `-- name: InsertOrUpdateGithubSBOM :exec
 INSERT INTO sbom_github_packages (
   repo_id, hentet_dato, name, version, license, purl
-) VALUES ($1, $2, $3, $4, $5, $6)
+) VALUES (
+  $1, $2, $3, $4, $5, $6
+)
+ON CONFLICT (repo_id, hentet_dato, name, version) DO UPDATE SET
+  license = EXCLUDED.license,
+  purl = EXCLUDED.purl
 `
 
-type InsertGithubSBOMParams struct {
+type InsertOrUpdateGithubSBOMParams struct {
 	RepoID     int64
 	HentetDato time.Time
 	Name       string
@@ -26,8 +31,8 @@ type InsertGithubSBOMParams struct {
 	Purl       sql.NullString
 }
 
-func (q *Queries) InsertGithubSBOM(ctx context.Context, arg InsertGithubSBOMParams) error {
-	_, err := q.db.ExecContext(ctx, insertGithubSBOM,
+func (q *Queries) InsertOrUpdateGithubSBOM(ctx context.Context, arg InsertOrUpdateGithubSBOMParams) error {
+	_, err := q.db.ExecContext(ctx, insertOrUpdateGithubSBOM,
 		arg.RepoID,
 		arg.HentetDato,
 		arg.Name,

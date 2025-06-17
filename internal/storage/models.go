@@ -18,17 +18,12 @@ type CiConfig struct {
 }
 
 type Dockerfile struct {
-	ID         int32
-	RepoID     int64
-	HentetDato time.Time
-	FullName   string
-	Path       string
-	Content    string
-}
-
-type DockerfileFeature struct {
-	DockerfileID         int32
+	ID                   int32
+	RepoID               int64
 	HentetDato           time.Time
+	FullName             string
+	Path                 string
+	Content              string
 	BaseImage            sql.NullString
 	BaseTag              sql.NullString
 	UsesLatestTag        sql.NullBool

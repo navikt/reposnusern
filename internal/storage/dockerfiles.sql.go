@@ -7,30 +7,101 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"time"
 )
 
-const insertDockerfile = `-- name: InsertDockerfile :one
-INSERT INTO dockerfiles (repo_id, hentet_dato, full_name, path, content)
-VALUES ($1, $2, $3, $4, $5)
+const insertOrUpdateDockerfile = `-- name: InsertOrUpdateDockerfile :one
+INSERT INTO dockerfiles (
+  repo_id, hentet_dato, full_name, path, content,
+  base_image, base_tag, uses_latest_tag,
+  has_user_instruction, has_copy_sensitive, has_package_installs,
+  uses_multistage, has_healthcheck, uses_add_instruction,
+  has_label_metadata, has_expose, has_entrypoint_or_cmd,
+  installs_curl_or_wget, installs_build_tools, has_apt_get_clean,
+  world_writable, has_secrets_in_env_or_arg
+)
+VALUES (
+  $1, $2, $3, $4, $5,
+  $6, $7, $8,
+  $9, $10, $11,
+  $12, $13, $14,
+  $15, $16, $17,
+  $18, $19, $20,
+  $21, $22
+)
+ON CONFLICT (repo_id, hentet_dato, path) DO UPDATE SET
+  full_name = EXCLUDED.full_name,
+  content = EXCLUDED.content,
+  base_image = EXCLUDED.base_image,
+  base_tag = EXCLUDED.base_tag,
+  uses_latest_tag = EXCLUDED.uses_latest_tag,
+  has_user_instruction = EXCLUDED.has_user_instruction,
+  has_copy_sensitive = EXCLUDED.has_copy_sensitive,
+  has_package_installs = EXCLUDED.has_package_installs,
+  uses_multistage = EXCLUDED.uses_multistage,
+  has_healthcheck = EXCLUDED.has_healthcheck,
+  uses_add_instruction = EXCLUDED.uses_add_instruction,
+  has_label_metadata = EXCLUDED.has_label_metadata,
+  has_expose = EXCLUDED.has_expose,
+  has_entrypoint_or_cmd = EXCLUDED.has_entrypoint_or_cmd,
+  installs_curl_or_wget = EXCLUDED.installs_curl_or_wget,
+  installs_build_tools = EXCLUDED.installs_build_tools,
+  has_apt_get_clean = EXCLUDED.has_apt_get_clean,
+  world_writable = EXCLUDED.world_writable,
+  has_secrets_in_env_or_arg = EXCLUDED.has_secrets_in_env_or_arg
 RETURNING id
 `
 
-type InsertDockerfileParams struct {
-	RepoID     int64
-	HentetDato time.Time
-	FullName   string
-	Path       string
-	Content    string
+type InsertOrUpdateDockerfileParams struct {
+	RepoID               int64
+	HentetDato           time.Time
+	FullName             string
+	Path                 string
+	Content              string
+	BaseImage            sql.NullString
+	BaseTag              sql.NullString
+	UsesLatestTag        sql.NullBool
+	HasUserInstruction   sql.NullBool
+	HasCopySensitive     sql.NullBool
+	HasPackageInstalls   sql.NullBool
+	UsesMultistage       sql.NullBool
+	HasHealthcheck       sql.NullBool
+	UsesAddInstruction   sql.NullBool
+	HasLabelMetadata     sql.NullBool
+	HasExpose            sql.NullBool
+	HasEntrypointOrCmd   sql.NullBool
+	InstallsCurlOrWget   sql.NullBool
+	InstallsBuildTools   sql.NullBool
+	HasAptGetClean       sql.NullBool
+	WorldWritable        sql.NullBool
+	HasSecretsInEnvOrArg sql.NullBool
 }
 
-func (q *Queries) InsertDockerfile(ctx context.Context, arg InsertDockerfileParams) (int32, error) {
-	row := q.db.QueryRowContext(ctx, insertDockerfile,
+func (q *Queries) InsertOrUpdateDockerfile(ctx context.Context, arg InsertOrUpdateDockerfileParams) (int32, error) {
+	row := q.db.QueryRowContext(ctx, insertOrUpdateDockerfile,
 		arg.RepoID,
 		arg.HentetDato,
 		arg.FullName,
 		arg.Path,
 		arg.Content,
+		arg.BaseImage,
+		arg.BaseTag,
+		arg.UsesLatestTag,
+		arg.HasUserInstruction,
+		arg.HasCopySensitive,
+		arg.HasPackageInstalls,
+		arg.UsesMultistage,
+		arg.HasHealthcheck,
+		arg.UsesAddInstruction,
+		arg.HasLabelMetadata,
+		arg.HasExpose,
+		arg.HasEntrypointOrCmd,
+		arg.InstallsCurlOrWget,
+		arg.InstallsBuildTools,
+		arg.HasAptGetClean,
+		arg.WorldWritable,
+		arg.HasSecretsInEnvOrArg,
 	)
 	var id int32
 	err := row.Scan(&id)

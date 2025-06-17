@@ -44,9 +44,9 @@ func NewRealPostgresWriter(db *sql.DB) *RealPostgresWriter {
 	return &RealPostgresWriter{db: db}
 }
 
-func (r *RealPostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry, index int, snapshot time.Time) error {
+func (r *RealPostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry, snapshot time.Time) error {
 	pw := &dbwriter.PostgresWriter{DB: r.db}
-	return pw.ImportRepo(ctx, entry, index, snapshot)
+	return pw.ImportRepo(ctx, entry, snapshot)
 }
 
 func StartTestPostgresContainer() *TestDB {
@@ -123,7 +123,7 @@ func RunMigrations(db *sql.DB) {
 
 	schemaPath := root + "/db/schema.sql"
 	if _, err := os.Stat(schemaPath); os.IsNotExist(err) {
-		schemaPath = root + "/../db/schema.sql"
+		schemaPath = root + "/../../db/schema.sql"
 	}
 
 	schema, err := os.ReadFile(schemaPath)
