@@ -9,8 +9,6 @@ spec:
   image: "{{ image }}"
   schedule: "5 22 * * *"
   ttlSecondsAfterFinished: 300
-  replicas:
-    cpuThresholdPercentage: 90
   resources:
     limits:
       memory: "128Mi"
