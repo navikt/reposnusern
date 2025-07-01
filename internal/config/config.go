@@ -47,7 +47,7 @@ func NewConfig() (Config, error) {
 		SkipArchived:  os.Getenv("REPOSNUSERARCHIVED") != "true",
 		Storage:       storage,
 		PostgresDSN:   os.Getenv("POSTGRES_DSN"),
-		BQProjectID:   os.Getenv("BQ_PROJECT_ID"),
+		BQProjectID:   os.Getenv("GCP_TEAM_PROJECT_ID"),
 		BQDataset:     os.Getenv("BQ_DATASET"),
 		BQTable:       os.Getenv("BQ_TABLE"),
 		BQCredentials: os.Getenv("BQ_CREDENTIALS"),

@@ -11,7 +11,6 @@ import (
 	"github.com/jonmartinstorm/reposnusern/internal/models"
 	"github.com/jonmartinstorm/reposnusern/internal/parser"
 	"google.golang.org/api/googleapi"
-	"google.golang.org/api/option"
 )
 
 type BigQueryWriter struct {
@@ -22,7 +21,7 @@ type BigQueryWriter struct {
 func NewBigQueryWriter(ctx context.Context, cfg *config.Config) (*BigQueryWriter, error) {
 	var client *bigquery.Client
 
-	client, err := bigquery.NewClient(ctx, cfg.BQProjectID, option.WithCredentialsFile(cfg.BQCredentials))
+	client, err := bigquery.NewClient(ctx, cfg.BQProjectID)
 	if err != nil {
 		return nil, fmt.Errorf("kan ikke opprette BigQuery-klient: %w", err)
 	}
