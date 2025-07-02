@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strconv"
 )
@@ -14,17 +15,26 @@ const (
 )
 
 type Config struct {
-	Org           string
-	Token         string
-	Debug         bool
-	SkipArchived  bool
-	Storage       StorageType
-	PostgresDSN   string
-	BQProjectID   string
-	BQDataset     string
-	BQTable       string
-	BQCredentials string // Valgfritt hvis GCP auth skjer automatisk
-	Parallelism   int    // maks antall samtidige repo-prosesser
+	Org               string
+	Token             string
+	Debug             bool
+	SkipArchived      bool
+	Storage           StorageType
+	PostgresDSN       string
+	BQProjectID       string
+	BQDataset         string
+	BQTable           string
+	BQCredentials     string           // Valgfritt hvis GCP auth skjer automatisk
+	Parallelism       int              // maks antall samtidige repo-prosesser
+	Feature_Sbom      bool             // Om SBOM-funksjonalitet er aktivert
+	Feature_GitHubApp bool             // Om GitHub App autentisering er aktivert
+	GitHubAppConfig   *GitHubAppConfig // Valgfritt, for GitHub App autentisering
+}
+
+type GitHubAppConfig struct {
+	AppID          int64
+	InstallationID int64
+	PrivateKey     []byte
 }
 
 // NewConfig oppretter en ny konfigurasjon basert på miljøvariabler
@@ -40,25 +50,33 @@ func NewConfig() (Config, error) {
 		}
 	}
 
+	var githubAppConfig, _ = LoadGitHubAppConfig()
+
 	cfg := Config{
-		Org:           os.Getenv("ORG"),
-		Token:         os.Getenv("GITHUB_TOKEN"),
-		Debug:         os.Getenv("REPOSNUSERDEBUG") == "true",
-		SkipArchived:  os.Getenv("REPOSNUSERARCHIVED") != "true",
-		Storage:       storage,
-		PostgresDSN:   os.Getenv("POSTGRES_DSN"),
-		BQProjectID:   os.Getenv("GCP_TEAM_PROJECT_ID"),
-		BQDataset:     os.Getenv("BQ_DATASET"),
-		BQTable:       os.Getenv("BQ_TABLE"),
-		BQCredentials: os.Getenv("BQ_CREDENTIALS"),
-		Parallelism:   parallelism,
+		Org:               os.Getenv("ORG"),
+		Token:             os.Getenv("GITHUB_TOKEN"),
+		Debug:             os.Getenv("REPOSNUSERDEBUG") == "true",
+		SkipArchived:      os.Getenv("REPOSNUSERARCHIVED") != "true",
+		Storage:           storage,
+		PostgresDSN:       os.Getenv("POSTGRES_DSN"),
+		BQProjectID:       os.Getenv("GCP_TEAM_PROJECT_ID"),
+		BQDataset:         os.Getenv("BQ_DATASET"),
+		BQTable:           os.Getenv("BQ_TABLE"),
+		BQCredentials:     os.Getenv("BQ_CREDENTIALS"),
+		Parallelism:       parallelism,
+		Feature_Sbom:      os.Getenv("SBOM") == "true",
+		Feature_GitHubApp: os.Getenv("GITHUB_APP_ENABLED") == "true",
+		GitHubAppConfig:   githubAppConfig,
 	}
 
 	if cfg.Org == "" {
 		return Config{}, errors.New("ORG må være satt")
 	}
-	if cfg.Token == "" {
-		return Config{}, errors.New("GITHUB_TOKEN må være satt")
+	if cfg.Token == "" && !cfg.Feature_GitHubApp {
+		return Config{}, errors.New("GITHUB_TOKEN må være satt, eller GitHub App må være aktivert")
+	}
+	if cfg.Feature_GitHubApp && cfg.GitHubAppConfig == nil {
+		return Config{}, errors.New("GitHub App er aktivert, men konfigurasjon mangler")
 	}
 	if cfg.Storage == "" {
 		return Config{}, errors.New("REPO_STORAGE må være satt til 'postgres' eller 'bigquery'")
@@ -78,4 +96,43 @@ func NewConfig() (Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func LoadGitHubAppConfig() (*GitHubAppConfig, error) {
+	// Get installation ID from env
+	installationID := os.Getenv("GITHUB_APP_INSTALLATION_ID")
+	if installationID == "" {
+		return nil, fmt.Errorf("missing required environment variable: GITHUB_APP_INSTALLATION_ID")
+	}
+
+	// Get app ID from env (only required for REST client)
+	appID := os.Getenv("GITHUB_APP_ID")
+	if appID == "" {
+		return nil, fmt.Errorf("missing required environment variable: GITHUB_APP_ID")
+	}
+
+	// Load private key from env
+	privateKeyPEM := os.Getenv("GITHUB_APP_PRIVATE_KEY")
+	if privateKeyPEM == "" {
+		return nil, fmt.Errorf("missing required environment variable: GITHUB_APP_PRIVATE_KEY")
+	}
+	privateKey := []byte(privateKeyPEM)
+
+	// Parse installation ID
+	installationIDInt, err := strconv.ParseInt(installationID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid GITHUB_APP_INSTALLATION_ID: %w", err)
+	}
+
+	// Parse app ID
+	appIDInt, err := strconv.ParseInt(appID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid GITHUB_APP_ID: %w", err)
+	}
+
+	return &GitHubAppConfig{
+		AppID:          appIDInt,
+		InstallationID: installationIDInt,
+		PrivateKey:     privateKey,
+	}, nil
 }

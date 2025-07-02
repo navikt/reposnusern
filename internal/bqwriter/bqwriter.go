@@ -16,6 +16,7 @@ import (
 type BigQueryWriter struct {
 	Client  *bigquery.Client
 	Dataset string
+	Config  *config.Config
 }
 
 func NewBigQueryWriter(ctx context.Context, cfg *config.Config) (*BigQueryWriter, error) {
@@ -45,6 +46,7 @@ func NewBigQueryWriter(ctx context.Context, cfg *config.Config) (*BigQueryWriter
 	return &BigQueryWriter{
 		Client:  client,
 		Dataset: cfg.BQDataset,
+		Config:  cfg,
 	}, nil
 }
 
@@ -53,7 +55,6 @@ func (w *BigQueryWriter) ImportRepo(ctx context.Context, entry models.RepoEntry,
 	langs := ConvertLanguages(entry, snapshot)
 	dockerfileFeatures, dockerfileStages := ConvertDockerfileFeatures(entry, snapshot)
 	ciconfig := ConvertCI(entry, snapshot)
-	sbom := ConvertSBOMPackages(entry, snapshot)
 
 	if err := insert(ctx, w.Client, w.Dataset, "repos", []BGRepoEntry{repo}); err != nil {
 		return fmt.Errorf("repos insert failed: %w", err)
@@ -70,8 +71,11 @@ func (w *BigQueryWriter) ImportRepo(ctx context.Context, entry models.RepoEntry,
 	if err := insert(ctx, w.Client, w.Dataset, "ci_config", ciconfig); err != nil {
 		return fmt.Errorf("ci_config insert failed: %w", err)
 	}
-	if err := insert(ctx, w.Client, w.Dataset, "sbom_packages", sbom); err != nil {
-		return fmt.Errorf("sbom insert failed: %w", err)
+	if w.Config.Feature_Sbom {
+		sbom := ConvertSBOMPackages(entry, snapshot)
+		if err := insert(ctx, w.Client, w.Dataset, "sbom_packages", sbom); err != nil {
+			return fmt.Errorf("sbom insert failed: %w", err)
+		}
 	}
 
 	return nil

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/jonmartinstorm/reposnusern/internal/config"
 	"github.com/jonmartinstorm/reposnusern/internal/models"
 )
@@ -37,12 +38,47 @@ func NewRepoFetcher(cfg config.Config) *RepoFetcher {
 	}
 }
 
+// CreateGitHubAppTransport creates a transport for the GitHub App
+func CreateGitHubAppTransport(config *config.GitHubAppConfig) (http.RoundTripper, error) {
+	tr, err := ghinstallation.New(
+		http.DefaultTransport,
+		config.AppID,
+		config.InstallationID,
+		config.PrivateKey,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitHub installation transport: %w", err)
+	}
+	return tr, nil
+}
+
+// CreateGitHubAppToken creates an access token for GitHub API using the provided transport
+func CreateGitHubAppToken(ctx context.Context, config *config.GitHubAppConfig) (string, error) {
+	tr := http.DefaultTransport
+	// Fix: Use AppID instead of InstallationID for the second parameter
+	appsTransport, err := ghinstallation.NewAppsTransport(tr, config.AppID, config.PrivateKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to create GitHub apps transport: %w", err)
+	}
+	itr := ghinstallation.NewFromAppsTransport(appsTransport, config.InstallationID)
+	token, err := itr.Token(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get installation token: %w", err)
+	}
+	return token, nil
+}
+
 func (r *RepoFetcher) GetReposPage(ctx context.Context, cfg config.Config, page int) ([]models.RepoMeta, error) {
 	url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&type=all&page=%d", cfg.Org, page)
 	var pageRepos []models.RepoMeta
 	slog.Info("Henter repos", "page", page)
 
-	err := DoRequestWithRateLimit(ctx, "GET", url, cfg.Token, nil, &pageRepos)
+	token, err := r.GetAuthToken(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get auth token: %w", err)
+	}
+
+	err = DoRequestWithRateLimit(ctx, "GET", url, token, nil, &pageRepos)
 	if err != nil {
 		return nil, err
 	}
@@ -60,8 +96,13 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 		return nil, err
 	}
 
+	token, err := r.GetAuthToken(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get auth token: %w", err)
+	}
+
 	var result map[string]interface{}
-	err = DoRequestWithRateLimit(ctx, "POST", "https://api.github.com/graphql", r.Cfg.Token, bodyBytes, &result)
+	err = DoRequestWithRateLimit(ctx, "POST", "https://api.github.com/graphql", token, bodyBytes, &result)
 	if err != nil {
 		slog.Error("GraphQL-kall feilet", "repo", r.Cfg.Org+"/"+baseRepo.Name, "error", err)
 		return nil, err
@@ -77,15 +118,18 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 		return nil, fmt.Errorf("ingen repository-data for %s/%s", r.Cfg.Org, baseRepo.Name)
 	}
 
-	sbom := fetchSBOM(ctx, r.Cfg.Org, baseRepo.Name, r.Cfg.Token)
 	entry := ParseRepoData(data, baseRepo)
 
-	entry.SBOM = sbom
+	// Hent SBOM hvis feature_sbom er true
+	if r.Cfg.Feature_Sbom {
+		sbom := r.fetchSBOM(ctx, r.Cfg.Org, baseRepo.Name)
+		entry.SBOM = sbom
+	}
 
 	if IsMonorepoCandidate(entry) {
 		slog.Info("Monorepo-kandidat – henter dype Dockerfiles", "repo", baseRepo.FullName)
 
-		files := FetchDockerfilesFromRepoREST(ctx, r.Cfg.Org, baseRepo.Name, r.Cfg.Token)
+		files := r.FetchDockerfilesFromRepoREST(ctx, r.Cfg.Org, baseRepo.Name)
 		entry.Files["dockerfile"] = append(entry.Files["dockerfile"], files...)
 	}
 
@@ -136,11 +180,17 @@ func DoRequestWithRateLimit(ctx context.Context, method, url, token string, body
 	}
 }
 
-func fetchSBOM(ctx context.Context, owner, repo, token string) map[string]interface{} {
+func (r *RepoFetcher) fetchSBOM(ctx context.Context, owner, repo string) map[string]interface{} {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/dependency-graph/sbom", owner, repo)
 
+	token, err := r.GetAuthToken(ctx)
+	if err != nil {
+		slog.Warn("Kunne ikke hente auth token for SBOM", "repo", owner+"/"+repo, "error", err)
+		return nil
+	}
+
 	var sbom map[string]interface{}
-	err := DoRequestWithRateLimit(ctx, "GET", url, token, nil, &sbom)
+	err = DoRequestWithRateLimit(ctx, "GET", url, token, nil, &sbom)
 	if err != nil {
 		slog.Warn("SBOM-kall feilet", "repo", owner+"/"+repo, "error", err)
 		return nil
@@ -394,7 +444,7 @@ func ConvertFiles(input map[string][]map[string]string) map[string][]models.File
 	return out
 }
 
-func FetchDockerfilesFromRepoREST(ctx context.Context, owner, repo, token string) []models.FileEntry {
+func (r *RepoFetcher) FetchDockerfilesFromRepoREST(ctx context.Context, owner, repo string) []models.FileEntry {
 	var results []models.FileEntry
 
 	treeURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/trees/HEAD?recursive=1", owner, repo)
@@ -406,7 +456,13 @@ func FetchDockerfilesFromRepoREST(ctx context.Context, owner, repo, token string
 		} `json:"tree"`
 	}
 
-	err := DoRequestWithRateLimit(ctx, "GET", treeURL, token, nil, &tree)
+	token, err := r.GetAuthToken(ctx)
+	if err != nil {
+		slog.Warn("Kunne ikke hente auth token for Dockerfiles", "repo", owner+"/"+repo, "error", err)
+		return results
+	}
+
+	err = DoRequestWithRateLimit(ctx, "GET", treeURL, token, nil, &tree)
 	if err != nil {
 		slog.Warn("Klarte ikke hente repo-tree", "repo", owner+"/"+repo, "error", err)
 		return results
@@ -420,7 +476,7 @@ func FetchDockerfilesFromRepoREST(ctx context.Context, owner, repo, token string
 			continue
 		}
 
-		content := fetchFileContent(ctx, owner, repo, token, entry.Path)
+		content := r.fetchFileContent(ctx, owner, repo, entry.Path)
 		if content != "" {
 			results = append(results, models.FileEntry{
 				Path:    entry.Path,
@@ -431,14 +487,20 @@ func FetchDockerfilesFromRepoREST(ctx context.Context, owner, repo, token string
 	return results
 }
 
-func fetchFileContent(ctx context.Context, owner, repo, token, path string) string {
+func (r *RepoFetcher) fetchFileContent(ctx context.Context, owner, repo, path string) string {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s", owner, repo, path)
+
+	token, err := r.GetAuthToken(ctx)
+	if err != nil {
+		slog.Warn("Kunne ikke hente auth token for filinnhold", "repo", owner+"/"+repo, "path", path, "error", err)
+		return ""
+	}
 
 	var file struct {
 		Content  string `json:"content"`
 		Encoding string `json:"encoding"`
 	}
-	err := DoRequestWithRateLimit(ctx, "GET", url, token, nil, &file)
+	err = DoRequestWithRateLimit(ctx, "GET", url, token, nil, &file)
 	if err != nil {
 		slog.Warn("Klarte ikke hente filinnhold", "repo", owner+"/"+repo, "path", path, "error", err)
 		return ""
@@ -451,4 +513,22 @@ func fetchFileContent(ctx context.Context, owner, repo, token, path string) stri
 		}
 	}
 	return ""
+}
+
+// GetAuthToken returns the appropriate authentication token based on configuration
+func (r *RepoFetcher) GetAuthToken(ctx context.Context) (string, error) {
+	if r.Cfg.Feature_GitHubApp && r.Cfg.GitHubAppConfig != nil {
+		// Use GitHub App authentication
+		token, err := CreateGitHubAppToken(ctx, r.Cfg.GitHubAppConfig)
+		if err != nil {
+			return "", fmt.Errorf("failed to create GitHub App token: %w", err)
+		}
+		return token, nil
+	}
+
+	// Use personal access token
+	if r.Cfg.Token == "" {
+		return "", fmt.Errorf("no authentication token available")
+	}
+	return r.Cfg.Token, nil
 }
