@@ -190,12 +190,60 @@ func (r *RepoFetcher) fetchSBOM(ctx context.Context, owner, repo string) map[str
 	}
 
 	var sbom map[string]interface{}
-	err = DoRequestWithRateLimit(ctx, "GET", url, token, nil, &sbom)
+	err = doRequestWithRateLimitAndOptional404(ctx, "GET", url, token, nil, &sbom)
 	if err != nil {
 		slog.Warn("SBOM-kall feilet", "repo", owner+"/"+repo, "error", err)
 		return nil
 	}
 	return sbom
+}
+
+func doRequestWithRateLimitAndOptional404(ctx context.Context, method, url, token string, body []byte, out interface{}) error {
+	for {
+		req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Accept", "application/vnd.github+json")
+		if method == "POST" {
+			req.Header.Set("Content-Type", "application/json")
+		}
+
+		resp, err := HttpClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				log.Printf("advarsel: klarte ikke å lukke body: %v", err)
+			}
+		}()
+
+		if rl := resp.Header.Get("X-RateLimit-Remaining"); rl == "0" {
+			reset := resp.Header.Get("X-RateLimit-Reset")
+			if ts, err := strconv.ParseInt(reset, 10, 64); err == nil {
+				wait := time.Until(time.Unix(ts, 0)) + time.Second
+				slog.Warn("Rate limit nådd", "venter", wait.Truncate(time.Second))
+				time.Sleep(wait)
+				continue
+			}
+		}
+
+		// 404 is acceptable for SBOM - it just means no SBOM is available
+		if resp.StatusCode == 404 {
+			slog.Info("SBOM ikke tilgjengelig (404)", "url", url)
+			return nil
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			slog.Error("GitHub-feil", "status", resp.StatusCode, "body", string(bodyBytes))
+			return fmt.Errorf("GitHub API-feil: status %d – %s", resp.StatusCode, string(bodyBytes))
+		}
+
+		return json.NewDecoder(resp.Body).Decode(out)
+	}
 }
 
 func ParseRepoData(data map[string]interface{}, baseRepo models.RepoMeta) *models.RepoEntry {
