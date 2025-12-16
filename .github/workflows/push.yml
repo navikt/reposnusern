@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: 📥 Sjekk ut kode
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: 🧰 Sett opp Go
         uses: actions/setup-go@v6
@@ -22,7 +22,7 @@ jobs:
           go-version: '1.24'
 
       - name: ⚡ Cache Go mod
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cache/go-build
@@ -48,7 +48,7 @@ jobs:
     needs: unit-and-lint
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version: '1.24'
