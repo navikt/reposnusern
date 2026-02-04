@@ -8,22 +8,34 @@ This document lists common manifest files and their corresponding lockfiles acro
 - Monorepos may have multiple manifest/lockfile pairs
 
 ## JavaScript / Node.js
-
+Mapping:
+> `package.json` -> `package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml`, `bun.lock`, `deno.lock`
 ### npm
 - **Manifest**: `package.json`
-- **Lockfile**: `package-lock.json`
+- **Lockfile**: `package-lock.json`, `npm-shrinkwrap.json`
+- https://docs.npmjs.com/cli/v6/configuring-npm/package-lock-json
+- https://docs.npmjs.com/cli/v6/configuring-npm/shrinkwrap-json
 
 ### Yarn (Classic & Berry)
 - **Manifest**: `package.json`
 - **Lockfile**: `yarn.lock`
+- https://classic.yarnpkg.com/lang/en/docs/yarn-lock/
 
 ### pnpm
 - **Manifest**: `package.json`
 - **Lockfile**: `pnpm-lock.yaml`
+- https://github.com/pnpm/spec/tree/master/lockfile
 
 ### Bun
 - **Manifest**: `package.json`
-- **Lockfile**: `bun.lockb`
+- **Lockfile**: `bun.lockb` (deprecated), `bun.lock`
+
+### Deno
+- **Manifest**: `package.json`, `deno.json`
+- **Lockfile**: `deno.lock`
+- https://docs.deno.com/runtime/fundamentals/configuration/#lockfile
+
+
 
 ## Python
 
