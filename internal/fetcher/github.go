@@ -336,7 +336,13 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 				name, _ := entry["name"].(string)
 				lowerName := strings.ToLower(name)
 
-				if !strings.Contains(lowerName, "dockerfile") {
+				// Check if this is a file we want to extract
+				var fileType string
+				if strings.Contains(lowerName, "dockerfile") {
+					fileType = lowerName
+				} else if isManifestOrLockfile(name) {
+					fileType = "dependencies"
+				} else {
 					continue
 				}
 
@@ -348,7 +354,7 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 				}
 
 				if content != "" {
-					files[lowerName] = append(files[lowerName], map[string]string{
+					files[fileType] = append(files[fileType], map[string]string{
 						"path":    name,
 						"content": content,
 					})
@@ -357,6 +363,24 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 		}
 	}
 	return ConvertFiles(files)
+}
+
+// isManifestOrLockfile checks if a filename is a manifest or lockfile we care about
+func isManifestOrLockfile(filename string) bool {
+	manifests := []string{
+		"package.json",
+		"package-lock.json",
+		"yarn.lock",
+		"pnpm-lock.yaml",
+		"bun.lockb",
+	}
+
+	for _, m := range manifests {
+		if filename == m {
+			return true
+		}
+	}
+	return false
 }
 
 func ExtractCI(data map[string]interface{}) []models.FileEntry {

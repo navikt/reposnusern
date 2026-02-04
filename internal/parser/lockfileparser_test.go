@@ -1,0 +1,189 @@
+package parser
+
+import (
+	"testing"
+
+	"github.com/jonmartinstorm/reposnusern/internal/models"
+)
+
+func TestDetectLockfilePairings_SimplePackageJson(t *testing.T) {
+	files := map[string][]models.FileEntry{
+		"other": {
+			{Path: "package.json", Content: "{}"},
+			{Path: "package-lock.json", Content: "{}"},
+		},
+	}
+
+	pairings := DetectLockfilePairings(files)
+
+	if len(pairings) != 1 {
+		t.Fatalf("expected 1 pairing, got %d", len(pairings))
+	}
+
+	if pairings[0].Manifest != "package.json" {
+		t.Errorf("expected manifest 'package.json', got '%s'", pairings[0].Manifest)
+	}
+
+	if pairings[0].Lockfile != "package-lock.json" {
+		t.Errorf("expected lockfile 'package-lock.json', got '%s'", pairings[0].Lockfile)
+	}
+}
+
+func TestDetectLockfilePairings_YarnLock(t *testing.T) {
+	files := map[string][]models.FileEntry{
+		"other": {
+			{Path: "package.json", Content: "{}"},
+			{Path: "yarn.lock", Content: ""},
+		},
+	}
+
+	pairings := DetectLockfilePairings(files)
+
+	if len(pairings) != 1 {
+		t.Fatalf("expected 1 pairing, got %d", len(pairings))
+	}
+
+	if pairings[0].Lockfile != "yarn.lock" {
+		t.Errorf("expected lockfile 'yarn.lock', got '%s'", pairings[0].Lockfile)
+	}
+}
+
+func TestDetectLockfilePairings_NoLockfile(t *testing.T) {
+	files := map[string][]models.FileEntry{
+		"other": {
+			{Path: "package.json", Content: "{}"},
+		},
+	}
+
+	pairings := DetectLockfilePairings(files)
+
+	if len(pairings) != 1 {
+		t.Fatalf("expected 1 pairing, got %d", len(pairings))
+	}
+
+	if pairings[0].Manifest != "package.json" {
+		t.Errorf("expected manifest 'package.json', got '%s'", pairings[0].Manifest)
+	}
+
+	if pairings[0].Lockfile != "" {
+		t.Errorf("expected empty lockfile, got '%s'", pairings[0].Lockfile)
+	}
+}
+
+func TestDetectLockfilePairings_MultipleLockfiles(t *testing.T) {
+	files := map[string][]models.FileEntry{
+		"other": {
+			{Path: "package.json", Content: "{}"},
+			{Path: "package-lock.json", Content: "{}"},
+			{Path: "yarn.lock", Content: ""},
+		},
+	}
+
+	pairings := DetectLockfilePairings(files)
+
+	if len(pairings) != 1 {
+		t.Fatalf("expected 1 pairing, got %d", len(pairings))
+	}
+
+	if pairings[0].Lockfile != "package-lock.json" {
+		t.Errorf("expected lockfile 'package-lock.json', got '%s'", pairings[0].Lockfile)
+	}
+}
+
+func TestDetectLockfilePairings_Subdirectories(t *testing.T) {
+	files := map[string][]models.FileEntry{
+		"other": {
+			{Path: "package.json", Content: "{}"},
+			{Path: "package-lock.json", Content: "{}"},
+			{Path: "frontend/package.json", Content: "{}"},
+			{Path: "frontend/yarn.lock", Content: ""},
+			{Path: "backend/package.json", Content: "{}"},
+		},
+	}
+
+	pairings := DetectLockfilePairings(files)
+
+	if len(pairings) != 3 {
+		t.Fatalf("expected 3 pairings, got %d", len(pairings))
+	}
+
+	pairingsMap := make(map[string]string)
+	for _, p := range pairings {
+		pairingsMap[p.Manifest] = p.Lockfile
+	}
+
+	if pairingsMap["package.json"] != "package-lock.json" {
+		t.Errorf("root package.json should have package-lock.json, got '%s'", pairingsMap["package.json"])
+	}
+
+	if pairingsMap["frontend/package.json"] != "frontend/yarn.lock" {
+		t.Errorf("frontend/package.json should have frontend/yarn.lock, got '%s'", pairingsMap["frontend/package.json"])
+	}
+
+	if pairingsMap["backend/package.json"] != "" {
+		t.Errorf("backend/package.json should have empty lockfile, got '%s'", pairingsMap["backend/package.json"])
+	}
+}
+
+func TestDetectLockfilePairings_NoManifests(t *testing.T) {
+	files := map[string][]models.FileEntry{
+		"other": {
+			{Path: "README.md", Content: "# Project"},
+			{Path: "src/main.js", Content: "console.log('hello')"},
+		},
+	}
+
+	pairings := DetectLockfilePairings(files)
+
+	if len(pairings) != 0 {
+		t.Errorf("expected 0 pairings, got %d", len(pairings))
+	}
+}
+
+func TestHasProperLockfiles_AllHaveLockfiles(t *testing.T) {
+	pairings := []LockfilePairing{
+		{Manifest: "package.json", Lockfile: "package-lock.json"},
+		{Manifest: "frontend/package.json", Lockfile: "frontend/yarn.lock"},
+	}
+
+	result := HasProperLockfiles(pairings)
+
+	if !result {
+		t.Error("expected true when all manifests have lockfiles")
+	}
+}
+
+func TestHasProperLockfiles_MissingLockfile(t *testing.T) {
+	pairings := []LockfilePairing{
+		{Manifest: "package.json", Lockfile: "package-lock.json"},
+		{Manifest: "frontend/package.json", Lockfile: ""},
+	}
+
+	result := HasProperLockfiles(pairings)
+
+	if result {
+		t.Error("expected false when at least one manifest lacks a lockfile")
+	}
+}
+
+func TestHasProperLockfiles_NoManifests(t *testing.T) {
+	pairings := []LockfilePairing{}
+
+	result := HasProperLockfiles(pairings)
+
+	if result {
+		t.Error("expected false when there are no manifests")
+	}
+}
+
+func TestHasProperLockfiles_WhitespaceLockfile(t *testing.T) {
+	pairings := []LockfilePairing{
+		{Manifest: "package.json", Lockfile: "   "},
+	}
+
+	result := HasProperLockfiles(pairings)
+
+	if result {
+		t.Error("expected false when lockfile is only whitespace")
+	}
+}

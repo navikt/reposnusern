@@ -2,6 +2,7 @@ package bqwriter
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -117,6 +118,10 @@ type BGRepoEntry struct {
 	HasSecurityMD bool      `bigquery:"has_security_md"`
 	HasDependabot bool      `bigquery:"has_dependabot"`
 	HasCodeQL     bool      `bigquery:"has_codeql"`
+
+	// Dependency management
+	ProperLockfiles  bool   `bigquery:"proper_lockfiles"`
+	LockfilePairings string `bigquery:"lockfile_pairings"`
 }
 
 type BGRepoLanguage struct {
@@ -178,32 +183,42 @@ type BGSBOMPackages struct {
 
 func ConvertToBG(entry models.RepoEntry, snapshot time.Time) BGRepoEntry {
 	r := entry.Repo
+
+	// Marshal lockfile pairings to JSON string
+	lockfilePairingsJSON := ""
+	if len(r.LockfilePairings) > 0 {
+		jsonBytes, _ := json.Marshal(r.LockfilePairings)
+		lockfilePairingsJSON = string(jsonBytes)
+	}
+
 	return BGRepoEntry{
-		RepoID:        r.ID,
-		WhenCollected: snapshot,
-		Name:          r.Name,
-		FullName:      r.FullName,
-		Description:   r.Description,
-		Stars:         r.Stars,
-		Forks:         r.Forks,
-		Archived:      r.Archived,
-		Private:       r.Private,
-		IsFork:        r.IsFork,
-		Language:      r.Language,
-		SizeMB:        float32(r.Size) / 1024.0,
-		UpdatedAt:     parseTime(r.UpdatedAt),
-		PushedAt:      parseTime(r.PushedAt),
-		CreatedAt:     parseTime(r.CreatedAt),
-		HtmlUrl:       r.HtmlUrl,
-		Topics:        strings.Join(r.Topics, ","),
-		Visibility:    r.Visibility,
-		License:       safeLicense(r.License),
-		OpenIssues:    r.OpenIssues,
-		LanguagesUrl:  r.LanguagesURL,
-		ReadmeContent: r.Readme,
-		HasSecurityMD: r.Security["has_security_md"],
-		HasDependabot: r.Security["has_dependabot"],
-		HasCodeQL:     r.Security["has_codeql"],
+		RepoID:           r.ID,
+		WhenCollected:    snapshot,
+		Name:             r.Name,
+		FullName:         r.FullName,
+		Description:      r.Description,
+		Stars:            r.Stars,
+		Forks:            r.Forks,
+		Archived:         r.Archived,
+		Private:          r.Private,
+		IsFork:           r.IsFork,
+		Language:         r.Language,
+		SizeMB:           float32(r.Size) / 1024.0,
+		UpdatedAt:        parseTime(r.UpdatedAt),
+		PushedAt:         parseTime(r.PushedAt),
+		CreatedAt:        parseTime(r.CreatedAt),
+		HtmlUrl:          r.HtmlUrl,
+		Topics:           strings.Join(r.Topics, ","),
+		Visibility:       r.Visibility,
+		License:          safeLicense(r.License),
+		OpenIssues:       r.OpenIssues,
+		LanguagesUrl:     r.LanguagesURL,
+		ReadmeContent:    r.Readme,
+		HasSecurityMD:    r.Security["has_security_md"],
+		HasDependabot:    r.Security["has_dependabot"],
+		HasCodeQL:        r.Security["has_codeql"],
+		ProperLockfiles:  r.ProperLockfiles,
+		LockfilePairings: lockfilePairingsJSON,
 	}
 }
 

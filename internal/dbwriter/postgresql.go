@@ -3,6 +3,7 @@ package dbwriter
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -47,6 +48,24 @@ func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry,
 	id := int64(r.ID)
 	name := r.FullName
 
+	// Detect lockfile pairings from repository files
+	lockfilePairings := parser.DetectLockfilePairings(entry.Files)
+	properLockfiles := parser.HasProperLockfiles(lockfilePairings)
+
+	// Marshal lockfile pairings to JSON
+	var lockfilePairingsJSON sql.NullString
+	if len(lockfilePairings) > 0 {
+		jsonBytes, err := json.Marshal(lockfilePairings)
+		if err != nil {
+			slog.Warn("Failed to marshal lockfile pairings", "repo", name, "error", err)
+		} else {
+			lockfilePairingsJSON = sql.NullString{
+				String: string(jsonBytes),
+				Valid:  true,
+			}
+		}
+	}
+
 	repo := storage.InsertOrUpdateRepoParams{
 		ID:           id,
 		HentetDato:   snapshotDate,
@@ -73,9 +92,11 @@ func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry,
 			String: r.Readme,
 			Valid:  r.Readme != "",
 		},
-		HasSecurityMd: r.Security["has_security_md"],
-		HasDependabot: r.Security["has_dependabot"],
-		HasCodeql:     r.Security["has_codeql"],
+		HasSecurityMd:    r.Security["has_security_md"],
+		HasDependabot:    r.Security["has_dependabot"],
+		HasCodeql:        r.Security["has_codeql"],
+		ProperLockfiles:  properLockfiles,
+		LockfilePairings: lockfilePairingsJSON,
 	}
 
 	if err := queries.InsertOrUpdateRepo(ctx, repo); err != nil {

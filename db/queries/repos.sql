@@ -4,13 +4,15 @@ INSERT INTO repos (
   name, full_name, description, stars, forks, archived, private, is_fork,
   language, size_mb, updated_at, pushed_at, created_at, html_url, topics,
   visibility, license, open_issues, languages_url,
-  has_security_md, has_dependabot, has_codeql, readme_content
+  has_security_md, has_dependabot, has_codeql, readme_content,
+  proper_lockfiles, lockfile_pairings
 ) VALUES (
   $1, $2,
   $3, $4, $5, $6, $7, $8, $9, $10,
   $11, $12, $13, $14, $15, $16, $17,
   $18, $19, $20, $21,
-  $22, $23, $24, $25
+  $22, $23, $24, $25,
+  $26, $27
 )
 ON CONFLICT (id, hentet_dato) DO UPDATE SET
   name = EXCLUDED.name,
@@ -35,4 +37,6 @@ ON CONFLICT (id, hentet_dato) DO UPDATE SET
   has_security_md = EXCLUDED.has_security_md,
   has_dependabot = EXCLUDED.has_dependabot,
   has_codeql = EXCLUDED.has_codeql,
-  readme_content = EXCLUDED.readme_content;
+  readme_content = EXCLUDED.readme_content,
+  proper_lockfiles = EXCLUDED.proper_lockfiles,
+  lockfile_pairings = EXCLUDED.lockfile_pairings;

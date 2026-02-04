@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS repos (
 
     -- dependency management
     proper_lockfiles BOOLEAN NOT NULL DEFAULT FALSE,
-    lockfile_pairings JSONB,
+    lockfile_pairings TEXT,
 
     PRIMARY KEY (id, hentet_dato)
 );

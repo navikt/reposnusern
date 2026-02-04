@@ -9,6 +9,11 @@ type License struct {
 	SpdxID string `json:"spdx_id"`
 }
 
+type LockfilePairing struct {
+	Manifest string `json:"manifest"`
+	Lockfile string `json:"lockfile"`
+}
+
 type RepoMeta struct {
 	ID           int64           `json:"id"`
 	Name         string          `json:"name"`
@@ -32,6 +37,10 @@ type RepoMeta struct {
 	License      *License        `json:"license"`
 	Readme       string          `json:"readme"`
 	Security     map[string]bool `json:"security"`
+
+	// Dependency management
+	LockfilePairings []LockfilePairing `json:"lockfile_pairings"`
+	ProperLockfiles  bool              `json:"proper_lockfiles"`
 }
 
 type RepoEntry struct {
