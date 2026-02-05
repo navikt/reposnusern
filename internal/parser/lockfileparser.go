@@ -205,6 +205,8 @@ func findFiles(filePaths map[string]bool, filenames []string) []string {
 func HasProperLockfiles(pairings []LockfilePairing) bool {
 	if len(pairings) == 0 {
 		return false // No manifests found, so no proper lockfiles
+		// TODO: Decide if this should be true or false when no manifests are found.
+		// Arguably it could be considered "proper" if there are no manifests, but for now we treat it as false to indicate no lockfile pairings.
 	}
 
 	for _, pairing := range pairings {
@@ -214,4 +216,26 @@ func HasProperLockfiles(pairings []LockfilePairing) bool {
 	}
 
 	return true // All manifests have lockfiles
+}
+
+// GetAllDependencyFileNames returns all unique dependency file names (manifests and lockfiles) from all ecosystems
+func GetAllDependencyFileNames() []string {
+	filenameSet := make(map[string]bool)
+
+	for _, config := range ecosystems {
+		for _, manifest := range config.Manifests {
+			filenameSet[manifest] = true
+		}
+		for _, lockfile := range config.Lockfiles {
+			filenameSet[lockfile] = true
+		}
+	}
+
+	// Convert map to slice
+	result := make([]string, 0, len(filenameSet))
+	for filename := range filenameSet {
+		result = append(result, filename)
+	}
+
+	return result
 }

@@ -1,6 +1,6 @@
-# Manifest Files and Lockfiles Reference
+# Dependency Files Reference
 
-This document lists common manifest files and their corresponding lockfiles across different programming languages and package managers.
+This document lists common dependency files (manifests and their corresponding lockfiles) across different programming languages and package managers.
 
 - Some ecosystems don't have standardized lockfiles
 - Lockfiles ensure reproducible builds by recording exact versions
