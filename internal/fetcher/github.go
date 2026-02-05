@@ -367,16 +367,54 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 
 // isManifestOrLockfile checks if a filename is a manifest or lockfile we care about
 func isManifestOrLockfile(filename string) bool {
-	manifests := []string{
-		"package.json",
-		"package-lock.json",
-		"yarn.lock",
-		"pnpm-lock.yaml",
-		"bun.lockb",
+	files := []string{
+		// JavaScript/Node.js
+		"package.json", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock",
+		"pnpm-lock.yaml", "bun.lockb", "bun.lock", "deno.json", "deno.lock",
+		// Python
+		"Pipfile", "Pipfile.lock", "pyproject.toml", "poetry.lock", "pdm.lock",
+		"uv.lock", "requirements.txt", "setup.py",
+		// Ruby
+		"Gemfile", "Gemfile.lock",
+		// PHP
+		"composer.json", "composer.lock",
+		// Rust
+		"Cargo.toml", "Cargo.lock",
+		// Go
+		"go.mod", "go.sum",
+		// Java/Kotlin
+		"pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle",
+		"settings.gradle.kts", "gradle.lockfile",
+		// .NET
+		"packages.config", "packages.lock.json",
+		// Swift
+		"Package.swift", "Package.resolved",
+		// Dart/Flutter
+		"pubspec.yaml", "pubspec.lock",
+		// Elixir
+		"mix.exs", "mix.lock",
+		// Scala
+		"build.sbt", "coursier.lock",
+		// Clojure
+		"project.clj", "deps.edn",
+		// R
+		"DESCRIPTION", "renv.lock",
+		// Perl
+		"cpanfile", "cpanfile.snapshot",
+		// Haskell
+		"stack.yaml", "package.yaml", "stack.yaml.lock",
+		"cabal.project", "cabal.project.freeze",
+		// C/C++
+		"conanfile.txt", "conanfile.py", "conan.lock",
+		"vcpkg.json", "vcpkg-lock.json",
+		// Nim
+		"nimble.lock",
+		// Crystal
+		"shard.yml", "shard.lock",
 	}
 
-	for _, m := range manifests {
-		if filename == m {
+	for _, f := range files {
+		if filename == f {
 			return true
 		}
 	}

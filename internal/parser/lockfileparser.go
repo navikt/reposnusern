@@ -20,21 +20,88 @@ type EcosystemConfig struct {
 	Lockfiles []string
 }
 
-// Ecosystem configurations - currently only JavaScript, easily extensible
+// Ecosystem configurations - comprehensive language support
 var ecosystems = map[string]EcosystemConfig{
 	"javascript": {
 		Manifests: []string{"package.json"},
-		Lockfiles: []string{"package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb"},
+		Lockfiles: []string{"package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb", "bun.lock", "deno.lock"},
 	},
-	// Future ecosystems can be added here:
-	// "rust": {
-	//     Manifests: []string{"Cargo.toml"},
-	//     Lockfiles: []string{"Cargo.lock"},
-	// },
-	// "python": {
-	//     Manifests: []string{"Pipfile", "pyproject.toml"},
-	//     Lockfiles: []string{"Pipfile.lock", "poetry.lock", "pdm.lock", "uv.lock"},
-	// },
+	"deno": {
+		Manifests: []string{"deno.json"},
+		Lockfiles: []string{"deno.lock"},
+	},
+	"python": {
+		Manifests: []string{"Pipfile", "pyproject.toml", "requirements.txt", "setup.py"},
+		Lockfiles: []string{"Pipfile.lock", "poetry.lock", "pdm.lock", "uv.lock"},
+	},
+	"ruby": {
+		Manifests: []string{"Gemfile"},
+		Lockfiles: []string{"Gemfile.lock"},
+	},
+	"php": {
+		Manifests: []string{"composer.json"},
+		Lockfiles: []string{"composer.lock"},
+	},
+	"rust": {
+		Manifests: []string{"Cargo.toml"},
+		Lockfiles: []string{"Cargo.lock"},
+	},
+	"go": {
+		Manifests: []string{"go.mod"},
+		Lockfiles: []string{"go.sum"},
+	},
+	"java": {
+		Manifests: []string{"pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"},
+		Lockfiles: []string{"gradle.lockfile"},
+	},
+	"dotnet": {
+		Manifests: []string{"packages.config"},
+		Lockfiles: []string{"packages.lock.json"},
+	},
+	"swift": {
+		Manifests: []string{"Package.swift"},
+		Lockfiles: []string{"Package.resolved"},
+	},
+	"dart": {
+		Manifests: []string{"pubspec.yaml"},
+		Lockfiles: []string{"pubspec.lock"},
+	},
+	"elixir": {
+		Manifests: []string{"mix.exs"},
+		Lockfiles: []string{"mix.lock"},
+	},
+	"scala": {
+		Manifests: []string{"build.sbt"},
+		Lockfiles: []string{"coursier.lock"},
+	},
+	"clojure": {
+		Manifests: []string{"project.clj", "deps.edn"},
+		Lockfiles: []string{},
+	},
+	"r": {
+		Manifests: []string{"DESCRIPTION"},
+		Lockfiles: []string{"renv.lock"},
+	},
+	"perl": {
+		Manifests: []string{"cpanfile"},
+		Lockfiles: []string{"cpanfile.snapshot"},
+	},
+	"haskell": {
+		Manifests: []string{"stack.yaml", "package.yaml", "cabal.project"},
+		Lockfiles: []string{"stack.yaml.lock", "cabal.project.freeze"},
+	},
+	"cpp": {
+		Manifests: []string{"conanfile.txt", "conanfile.py", "vcpkg.json"},
+		Lockfiles: []string{"conan.lock", "vcpkg-lock.json"},
+	},
+	"nim": {
+		Manifests: []string{},
+		Lockfiles: []string{"nimble.lock"},
+	},
+	"crystal": {
+		Manifests: []string{"shard.yml"},
+		Lockfiles: []string{"shard.lock"},
+	},
 }
 
 // DetectLockfilePairings analyzes repository files and returns manifest-lockfile pairings

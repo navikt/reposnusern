@@ -10,6 +10,7 @@ This document lists common manifest files and their corresponding lockfiles acro
 ## JavaScript / Node.js
 Mapping:
 > `package.json` -> `package-lock.json`, `npm-shrinkwrap.json`, `yarn.lock`, `pnpm-lock.yaml`, `bun.lock`, `deno.lock`
+> `deno.json`-> `deno.lock`
 ### npm
 - **Manifest**: `package.json`
 - **Lockfile**: `package-lock.json`, `npm-shrinkwrap.json`
@@ -34,8 +35,6 @@ Mapping:
 - **Manifest**: `package.json`, `deno.json`
 - **Lockfile**: `deno.lock`
 - https://docs.deno.com/runtime/fundamentals/configuration/#lockfile
-
-
 
 ## Python
 
