@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
@@ -19,6 +20,9 @@ import (
 	"github.com/jonmartinstorm/reposnusern/internal/models"
 	"github.com/jonmartinstorm/reposnusern/internal/parser"
 )
+
+// apiCallCounter tracks the total number of external API calls made
+var apiCallCounter atomic.Int64
 
 type RepoFetcher struct {
 	Cfg config.Config
@@ -37,6 +41,11 @@ func NewRepoFetcher(cfg config.Config) *RepoFetcher {
 	return &RepoFetcher{
 		Cfg: cfg,
 	}
+}
+
+// GetAPICallCount returns the total number of external API calls made
+func GetAPICallCount() int64 {
+	return apiCallCounter.Load()
 }
 
 // CreateGitHubAppTransport creates a transport for the GitHub App
@@ -170,6 +179,8 @@ func DoRequestWithRateLimit(ctx context.Context, method, url, token string, body
 	for {
 		slog.Info("Henter URL", "url", url)
 
+		apiCallCounter.Add(1)
+
 		req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))
 		if err != nil {
 			return err
@@ -230,6 +241,8 @@ func (r *RepoFetcher) fetchSBOM(ctx context.Context, owner, repo string) map[str
 
 func doRequestWithRateLimitAndOptional404(ctx context.Context, method, url, token string, body []byte, out interface{}) error {
 	for {
+		apiCallCounter.Add(1)
+
 		req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))
 		if err != nil {
 			return err

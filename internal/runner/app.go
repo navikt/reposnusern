@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jonmartinstorm/reposnusern/internal/config"
+	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
 	"github.com/jonmartinstorm/reposnusern/internal/models"
 	_ "github.com/lib/pq"
 	"golang.org/x/sync/errgroup"
@@ -111,6 +112,11 @@ loop:
 	}
 
 	logMemoryStats()
+
+	// Log API call statistics
+	apiCalls := fetcher.GetAPICallCount()
+	slog.Info("Totalt antall eksterne API-kall", "antall", apiCalls)
+
 	slog.Info("Ferdig med alle repos!", "varighet", time.Since(snapshotTime).String())
 	return nil
 }
