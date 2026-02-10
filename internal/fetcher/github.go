@@ -600,7 +600,6 @@ func (r *RepoFetcher) fetchRepoTreeREST(ctx context.Context, owner, repo string)
 		slog.Warn("Git tree was truncated (too large)", "repo", owner+"/"+repo)
 	}
 
-	slog.Debug("PRINT TREE for repo", "repo", owner+"/"+repo, "tree", tree.Tree)
 	return tree.Tree, nil
 }
 
@@ -615,7 +614,9 @@ func (r *RepoFetcher) FetchDockerfilesFromTree(ctx context.Context, owner, repo 
 		if !strings.Contains(strings.ToLower(entry.Path), "dockerfile") {
 			continue
 		}
-
+		if entry.Size == 0 {
+			continue
+		}
 		content := r.fetchFileContent(ctx, owner, repo, entry.Path)
 		if content != "" {
 			results = append(results, models.FileEntry{
@@ -655,15 +656,16 @@ func (r *RepoFetcher) FetchDependencyfilesFromTree(ctx context.Context, owner, r
 		if len(pathParts) == 1 {
 			continue
 		}
-
-		content := r.fetchFileContent(ctx, owner, repo, entry.Path)
-		if content != "" {
-			results = append(results, models.FileEntry{
-				Path:    entry.Path,
-				Content: content,
-			})
-			slog.Debug("Fant dependency file i underkatalog", "repo", owner+"/"+repo, "path", entry.Path)
+		
+		// Skip empty files, should they exist in the tree
+		if entry.Size == 0 {
+			continue
 		}
+		results = append(results, models.FileEntry{
+			Path:    entry.Path,
+			Content: "Go to " + entry.URL, // Content is not interesting for now, maybe in a later feature.
+		})
+		slog.Debug("Fant dependency file i underkatalog", "repo", owner+"/"+repo, "path", entry.Path)
 	}
 
 	slog.Info("Hentet dependency files fra underkataloger", "repo", owner+"/"+repo, "count", len(results))
