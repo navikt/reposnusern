@@ -140,6 +140,8 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 	var treeEntries []struct {
 		Path string `json:"path"`
 		Type string `json:"type"`
+		Size int    `json:"size"`
+		SHA  string `json:"sha"`
 	}
 	var treeErr error
 
@@ -576,6 +578,8 @@ func ConvertFiles(input map[string][]map[string]string) map[string][]models.File
 func (r *RepoFetcher) fetchRepoTreeREST(ctx context.Context, owner, repo string) ([]struct {
 	Path string `json:"path"`
 	Type string `json:"type"`
+	Size int    `json:"size"`
+	SHA  string `json:"sha"`
 }, error) {
 	treeURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/trees/HEAD?recursive=1", owner, repo)
 
@@ -583,7 +587,10 @@ func (r *RepoFetcher) fetchRepoTreeREST(ctx context.Context, owner, repo string)
 		Tree []struct {
 			Path string `json:"path"`
 			Type string `json:"type"`
+			Size int    `json:"size"`
+			SHA  string `json:"sha"`
 		} `json:"tree"`
+		Truncated bool `json:"truncated"`
 	}
 
 	token, err := r.GetAuthToken(ctx)
@@ -596,6 +603,11 @@ func (r *RepoFetcher) fetchRepoTreeREST(ctx context.Context, owner, repo string)
 		return nil, fmt.Errorf("could not fetch repo tree: %w", err)
 	}
 
+	if tree.Truncated {
+		slog.Warn("Git tree was truncated (too large)", "repo", owner+"/"+repo)
+	}
+
+	slog.Debug("PRINT TREE for repo", "repo", owner+"/"+repo, "tree", tree.Tree)
 	return tree.Tree, nil
 }
 
@@ -603,6 +615,8 @@ func (r *RepoFetcher) fetchRepoTreeREST(ctx context.Context, owner, repo string)
 func (r *RepoFetcher) FetchDockerfilesFromTree(ctx context.Context, owner, repo string, treeEntries []struct {
 	Path string `json:"path"`
 	Type string `json:"type"`
+	Size int    `json:"size"`
+	SHA  string `json:"sha"`
 }) []models.FileEntry {
 	var results []models.FileEntry
 
@@ -630,6 +644,8 @@ func (r *RepoFetcher) FetchDockerfilesFromTree(ctx context.Context, owner, repo 
 func (r *RepoFetcher) FetchDependencyFilesFromTree(ctx context.Context, owner, repo string, treeEntries []struct {
 	Path string `json:"path"`
 	Type string `json:"type"`
+	Size int    `json:"size"`
+	SHA  string `json:"sha"`
 }) []models.FileEntry {
 	var results []models.FileEntry
 
