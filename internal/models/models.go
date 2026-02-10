@@ -39,8 +39,8 @@ type RepoMeta struct {
 	Security     map[string]bool `json:"security"`
 
 	// Dependency management
-	LockfilePairings []LockfilePairing `json:"lockfile_pairings"`
-	ProperLockfiles  bool              `json:"proper_lockfiles"`
+	LockfilePairings     []LockfilePairing `json:"lockfile_pairings"`
+	HasCompleteLockfiles bool              `json:"has_complete_lockfiles"`
 }
 
 type RepoEntry struct {

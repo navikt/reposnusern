@@ -160,7 +160,7 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 			files := r.FetchDockerfilesFromTree(ctx, r.Cfg.Org, baseRepo.Name, treeEntries)
 			entry.Files["dockerfile"] = append(entry.Files["dockerfile"], files...)
 
-			manifests := r.FetchDependencyFilesFromTree(ctx, r.Cfg.Org, baseRepo.Name, treeEntries)
+			manifests := r.FetchDependencyfilesFromTree(ctx, r.Cfg.Org, baseRepo.Name, treeEntries)
 			entry.Files["dependencies"] = append(entry.Files["dependencies"], manifests...)
 		}
 	} else if shouldSearchDeepForManifests(entry) {
@@ -172,7 +172,7 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 		}
 
 		if treeEntries != nil {
-			manifests := r.FetchDependencyFilesFromTree(ctx, r.Cfg.Org, baseRepo.Name, treeEntries)
+			manifests := r.FetchDependencyfilesFromTree(ctx, r.Cfg.Org, baseRepo.Name, treeEntries)
 			entry.Files["dependencies"] = append(entry.Files["dependencies"], manifests...)
 		}
 	}
@@ -407,7 +407,7 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 				var fileType string
 				if strings.Contains(lowerName, "dockerfile") {
 					fileType = lowerName
-				} else if isDependencyFile(name) {
+				} else if isDependencyfile(name) {
 					fileType = "dependencies"
 				} else {
 					continue
@@ -432,10 +432,10 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 	return ConvertFiles(files)
 }
 
-// isDependencyFile checks if a filename is a dependency file we care about
+// isDependencyfile checks if a filename is a dependency file we care about
 // Uses the parser package's ecosystem definitions as single source of truth
-func isDependencyFile(filename string) bool {
-	files := parser.GetAllDependencyFileNames()
+func isDependencyfile(filename string) bool {
+	files := parser.GetAllDependencyfileNames()
 	for _, f := range files {
 		if filename == f {
 			return true
@@ -627,15 +627,13 @@ func (r *RepoFetcher) FetchDockerfilesFromTree(ctx context.Context, owner, repo 
 	return results
 }
 
-// FetchDependencyFilesFromTree extracts dependency files from a provided git tree structure
-// Searches subdirectories for dependency files (for monorepo scenarios)
-func (r *RepoFetcher) FetchDependencyFilesFromTree(ctx context.Context, owner, repo string, treeEntries []TreeEntry) []models.FileEntry {
+// FetchDependencyfilesFromTree extracts dependency files from a provided git tree structure
+func (r *RepoFetcher) FetchDependencyfilesFromTree(ctx context.Context, owner, repo string, treeEntries []TreeEntry) []models.FileEntry {
 	var results []models.FileEntry
 
-	// Get list of all dependency file names we care about
-	dependencyFiles := parser.GetAllDependencyFileNames()
+	dependencyfileNames := parser.GetAllDependencyfileNames()
 	fileMap := make(map[string]bool)
-	for _, name := range dependencyFiles {
+	for _, name := range dependencyfileNames {
 		fileMap[name] = true
 	}
 

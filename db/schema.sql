@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS repos (
     has_codeql BOOLEAN NOT NULL DEFAULT FALSE,
 
     -- dependency management
-    proper_lockfiles BOOLEAN NOT NULL DEFAULT FALSE,
+    has_complete_lockfiles BOOLEAN NOT NULL DEFAULT FALSE,
     lockfile_pairings TEXT,
 
     PRIMARY KEY (id, hentet_dato)

@@ -120,8 +120,8 @@ type BGRepoEntry struct {
 	HasCodeQL     bool      `bigquery:"has_codeql"`
 
 	// Dependency management
-	ProperLockfiles  bool   `bigquery:"proper_lockfiles"`
-	LockfilePairings string `bigquery:"lockfile_pairings"`
+	HasCompleteLockfiles bool   `bigquery:"has_complete_lockfiles"`
+	LockfilePairings     string `bigquery:"lockfile_pairings"`
 }
 
 type BGRepoLanguage struct {
@@ -192,33 +192,33 @@ func ConvertToBG(entry models.RepoEntry, snapshot time.Time) BGRepoEntry {
 	}
 
 	return BGRepoEntry{
-		RepoID:           r.ID,
-		WhenCollected:    snapshot,
-		Name:             r.Name,
-		FullName:         r.FullName,
-		Description:      r.Description,
-		Stars:            r.Stars,
-		Forks:            r.Forks,
-		Archived:         r.Archived,
-		Private:          r.Private,
-		IsFork:           r.IsFork,
-		Language:         r.Language,
-		SizeMB:           float32(r.Size) / 1024.0,
-		UpdatedAt:        parseTime(r.UpdatedAt),
-		PushedAt:         parseTime(r.PushedAt),
-		CreatedAt:        parseTime(r.CreatedAt),
-		HtmlUrl:          r.HtmlUrl,
-		Topics:           strings.Join(r.Topics, ","),
-		Visibility:       r.Visibility,
-		License:          safeLicense(r.License),
-		OpenIssues:       r.OpenIssues,
-		LanguagesUrl:     r.LanguagesURL,
-		ReadmeContent:    r.Readme,
-		HasSecurityMD:    r.Security["has_security_md"],
-		HasDependabot:    r.Security["has_dependabot"],
-		HasCodeQL:        r.Security["has_codeql"],
-		ProperLockfiles:  r.ProperLockfiles,
-		LockfilePairings: lockfilePairingsJSON,
+		RepoID:               r.ID,
+		WhenCollected:        snapshot,
+		Name:                 r.Name,
+		FullName:             r.FullName,
+		Description:          r.Description,
+		Stars:                r.Stars,
+		Forks:                r.Forks,
+		Archived:             r.Archived,
+		Private:              r.Private,
+		IsFork:               r.IsFork,
+		Language:             r.Language,
+		SizeMB:               float32(r.Size) / 1024.0,
+		UpdatedAt:            parseTime(r.UpdatedAt),
+		PushedAt:             parseTime(r.PushedAt),
+		CreatedAt:            parseTime(r.CreatedAt),
+		HtmlUrl:              r.HtmlUrl,
+		Topics:               strings.Join(r.Topics, ","),
+		Visibility:           r.Visibility,
+		License:              safeLicense(r.License),
+		OpenIssues:           r.OpenIssues,
+		LanguagesUrl:         r.LanguagesURL,
+		ReadmeContent:        r.Readme,
+		HasSecurityMD:        r.Security["has_security_md"],
+		HasDependabot:        r.Security["has_dependabot"],
+		HasCodeQL:            r.Security["has_codeql"],
+		HasCompleteLockfiles: r.HasCompleteLockfiles,
+		LockfilePairings:     lockfilePairingsJSON,
 	}
 }
 

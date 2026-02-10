@@ -5,7 +5,7 @@ INSERT INTO repos (
   language, size_mb, updated_at, pushed_at, created_at, html_url, topics,
   visibility, license, open_issues, languages_url,
   has_security_md, has_dependabot, has_codeql, readme_content,
-  proper_lockfiles, lockfile_pairings
+  has_complete_lockfiles, lockfile_pairings
 ) VALUES (
   $1, $2,
   $3, $4, $5, $6, $7, $8, $9, $10,
@@ -38,5 +38,5 @@ ON CONFLICT (id, hentet_dato) DO UPDATE SET
   has_dependabot = EXCLUDED.has_dependabot,
   has_codeql = EXCLUDED.has_codeql,
   readme_content = EXCLUDED.readme_content,
-  proper_lockfiles = EXCLUDED.proper_lockfiles,
+  has_complete_lockfiles = EXCLUDED.has_complete_lockfiles,
   lockfile_pairings = EXCLUDED.lockfile_pairings;

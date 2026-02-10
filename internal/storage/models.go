@@ -44,33 +44,33 @@ type Dockerfile struct {
 }
 
 type Repo struct {
-	ID               int64
-	HentetDato       time.Time
-	Name             string
-	FullName         string
-	Description      string
-	Stars            int64
-	Forks            int64
-	Archived         bool
-	Private          bool
-	IsFork           bool
-	Language         string
-	SizeMb           float32
-	UpdatedAt        string
-	PushedAt         string
-	CreatedAt        string
-	HtmlUrl          string
-	Topics           string
-	Visibility       string
-	License          string
-	OpenIssues       int64
-	LanguagesUrl     string
-	ReadmeContent    sql.NullString
-	HasSecurityMd    bool
-	HasDependabot    bool
-	HasCodeql        bool
-	ProperLockfiles  bool
-	LockfilePairings sql.NullString
+	ID                   int64
+	HentetDato           time.Time
+	Name                 string
+	FullName             string
+	Description          string
+	Stars                int64
+	Forks                int64
+	Archived             bool
+	Private              bool
+	IsFork               bool
+	Language             string
+	SizeMb               float32
+	UpdatedAt            string
+	PushedAt             string
+	CreatedAt            string
+	HtmlUrl              string
+	Topics               string
+	Visibility           string
+	License              string
+	OpenIssues           int64
+	LanguagesUrl         string
+	ReadmeContent        sql.NullString
+	HasSecurityMd        bool
+	HasDependabot        bool
+	HasCodeql            bool
+	HasCompleteLockfiles bool
+	LockfilePairings     sql.NullString
 }
 
 type RepoLanguage struct {

@@ -50,7 +50,7 @@ func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry,
 
 	// Detect lockfile pairings from repository files
 	lockfilePairings := parser.DetectLockfilePairings(entry.Files)
-	properLockfiles := parser.HasProperLockfiles(lockfilePairings)
+	hasCompleteLockfiles := parser.HasCompleteLockfiles(lockfilePairings)
 
 	// Marshal lockfile pairings to JSON
 	var lockfilePairingsJSON sql.NullString
@@ -92,11 +92,11 @@ func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry,
 			String: r.Readme,
 			Valid:  r.Readme != "",
 		},
-		HasSecurityMd:    r.Security["has_security_md"],
-		HasDependabot:    r.Security["has_dependabot"],
-		HasCodeql:        r.Security["has_codeql"],
-		ProperLockfiles:  properLockfiles,
-		LockfilePairings: lockfilePairingsJSON,
+		HasSecurityMd:        r.Security["has_security_md"],
+		HasDependabot:        r.Security["has_dependabot"],
+		HasCodeql:            r.Security["has_codeql"],
+		HasCompleteLockfiles: hasCompleteLockfiles,
+		LockfilePairings:     lockfilePairingsJSON,
 	}
 
 	if err := queries.InsertOrUpdateRepo(ctx, repo); err != nil {

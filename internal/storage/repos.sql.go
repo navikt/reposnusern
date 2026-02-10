@@ -18,7 +18,7 @@ INSERT INTO repos (
   language, size_mb, updated_at, pushed_at, created_at, html_url, topics,
   visibility, license, open_issues, languages_url,
   has_security_md, has_dependabot, has_codeql, readme_content,
-  proper_lockfiles, lockfile_pairings
+  has_complete_lockfiles, lockfile_pairings
 ) VALUES (
   $1, $2,
   $3, $4, $5, $6, $7, $8, $9, $10,
@@ -51,38 +51,38 @@ ON CONFLICT (id, hentet_dato) DO UPDATE SET
   has_dependabot = EXCLUDED.has_dependabot,
   has_codeql = EXCLUDED.has_codeql,
   readme_content = EXCLUDED.readme_content,
-  proper_lockfiles = EXCLUDED.proper_lockfiles,
+  has_complete_lockfiles = EXCLUDED.has_complete_lockfiles,
   lockfile_pairings = EXCLUDED.lockfile_pairings
 `
 
 type InsertOrUpdateRepoParams struct {
-	ID               int64
-	HentetDato       time.Time
-	Name             string
-	FullName         string
-	Description      string
-	Stars            int64
-	Forks            int64
-	Archived         bool
-	Private          bool
-	IsFork           bool
-	Language         string
-	SizeMb           float32
-	UpdatedAt        string
-	PushedAt         string
-	CreatedAt        string
-	HtmlUrl          string
-	Topics           string
-	Visibility       string
-	License          string
-	OpenIssues       int64
-	LanguagesUrl     string
-	HasSecurityMd    bool
-	HasDependabot    bool
-	HasCodeql        bool
-	ReadmeContent    sql.NullString
-	ProperLockfiles  bool
-	LockfilePairings sql.NullString
+	ID                   int64
+	HentetDato           time.Time
+	Name                 string
+	FullName             string
+	Description          string
+	Stars                int64
+	Forks                int64
+	Archived             bool
+	Private              bool
+	IsFork               bool
+	Language             string
+	SizeMb               float32
+	UpdatedAt            string
+	PushedAt             string
+	CreatedAt            string
+	HtmlUrl              string
+	Topics               string
+	Visibility           string
+	License              string
+	OpenIssues           int64
+	LanguagesUrl         string
+	HasSecurityMd        bool
+	HasDependabot        bool
+	HasCodeql            bool
+	ReadmeContent        sql.NullString
+	HasCompleteLockfiles bool
+	LockfilePairings     sql.NullString
 }
 
 func (q *Queries) InsertOrUpdateRepo(ctx context.Context, arg InsertOrUpdateRepoParams) error {
@@ -112,7 +112,7 @@ func (q *Queries) InsertOrUpdateRepo(ctx context.Context, arg InsertOrUpdateRepo
 		arg.HasDependabot,
 		arg.HasCodeql,
 		arg.ReadmeContent,
-		arg.ProperLockfiles,
+		arg.HasCompleteLockfiles,
 		arg.LockfilePairings,
 	)
 	return err

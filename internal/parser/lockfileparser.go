@@ -201,12 +201,12 @@ func findFiles(filePaths map[string]bool, filenames []string) []string {
 	return matches
 }
 
-// HasProperLockfiles returns true if all manifests have corresponding lockfiles
-func HasProperLockfiles(pairings []LockfilePairing) bool {
+// HasCompleteLockfiles returns true if all manifests have corresponding lockfiles
+func HasCompleteLockfiles(pairings []LockfilePairing) bool {
 	if len(pairings) == 0 {
-		return false // No manifests found, so no proper lockfiles
+		return false // No manifests found, so no complete lockfiles
 		// TODO: Decide if this should be true or false when no manifests are found.
-		// Arguably it could be considered "proper" if there are no manifests, but for now we treat it as false to indicate no lockfile pairings.
+		// Arguably it could be considered "complete" if there are no manifests, but for now we treat it as false to indicate no lockfile pairings.
 	}
 
 	for _, pairing := range pairings {
@@ -218,8 +218,8 @@ func HasProperLockfiles(pairings []LockfilePairing) bool {
 	return true // All manifests have lockfiles
 }
 
-// GetAllDependencyFileNames returns all unique dependency file names (manifests and lockfiles) from all ecosystems
-func GetAllDependencyFileNames() []string {
+// GetAllDependencyfileNames returns all unique dependency file names (manifests and lockfiles) from all ecosystems defined in the configuration
+func GetAllDependencyfileNames() []string {
 	filenameSet := make(map[string]bool)
 
 	for _, config := range ecosystems {
