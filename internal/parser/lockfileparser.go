@@ -8,12 +8,6 @@ import (
 	"github.com/jonmartinstorm/reposnusern/internal/models"
 )
 
-// LockfilePairing represents a manifest file and its corresponding lockfile
-type LockfilePairing struct {
-	Manifest string `json:"manifest"`
-	Lockfile string `json:"lockfile"` // empty string if missing
-}
-
 // EcosystemConfig defines manifest and lockfile patterns for a package ecosystem
 type EcosystemConfig struct {
 	Manifests []string
@@ -105,8 +99,8 @@ var ecosystems = map[string]EcosystemConfig{
 }
 
 // DetectLockfilePairings analyzes repository files and returns manifest-lockfile pairings
-func DetectLockfilePairings(files map[string][]models.FileEntry) []LockfilePairing {
-	var pairings []LockfilePairing
+func DetectLockfilePairings(files map[string][]models.FileEntry) []models.LockfilePairing {
+	var pairings []models.LockfilePairing
 
 	// Extract just paths for logging (without content)
 	filePaths := make(map[string][]string)
@@ -136,8 +130,8 @@ func DetectLockfilePairings(files map[string][]models.FileEntry) []LockfilePairi
 }
 
 // detectPairingsForEcosystem finds all manifest files for an ecosystem and checks for lockfiles
-func detectPairingsForEcosystem(config EcosystemConfig, filePaths map[string]bool) []LockfilePairing {
-	var pairings []LockfilePairing
+func detectPairingsForEcosystem(config EcosystemConfig, filePaths map[string]bool) []models.LockfilePairing {
+	var pairings []models.LockfilePairing
 
 	// Find all manifest files in the repository
 	manifests := findFiles(filePaths, config.Manifests)
@@ -175,7 +169,7 @@ func detectPairingsForEcosystem(config EcosystemConfig, filePaths map[string]boo
 			slog.Debug("No lockfile found for manifest", "manifest", manifestPath)
 		}
 
-		pairings = append(pairings, LockfilePairing{
+		pairings = append(pairings, models.LockfilePairing{
 			Manifest: manifestPath,
 			Lockfile: foundLockfile,
 		})
@@ -202,7 +196,7 @@ func findFiles(filePaths map[string]bool, filenames []string) []string {
 }
 
 // HasCompleteLockfiles returns true if all manifests have corresponding lockfiles
-func HasCompleteLockfiles(pairings []LockfilePairing) bool {
+func HasCompleteLockfiles(pairings []models.LockfilePairing) bool {
 	if len(pairings) == 0 {
 		return false // No manifests found, so no complete lockfiles
 		// TODO: Decide if this should be true or false when no manifests are found.

@@ -177,6 +177,10 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 		}
 	}
 
+	// Analyze lockfile pairings now that all files have been fetched
+	entry.Repo.LockfilePairings = parser.DetectLockfilePairings(entry.Files)
+	entry.Repo.HasCompleteLockfiles = parser.HasCompleteLockfiles(entry.Repo.LockfilePairings)
+
 	return entry, nil
 }
 

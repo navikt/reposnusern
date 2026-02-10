@@ -48,21 +48,11 @@ func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry,
 	id := int64(r.ID)
 	name := r.FullName
 
-	// Detect lockfile pairings from repository files
-	lockfilePairings := parser.DetectLockfilePairings(entry.Files)
-	hasCompleteLockfiles := parser.HasCompleteLockfiles(lockfilePairings)
-
-	// Marshal lockfile pairings to JSON
+	// Use pre-populated lockfile data from fetcher
 	var lockfilePairingsJSON sql.NullString
-	if len(lockfilePairings) > 0 {
-		jsonBytes, err := json.Marshal(lockfilePairings)
-		if err != nil {
-			slog.Warn("Failed to marshal lockfile pairings", "repo", name, "error", err)
-		} else {
-			lockfilePairingsJSON = sql.NullString{
-				String: string(jsonBytes),
-				Valid:  true,
-			}
+	if len(r.LockfilePairings) > 0 {
+		if jsonBytes, err := json.Marshal(r.LockfilePairings); err == nil {
+			lockfilePairingsJSON = sql.NullString{String: string(jsonBytes), Valid: true}
 		}
 	}
 
@@ -95,7 +85,7 @@ func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry,
 		HasSecurityMd:        r.Security["has_security_md"],
 		HasDependabot:        r.Security["has_dependabot"],
 		HasCodeql:            r.Security["has_codeql"],
-		HasCompleteLockfiles: hasCompleteLockfiles,
+		HasCompleteLockfiles: r.HasCompleteLockfiles,
 		LockfilePairings:     lockfilePairingsJSON,
 	}
 

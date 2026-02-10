@@ -141,7 +141,7 @@ func TestDetectLockfilePairings_NoManifests(t *testing.T) {
 }
 
 func TestHasCompleteLockfiles_AllHaveLockfiles(t *testing.T) {
-	pairings := []LockfilePairing{
+	pairings := []models.LockfilePairing{
 		{Manifest: "package.json", Lockfile: "package-lock.json"},
 		{Manifest: "frontend/package.json", Lockfile: "frontend/yarn.lock"},
 	}
@@ -154,7 +154,7 @@ func TestHasCompleteLockfiles_AllHaveLockfiles(t *testing.T) {
 }
 
 func TestHasCompleteLockfiles_MissingLockfile(t *testing.T) {
-	pairings := []LockfilePairing{
+	pairings := []models.LockfilePairing{
 		{Manifest: "package.json", Lockfile: "package-lock.json"},
 		{Manifest: "frontend/package.json", Lockfile: ""},
 	}
@@ -167,7 +167,7 @@ func TestHasCompleteLockfiles_MissingLockfile(t *testing.T) {
 }
 
 func TestHasCompleteLockfiles_NoManifests(t *testing.T) {
-	pairings := []LockfilePairing{}
+	pairings := []models.LockfilePairing{}
 
 	result := HasCompleteLockfiles(pairings)
 
@@ -177,7 +177,7 @@ func TestHasCompleteLockfiles_NoManifests(t *testing.T) {
 }
 
 func TestHasCompleteLockfiles_WhitespaceLockfile(t *testing.T) {
-	pairings := []LockfilePairing{
+	pairings := []models.LockfilePairing{
 		{Manifest: "package.json", Lockfile: "   "},
 	}
 
