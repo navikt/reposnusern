@@ -28,6 +28,14 @@ type RepoFetcher struct {
 	Cfg config.Config
 }
 
+// TreeEntry represents a single entry in a Git tree from GitHub's API
+type TreeEntry struct {
+	Path string `json:"path"`
+	Type string `json:"type"`
+	Size int    `json:"size"`
+	URL  string `json:"url"`
+}
+
 type TreeFile struct {
 	Path string `json:"path"`
 	URL  string `json:"url"`
@@ -137,12 +145,7 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 	}
 
 	// Fetch tree once if we need to search deeper for files
-	var treeEntries []struct {
-		Path string `json:"path"`
-		Type string `json:"type"`
-		Size int    `json:"size"`
-		SHA  string `json:"sha"`
-	}
+	var treeEntries []TreeEntry
 	var treeErr error
 
 	if IsMonorepoCandidate(entry) {
@@ -575,22 +578,12 @@ func ConvertFiles(input map[string][]map[string]string) map[string][]models.File
 }
 
 // fetchRepoTreeREST fetches the git tree structure from GitHub REST API
-func (r *RepoFetcher) fetchRepoTreeREST(ctx context.Context, owner, repo string) ([]struct {
-	Path string `json:"path"`
-	Type string `json:"type"`
-	Size int    `json:"size"`
-	SHA  string `json:"sha"`
-}, error) {
+func (r *RepoFetcher) fetchRepoTreeREST(ctx context.Context, owner, repo string) ([]TreeEntry, error) {
 	treeURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/trees/HEAD?recursive=1", owner, repo)
 
 	var tree struct {
-		Tree []struct {
-			Path string `json:"path"`
-			Type string `json:"type"`
-			Size int    `json:"size"`
-			SHA  string `json:"sha"`
-		} `json:"tree"`
-		Truncated bool `json:"truncated"`
+		Tree      []TreeEntry `json:"tree"`
+		Truncated bool        `json:"truncated"`
 	}
 
 	token, err := r.GetAuthToken(ctx)
@@ -612,12 +605,7 @@ func (r *RepoFetcher) fetchRepoTreeREST(ctx context.Context, owner, repo string)
 }
 
 // FetchDockerfilesFromTree extracts Dockerfiles from a provided git tree structure
-func (r *RepoFetcher) FetchDockerfilesFromTree(ctx context.Context, owner, repo string, treeEntries []struct {
-	Path string `json:"path"`
-	Type string `json:"type"`
-	Size int    `json:"size"`
-	SHA  string `json:"sha"`
-}) []models.FileEntry {
+func (r *RepoFetcher) FetchDockerfilesFromTree(ctx context.Context, owner, repo string, treeEntries []TreeEntry) []models.FileEntry {
 	var results []models.FileEntry
 
 	for _, entry := range treeEntries {
@@ -641,12 +629,7 @@ func (r *RepoFetcher) FetchDockerfilesFromTree(ctx context.Context, owner, repo 
 
 // FetchDependencyFilesFromTree extracts dependency files from a provided git tree structure
 // Searches subdirectories for dependency files (for monorepo scenarios)
-func (r *RepoFetcher) FetchDependencyFilesFromTree(ctx context.Context, owner, repo string, treeEntries []struct {
-	Path string `json:"path"`
-	Type string `json:"type"`
-	Size int    `json:"size"`
-	SHA  string `json:"sha"`
-}) []models.FileEntry {
+func (r *RepoFetcher) FetchDependencyFilesFromTree(ctx context.Context, owner, repo string, treeEntries []TreeEntry) []models.FileEntry {
 	var results []models.FileEntry
 
 	// Get list of all dependency file names we care about
