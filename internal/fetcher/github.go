@@ -323,7 +323,7 @@ func IsMonorepoCandidate(entry *models.RepoEntry) bool {
 		switch lang {
 		case "Go", "Java", "Python", "JavaScript", "TypeScript", "Rust":
 			langs++
-		} // TODO: Add more languages or decide on a better heuristic for monorepos?
+		}
 	}
 
 	hasMatrix := false
@@ -343,7 +343,6 @@ func IsMonorepoCandidate(entry *models.RepoEntry) bool {
 
 // shouldSearchDeepForManifests implements the hybrid approach:
 // Only search subdirectories if no root-level manifests exist but the repo has code
-// TODO: IS THIS NEEDED!?
 func shouldSearchDeepForManifests(entry *models.RepoEntry) bool {
 	// Check if we have any root-level dependency files
 	hasRootManifests := len(entry.Files["dependencies"]) > 0
@@ -660,14 +659,15 @@ func (r *RepoFetcher) FetchDependencyfilesFromTree(ctx context.Context, owner, r
 		if len(pathParts) == 1 {
 			continue
 		}
-		
+
 		// Skip empty files, should they exist in the tree
 		if entry.Size == 0 {
 			continue
 		}
 		results = append(results, models.FileEntry{
 			Path:    entry.Path,
-			Content: "Go to " + entry.URL, // Content is not interesting for now, maybe in a later feature.
+			Content: "",
+			// Content is not interesting for now, maybe in a later feature.
 		})
 		slog.Debug("Fant dependency file i underkatalog", "repo", owner+"/"+repo, "path", entry.Path)
 	}
