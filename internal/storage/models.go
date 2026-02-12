@@ -71,6 +71,7 @@ type Repo struct {
 	HasCodeql            bool
 	HasCompleteLockfiles bool
 	LockfilePairings     sql.NullString
+	LockfilePairCount    int32
 }
 
 type RepoLanguage struct {

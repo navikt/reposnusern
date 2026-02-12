@@ -87,6 +87,7 @@ func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry,
 		HasCodeql:            r.Security["has_codeql"],
 		HasCompleteLockfiles: r.HasCompleteLockfiles,
 		LockfilePairings:     lockfilePairingsJSON,
+		LockfilePairCount:    int32(r.Lockfile_pair_count),
 	}
 
 	if err := queries.InsertOrUpdateRepo(ctx, repo); err != nil {
