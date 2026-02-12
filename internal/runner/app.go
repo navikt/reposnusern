@@ -16,8 +16,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const MaxDebugRepos = 10
-
 type DBWriter interface {
 	ImportRepo(ctx context.Context, entry models.RepoEntry, snapshotDate time.Time) error
 }
@@ -73,8 +71,8 @@ loop:
 
 			// Debug-grense-sjekk før goroutine
 			currentIndex := atomic.LoadInt64(&repoIndex)
-			if a.Cfg.Debug && currentIndex >= MaxDebugRepos {
-				slog.Info("Debug-modus: nådd maks antall repos", "antall", MaxDebugRepos)
+			if a.Cfg.Debug && currentIndex >= a.Cfg.MaxDebugRepos {
+				slog.Info("Debug-modus: nådd maks antall repos", "antall", a.Cfg.MaxDebugRepos)
 				break loop
 			}
 			sem <- struct{}{}

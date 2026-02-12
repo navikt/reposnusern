@@ -37,6 +37,7 @@ var _ = Describe("App.Run", func() {
 			PostgresDSN: "mockdsn",
 			Debug:       true,
 			Parallelism: 2,
+			MaxDebugRepos: 10,
 		}
 
 		writer = &mocks.MockDBWriter{}
@@ -65,7 +66,6 @@ var _ = Describe("App.Run", func() {
 	})
 
 	It("stopper etter maks 10 repo i debug-modus", func() {
-		cfg.Parallelism = 2
 		app = runner.NewApp(cfg, writer, fetcher)
 
 		var repos []models.RepoMeta

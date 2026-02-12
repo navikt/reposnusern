@@ -18,6 +18,7 @@ type Config struct {
 	Org               string
 	Token             string
 	Debug             bool
+	MaxDebugRepos     int64 // maks antall repos i debug-modus
 	SkipArchived      bool
 	Storage           StorageType
 	PostgresDSN       string
@@ -50,12 +51,20 @@ func NewConfig() (Config, error) {
 		}
 	}
 
+	maxDebugRepos := int64(10)
+	if val := os.Getenv("REPOSNUSER_MAXDEBUGREPOS"); val != "" {
+		if i, err := strconv.Atoi(val); err == nil && i > 0 {
+			maxDebugRepos = int64(i)
+		}
+	}
+
 	var githubAppConfig, _ = LoadGitHubAppConfig()
 
 	cfg := Config{
 		Org:               os.Getenv("ORG"),
 		Token:             os.Getenv("GITHUB_TOKEN"),
 		Debug:             os.Getenv("REPOSNUSERDEBUG") == "true",
+		MaxDebugRepos:     maxDebugRepos,
 		SkipArchived:      os.Getenv("REPOSNUSERARCHIVED") != "true",
 		Storage:           storage,
 		PostgresDSN:       os.Getenv("POSTGRES_DSN"),
