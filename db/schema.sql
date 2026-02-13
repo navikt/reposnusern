@@ -28,6 +28,11 @@ CREATE TABLE IF NOT EXISTS repos (
     has_dependabot BOOLEAN NOT NULL DEFAULT FALSE,
     has_codeql BOOLEAN NOT NULL DEFAULT FALSE,
 
+    -- dependency management
+    has_complete_lockfiles BOOLEAN NOT NULL DEFAULT FALSE,
+    lockfile_pairings TEXT,
+    lockfile_pair_count INT NOT NULL DEFAULT 0,
+
     PRIMARY KEY (id, hentet_dato)
 );
 

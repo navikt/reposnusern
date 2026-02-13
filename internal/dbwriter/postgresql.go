@@ -3,6 +3,7 @@ package dbwriter
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -73,9 +74,12 @@ func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry,
 			String: r.Readme,
 			Valid:  r.Readme != "",
 		},
-		HasSecurityMd: r.Security["has_security_md"],
-		HasDependabot: r.Security["has_dependabot"],
-		HasCodeql:     r.Security["has_codeql"],
+		HasSecurityMd:        r.Security["has_security_md"],
+		HasDependabot:        r.Security["has_dependabot"],
+		HasCodeql:            r.Security["has_codeql"],
+		HasCompleteLockfiles: r.HasCompleteLockfiles,
+		LockfilePairings:     marshalToNullString(r.LockfilePairings),
+		LockfilePairCount:    int32(r.Lockfile_pair_count),
 	}
 
 	if err := queries.InsertOrUpdateRepo(ctx, repo); err != nil {
@@ -254,4 +258,15 @@ func SafeString(v interface{}) string {
 		return ""
 	}
 	return v.(string)
+}
+
+func marshalToNullString(v interface{}) sql.NullString {
+	if v == nil {
+		return sql.NullString{}
+	}
+	jsonBytes, err := json.Marshal(v)
+	if err != nil || len(jsonBytes) == 0 {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: string(jsonBytes), Valid: true}
 }

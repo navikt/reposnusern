@@ -12,15 +12,28 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/jonmartinstorm/reposnusern/internal/config"
 	"github.com/jonmartinstorm/reposnusern/internal/models"
+	"github.com/jonmartinstorm/reposnusern/internal/parser"
 )
+
+// apiCallCounter tracks the total number of external API calls made
+var apiCallCounter atomic.Int64
 
 type RepoFetcher struct {
 	Cfg config.Config
+}
+
+// TreeEntry represents a single entry in a Git tree from GitHub's API
+type TreeEntry struct {
+	Path string `json:"path"`
+	Type string `json:"type"`
+	Size int    `json:"size"`
+	URL  string `json:"url"`
 }
 
 type TreeFile struct {
@@ -36,6 +49,11 @@ func NewRepoFetcher(cfg config.Config) *RepoFetcher {
 	return &RepoFetcher{
 		Cfg: cfg,
 	}
+}
+
+// GetAPICallCount returns the total number of external API calls made
+func GetAPICallCount() int64 {
+	return apiCallCounter.Load()
 }
 
 // CreateGitHubAppTransport creates a transport for the GitHub App
@@ -126,12 +144,43 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 		entry.SBOM = sbom
 	}
 
-	if IsMonorepoCandidate(entry) {
-		slog.Info("Monorepo-kandidat – henter dype Dockerfiles", "repo", baseRepo.FullName)
+	// Fetch tree once if we need to search deeper for files
+	var treeEntries []TreeEntry
+	var treeErr error
 
-		files := r.FetchDockerfilesFromRepoREST(ctx, r.Cfg.Org, baseRepo.Name)
-		entry.Files["dockerfile"] = append(entry.Files["dockerfile"], files...)
+	if IsMonorepoCandidate(entry) {
+		slog.Info("Monorepo-kandidat – henter dype Dockerfiles og dependencyfiles", "repo", baseRepo.FullName)
+
+		treeEntries, treeErr = r.fetchRepoTreeREST(ctx, r.Cfg.Org, baseRepo.Name)
+		if treeErr != nil {
+			slog.Warn("Klarte ikke hente repo-tree", "repo", baseRepo.FullName, "error", treeErr)
+		}
+
+		if treeEntries != nil {
+			files := r.FetchDockerfilesFromTree(ctx, r.Cfg.Org, baseRepo.Name, treeEntries)
+			entry.Files["dockerfile"] = append(entry.Files["dockerfile"], files...)
+
+			manifests := r.FetchDependencyfilesFromTree(ctx, r.Cfg.Org, baseRepo.Name, treeEntries)
+			entry.Files["dependencies"] = append(entry.Files["dependencies"], manifests...)
+		}
+	} else if shouldSearchDeepForManifests(entry) {
+		slog.Info("Ikke monorepo, men ingen rot-manifester funnet, søker i underkataloger", "repo", baseRepo.FullName)
+
+		treeEntries, treeErr = r.fetchRepoTreeREST(ctx, r.Cfg.Org, baseRepo.Name)
+		if treeErr != nil {
+			slog.Warn("Klarte ikke hente repo-tree", "repo", baseRepo.FullName, "error", treeErr)
+		}
+
+		if treeEntries != nil {
+			manifests := r.FetchDependencyfilesFromTree(ctx, r.Cfg.Org, baseRepo.Name, treeEntries)
+			entry.Files["dependencies"] = append(entry.Files["dependencies"], manifests...)
+		}
 	}
+
+	// Analyze lockfile pairings now that all files have been fetched
+	entry.Repo.LockfilePairings = parser.DetectLockfilePairings(entry.Files)
+	entry.Repo.HasCompleteLockfiles = parser.HasCompleteLockfiles(entry.Repo.LockfilePairings)
+	entry.Repo.Lockfile_pair_count = len(entry.Repo.LockfilePairings)
 
 	return entry, nil
 }
@@ -139,6 +188,8 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 func DoRequestWithRateLimit(ctx context.Context, method, url, token string, body []byte, out interface{}) error {
 	for {
 		slog.Info("Henter URL", "url", url)
+
+		apiCallCounter.Add(1)
 
 		req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))
 		if err != nil {
@@ -200,6 +251,8 @@ func (r *RepoFetcher) fetchSBOM(ctx context.Context, owner, repo string) map[str
 
 func doRequestWithRateLimitAndOptional404(ctx context.Context, method, url, token string, body []byte, out interface{}) error {
 	for {
+		apiCallCounter.Add(1)
+
 		req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))
 		if err != nil {
 			return err
@@ -289,6 +342,24 @@ func IsMonorepoCandidate(entry *models.RepoEntry) bool {
 	return noDockerfiles && (langs > 0 || hasMatrix || hasSecuritySignals)
 }
 
+// shouldSearchDeepForManifests implements the hybrid approach:
+// Only search subdirectories if no root-level manifests exist but the repo has code
+func shouldSearchDeepForManifests(entry *models.RepoEntry) bool {
+	// Check if we have any root-level dependency files
+	hasRootManifests := len(entry.Files["dependencies"]) > 0
+
+	// If we have root manifests, no need to search deeper
+	if hasRootManifests {
+		return false
+	}
+
+	// No root manifests - check if repo has code
+	hasCode := len(entry.Languages) > 0
+
+	// Search deeper only if there's code but no root manifests
+	return hasCode
+}
+
 func ExtractLanguages(data map[string]interface{}) map[string]int {
 	langs := map[string]int{}
 
@@ -336,7 +407,13 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 				name, _ := entry["name"].(string)
 				lowerName := strings.ToLower(name)
 
-				if !strings.Contains(lowerName, "dockerfile") {
+				// Check if this is a file we want to extract
+				var fileType string
+				if strings.Contains(lowerName, "dockerfile") {
+					fileType = lowerName
+				} else if isDependencyfile(name) {
+					fileType = "dependencies"
+				} else {
 					continue
 				}
 
@@ -347,8 +424,16 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 					}
 				}
 
+				if fileType == "dependencies" {
+					files[fileType] = append(files[fileType], map[string]string{
+						"path":    name,
+						"content": "", // dependency files content is not interesting for now
+					})
+					continue
+				}
+				// For Dockerfiles, we want the content to analyze them later
 				if content != "" {
-					files[lowerName] = append(files[lowerName], map[string]string{
+					files[fileType] = append(files[fileType], map[string]string{
 						"path":    name,
 						"content": content,
 					})
@@ -357,6 +442,18 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 		}
 	}
 	return ConvertFiles(files)
+}
+
+// isDependencyfile checks if a filename is a dependency file we care about
+// Uses the parser package's ecosystem definitions as single source of truth
+func isDependencyfile(filename string) bool {
+	files := parser.GetAllDependencyfileNames()
+	for _, f := range files {
+		if filename == f {
+			return true
+		}
+	}
+	return false
 }
 
 func ExtractCI(data map[string]interface{}) []models.FileEntry {
@@ -492,38 +589,48 @@ func ConvertFiles(input map[string][]map[string]string) map[string][]models.File
 	return out
 }
 
-func (r *RepoFetcher) FetchDockerfilesFromRepoREST(ctx context.Context, owner, repo string) []models.FileEntry {
-	var results []models.FileEntry
-
+// fetchRepoTreeREST fetches the git tree structure from GitHub REST API
+func (r *RepoFetcher) fetchRepoTreeREST(ctx context.Context, owner, repo string) ([]TreeEntry, error) {
 	treeURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/git/trees/HEAD?recursive=1", owner, repo)
 
 	var tree struct {
-		Tree []struct {
-			Path string `json:"path"`
-			Type string `json:"type"`
-		} `json:"tree"`
+		Tree      []TreeEntry `json:"tree"`
+		Truncated bool        `json:"truncated"`
 	}
 
 	token, err := r.GetAuthToken(ctx)
 	if err != nil {
-		slog.Warn("Kunne ikke hente auth token for Dockerfiles", "repo", owner+"/"+repo, "error", err)
-		return results
+		slog.Warn("Kunne ikke hente auth token for git tree", "repo", owner+"/"+repo)
+		return nil, fmt.Errorf("could not get auth token: %w", err)
 	}
 
 	err = DoRequestWithRateLimit(ctx, "GET", treeURL, token, nil, &tree)
 	if err != nil {
-		slog.Warn("Klarte ikke hente repo-tree", "repo", owner+"/"+repo, "error", err)
-		return results
+		slog.Warn("Kunne ikke hente repo tree", "repo", owner+"/"+repo)
+		return nil, fmt.Errorf("could not fetch repo tree: %w", err)
 	}
 
-	for _, entry := range tree.Tree {
+	if tree.Truncated {
+		slog.Warn("Git tree was truncated (too large)", "repo", owner+"/"+repo)
+	}
+
+	return tree.Tree, nil
+}
+
+// FetchDockerfilesFromTree extracts Dockerfiles from a provided git tree structure
+func (r *RepoFetcher) FetchDockerfilesFromTree(ctx context.Context, owner, repo string, treeEntries []TreeEntry) []models.FileEntry {
+	var results []models.FileEntry
+
+	for _, entry := range treeEntries {
 		if entry.Type != "blob" {
 			continue
 		}
 		if !strings.Contains(strings.ToLower(entry.Path), "dockerfile") {
 			continue
 		}
-
+		if entry.Size == 0 {
+			continue
+		}
 		content := r.fetchFileContent(ctx, owner, repo, entry.Path)
 		if content != "" {
 			results = append(results, models.FileEntry{
@@ -532,6 +639,51 @@ func (r *RepoFetcher) FetchDockerfilesFromRepoREST(ctx context.Context, owner, r
 			})
 		}
 	}
+	return results
+}
+
+// FetchDependencyfilesFromTree extracts dependency files from a provided git tree structure
+func (r *RepoFetcher) FetchDependencyfilesFromTree(ctx context.Context, owner, repo string, treeEntries []TreeEntry) []models.FileEntry {
+	var results []models.FileEntry
+
+	dependencyfileNames := parser.GetAllDependencyfileNames()
+	fileMap := make(map[string]bool)
+	for _, name := range dependencyfileNames {
+		fileMap[name] = true
+	}
+
+	for _, entry := range treeEntries {
+		if entry.Type != "blob" {
+			continue
+		}
+
+		// Extract just the filename from the path
+		pathParts := strings.Split(entry.Path, "/")
+		filename := pathParts[len(pathParts)-1]
+
+		// Check if this filename is a dependency file we care about
+		if !fileMap[filename] {
+			continue
+		}
+
+		// Skip root-level files (they were already fetched via GraphQL)
+		if len(pathParts) == 1 {
+			continue
+		}
+
+		// Skip empty files, should they exist in the tree
+		if entry.Size == 0 {
+			continue
+		}
+		results = append(results, models.FileEntry{
+			Path:    entry.Path,
+			Content: "",
+			// Content is not interesting for now, maybe in a later feature.
+		})
+		slog.Debug("Fant dependency file i underkatalog", "repo", owner+"/"+repo, "path", entry.Path)
+	}
+
+	slog.Info("Hentet dependency files fra underkataloger", "repo", owner+"/"+repo, "count", len(results))
 	return results
 }
 
