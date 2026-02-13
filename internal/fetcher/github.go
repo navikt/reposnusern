@@ -424,6 +424,14 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 					}
 				}
 
+				if fileType == "dependencies" {
+					files[fileType] = append(files[fileType], map[string]string{
+						"path":    name,
+						"content": "", // dependency files content is not interesting for now
+					})
+					continue
+				}
+				// For Dockerfiles, we want the content to analyze them later
 				if content != "" {
 					files[fileType] = append(files[fileType], map[string]string{
 						"path":    name,
