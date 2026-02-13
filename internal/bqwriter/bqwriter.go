@@ -184,13 +184,6 @@ type BGSBOMPackages struct {
 func ConvertToBG(entry models.RepoEntry, snapshot time.Time) BGRepoEntry {
 	r := entry.Repo
 
-	// Marshal lockfile pairings to JSON string
-	lockfilePairingsJSON := ""
-	if len(r.LockfilePairings) > 0 {
-		jsonBytes, _ := json.Marshal(r.LockfilePairings)
-		lockfilePairingsJSON = string(jsonBytes)
-	}
-
 	return BGRepoEntry{
 		RepoID:               r.ID,
 		WhenCollected:        snapshot,
@@ -218,7 +211,7 @@ func ConvertToBG(entry models.RepoEntry, snapshot time.Time) BGRepoEntry {
 		HasDependabot:        r.Security["has_dependabot"],
 		HasCodeQL:            r.Security["has_codeql"],
 		HasCompleteLockfiles: r.HasCompleteLockfiles,
-		LockfilePairings:     lockfilePairingsJSON,
+		LockfilePairings:     marshalToJSONString(r.LockfilePairings),
 	}
 }
 
@@ -360,6 +353,17 @@ func extractPURL(pkg map[string]interface{}) string {
 func parseTime(value string) time.Time {
 	t, _ := time.Parse(time.RFC3339, value)
 	return t
+}
+
+func marshalToJSONString(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	jsonBytes, err := json.Marshal(v)
+	if err != nil || len(jsonBytes) == 0 {
+		return ""
+	}
+	return string(jsonBytes)
 }
 
 func ensureTableExists(ctx context.Context, client *bigquery.Client, dataset, table string, exampleStruct any) error {

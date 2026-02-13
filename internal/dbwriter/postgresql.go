@@ -48,14 +48,6 @@ func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry,
 	id := int64(r.ID)
 	name := r.FullName
 
-	// Use pre-populated lockfile data from fetcher
-	var lockfilePairingsJSON sql.NullString
-	if len(r.LockfilePairings) > 0 {
-		if jsonBytes, err := json.Marshal(r.LockfilePairings); err == nil {
-			lockfilePairingsJSON = sql.NullString{String: string(jsonBytes), Valid: true}
-		}
-	}
-
 	repo := storage.InsertOrUpdateRepoParams{
 		ID:           id,
 		HentetDato:   snapshotDate,
@@ -86,7 +78,7 @@ func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry,
 		HasDependabot:        r.Security["has_dependabot"],
 		HasCodeql:            r.Security["has_codeql"],
 		HasCompleteLockfiles: r.HasCompleteLockfiles,
-		LockfilePairings:     lockfilePairingsJSON,
+		LockfilePairings:     marshalToNullString(r.LockfilePairings),
 		LockfilePairCount:    int32(r.Lockfile_pair_count),
 	}
 
@@ -266,4 +258,15 @@ func SafeString(v interface{}) string {
 		return ""
 	}
 	return v.(string)
+}
+
+func marshalToNullString(v interface{}) sql.NullString {
+	if v == nil {
+		return sql.NullString{}
+	}
+	jsonBytes, err := json.Marshal(v)
+	if err != nil || len(jsonBytes) == 0 {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: string(jsonBytes), Valid: true}
 }
