@@ -592,11 +592,13 @@ func (r *RepoFetcher) fetchRepoTreeREST(ctx context.Context, owner, repo string)
 
 	token, err := r.GetAuthToken(ctx)
 	if err != nil {
+		slog.Warn("Kunne ikke hente auth token for git tree", "repo", owner+"/"+repo)
 		return nil, fmt.Errorf("could not get auth token: %w", err)
 	}
 
 	err = DoRequestWithRateLimit(ctx, "GET", treeURL, token, nil, &tree)
 	if err != nil {
+		slog.Warn("Kunne ikke hente repo tree", "repo", owner+"/"+repo)
 		return nil, fmt.Errorf("could not fetch repo tree: %w", err)
 	}
 
