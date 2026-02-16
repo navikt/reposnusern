@@ -122,6 +122,7 @@ type BGRepoEntry struct {
 	// Dependency management
 	HasCompleteLockfiles bool   `bigquery:"has_complete_lockfiles"`
 	LockfilePairings     string `bigquery:"lockfile_pairings"`
+	LockfilePairCount    int    `bigquery:"lockfile_pair_count"`
 }
 
 type BGRepoLanguage struct {
@@ -212,6 +213,7 @@ func ConvertToBG(entry models.RepoEntry, snapshot time.Time) BGRepoEntry {
 		HasCodeQL:            r.Security["has_codeql"],
 		HasCompleteLockfiles: r.HasCompleteLockfiles,
 		LockfilePairings:     marshalToJSONString(r.LockfilePairings),
+		LockfilePairCount:    r.Lockfile_pair_count,
 	}
 }
 
@@ -368,23 +370,53 @@ func marshalToJSONString(v interface{}) string {
 
 func ensureTableExists(ctx context.Context, client *bigquery.Client, dataset, table string, exampleStruct any) error {
 	tbl := client.Dataset(dataset).Table(table)
-	_, err := tbl.Metadata(ctx)
-	if err == nil {
-		return nil // tabellen finnes
-	}
-
-	if gErr, ok := err.(*googleapi.Error); !ok || gErr.Code != 404 {
-		return fmt.Errorf("feil ved henting av tabell-metadata: %w", err)
-	}
 
 	schema, err := bigquery.InferSchema(exampleStruct)
 	if err != nil {
 		return fmt.Errorf("klarte ikke å generere schema for %s: %w", table, err)
 	}
 
+	md, err := tbl.Metadata(ctx)
+	if err == nil {
+		return syncSchema(ctx, tbl, md, schema)
+	}
+
+	if gErr, ok := err.(*googleapi.Error); !ok || gErr.Code != 404 {
+		return fmt.Errorf("feil ved henting av tabell-metadata: %w", err)
+	}
+
 	if err := tbl.Create(ctx, &bigquery.TableMetadata{Schema: schema}); err != nil {
 		return fmt.Errorf("klarte ikke å opprette tabell %s: %w", table, err)
 	}
 
+	return nil
+}
+
+// syncSchema legger til manglende kolonner i tabellen basert på ønsket schema.
+func syncSchema(ctx context.Context, tbl *bigquery.Table, md *bigquery.TableMetadata, desired bigquery.Schema) error {
+	existing := make(map[string]bool)
+	for _, f := range md.Schema {
+		existing[f.Name] = true
+	}
+
+	var merged bigquery.Schema
+	merged = append(merged, md.Schema...)
+	changed := false
+	for _, f := range desired {
+		if !existing[f.Name] {
+			f.Required = false
+			merged = append(merged, f)
+			changed = true
+		}
+	}
+
+	if !changed {
+		return nil
+	}
+
+	update := bigquery.TableMetadataToUpdate{Schema: merged}
+	if _, err := tbl.Update(ctx, update, md.ETag); err != nil {
+		return fmt.Errorf("klarte ikke å oppdatere schema for %s: %w", tbl.TableID, err)
+	}
 	return nil
 }
