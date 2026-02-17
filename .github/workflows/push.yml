@@ -19,7 +19,7 @@ jobs:
       - name: 🧰 Sett opp Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.24'
+          go-version: '1.26'
 
       - name: ⚡ Cache Go mod
         uses: actions/cache@v5
