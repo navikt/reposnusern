@@ -78,7 +78,7 @@ func (p *PostgresWriter) ImportRepo(ctx context.Context, entry models.RepoEntry,
 		HasDependabot:        r.Security["has_dependabot"],
 		HasCodeql:            r.Security["has_codeql"],
 		HasCompleteLockfiles: r.HasCompleteLockfiles,
-		LockfilePairings:     marshalToNullString(r.LockfilePairings),
+		LockfilePairings:     marshalToJSONRawMessage(r.LockfilePairings),
 		LockfilePairCount:    int32(r.Lockfile_pair_count),
 	}
 
@@ -260,13 +260,13 @@ func SafeString(v interface{}) string {
 	return v.(string)
 }
 
-func marshalToNullString(v interface{}) sql.NullString {
+func marshalToJSONRawMessage(v interface{}) json.RawMessage {
 	if v == nil {
-		return sql.NullString{}
+		return nil
 	}
 	jsonBytes, err := json.Marshal(v)
-	if err != nil || len(jsonBytes) == 0 {
-		return sql.NullString{}
+	if err != nil || len(jsonBytes) == 0 || string(jsonBytes) == "null" {
+		return nil
 	}
-	return sql.NullString{String: string(jsonBytes), Valid: true}
+	return jsonBytes
 }

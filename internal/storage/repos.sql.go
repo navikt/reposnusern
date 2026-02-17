@@ -8,6 +8,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"time"
 )
 
@@ -83,7 +84,7 @@ type InsertOrUpdateRepoParams struct {
 	HasCodeql            bool
 	ReadmeContent        sql.NullString
 	HasCompleteLockfiles bool
-	LockfilePairings     sql.NullString
+	LockfilePairings     json.RawMessage
 	LockfilePairCount    int32
 }
 
