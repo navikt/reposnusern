@@ -1,0 +1,122 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  workflow_dispatch: # Manual trigger — runs deploy without test gate (escape hatch)
+
+permissions:
+  contents: read
+
+concurrency:
+  # PRs: group by branch → new push cancels old run
+  # Main: unique per commit → every merge gets tested
+  group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.head_ref) || format('ci-{0}', github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  unit-and-lint:
+    name: 🔎 Unit & lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Sjekk ut kode
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: 🧰 Sett opp Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+
+      - name: ⚡ Cache Go mod
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: 📦 Installer mockery v3
+        run: go install github.com/vektra/mockery/v3@latest
+
+      - name: 🧼 Installer golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.6
+
+      - name: 🧪 Unit-tester + vet + lint
+        run: make generate-mocks tidy vet lint unit
+
+      - name: 🔨 Bygg
+        run: make build
+  
+  integration-postgres:
+    name: 🐘 PostgreSQL integrasjonstest
+    needs: unit-and-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+
+      - name: 📦 Installer mockery v3
+        run: go install github.com/vektra/mockery/v3@latest
+
+      - name: 🔧 Generer mocks
+        run: make generate-mocks
+
+      - name: 🚀 Kjør Postgres-integrasjonstest
+        run: go test -v ./test/integration_postgres
+  
+  deploy:
+    name: Build and deploy to production
+    needs: integration-postgres
+    if: github.ref == 'refs/heads/main'
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false # Let in-flight deploys finish
+    permissions:
+      contents: read
+      id-token: write # Needed for workload identity federation (OIDC)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: prod-gcp:appsec
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: 'go.mod'
+
+      - uses: nais/docker-build-push@87f920b0411b987d9a1fd4113aa384e1e3b54f2c # ratchet:nais/docker-build-push@v0
+        id: docker-push
+        with:
+          team: appsec
+          push_image: true
+
+      - uses: nais/deploy/actions/deploy@fa754451577294aae42872a69b888b3470478ec1 # ratchet:nais/deploy/actions/deploy@v2
+        env:
+          RESOURCE: .nais/nais.yml
+          CLUSTER: prod-gcp
+          IMAGE: ${{ steps.docker-push.outputs.image }}
