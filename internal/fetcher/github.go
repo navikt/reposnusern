@@ -666,6 +666,11 @@ func (r *RepoFetcher) FetchDependencyfilesFromTree(ctx context.Context, owner, r
 			continue
 		}
 
+		if parser.IsIgnoredPath(entry.Path) {
+			slog.Info("Skipping ignored dependency file", "repo", owner+"/"+repo, "path", entry.Path)
+			continue
+		}
+
 		// Skip root-level files (they were already fetched via GraphQL)
 		if len(pathParts) == 1 {
 			continue
