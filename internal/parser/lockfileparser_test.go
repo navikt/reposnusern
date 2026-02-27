@@ -187,3 +187,58 @@ func TestHasCompleteLockfiles_WhitespaceLockfile(t *testing.T) {
 		t.Error("expected false when lockfile is only whitespace")
 	}
 }
+
+func TestIsIgnoredPath(t *testing.T) {
+	tests := []struct {
+		path     string
+		expected bool
+	}{
+		{"package.json", false},
+		{"frontend/package.json", false},
+		{"node_modules/express/package.json", true},
+		{"app/node_modules/lodash/package.json", true},
+		{"vendor/autoload.php", true},
+		{"lib/vendor/something/composer.json", true},
+		{"go.mod", false},
+		{"services/api/go.mod", false},
+		{"vendor/github.com/pkg/errors/go.mod", true},
+		{"site-packages/requests/setup.py", true},
+		{".venv/lib/site-packages/flask/setup.py", true},
+		{"vendor/bundle/gems/rails/Gemfile", true},
+		{"myvendor/bundle/gems/rails/Gemfile", false},
+		{"myvendor/package.json", false},
+		{"node_modules_extra/package.json", false},
+		{"vcpkg_installed/x64-linux/vcpkg.json", true},
+		{".dart_tool/package_config.json", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			result := IsIgnoredPath(tt.path)
+			if result != tt.expected {
+				t.Errorf("IsIgnoredPath(%q) = %v, want %v", tt.path, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestDetectLockfilePairings_SkipsIgnoredFiles(t *testing.T) {
+	files := map[string][]models.FileEntry{
+		"other": {
+			{Path: "package.json", Content: "{}"},
+			{Path: "package-lock.json", Content: "{}"},
+			{Path: "node_modules/express/package.json", Content: "{}"},
+			{Path: "node_modules/lodash/package.json", Content: "{}"},
+		},
+	}
+
+	pairings := DetectLockfilePairings(files)
+
+	if len(pairings) != 1 {
+		t.Fatalf("expected 1 pairing (ignored files should be skipped), got %d", len(pairings))
+	}
+
+	if pairings[0].Manifest != "package.json" {
+		t.Errorf("expected manifest 'package.json', got '%s'", pairings[0].Manifest)
+	}
+}

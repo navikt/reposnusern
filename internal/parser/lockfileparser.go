@@ -4,45 +4,52 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/jonmartinstorm/reposnusern/internal/models"
 )
 
 // EcosystemConfig defines manifest and lockfile patterns for a package ecosystem
 type EcosystemConfig struct {
-	Manifests []string
-	Lockfiles []string
+	Manifests   []string
+	Lockfiles   []string
+	IgnoredDirs []string
 }
 
 // Ecosystem configurations - comprehensive language support
 var ecosystems = map[string]EcosystemConfig{
 	"javascript": {
-		Manifests: []string{"package.json"},
-		Lockfiles: []string{"package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb", "bun.lock", "deno.lock"},
+		Manifests:   []string{"package.json"},
+		Lockfiles:   []string{"package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb", "bun.lock", "deno.lock"},
+		IgnoredDirs: []string{"node_modules"},
 	},
 	"deno": {
 		Manifests: []string{"deno.json"},
 		Lockfiles: []string{"deno.lock"},
 	},
 	"python": {
-		Manifests: []string{"Pipfile", "pyproject.toml", "requirements.txt", "setup.py"},
-		Lockfiles: []string{"Pipfile.lock", "poetry.lock", "pdm.lock", "uv.lock"},
+		Manifests:   []string{"Pipfile", "pyproject.toml", "requirements.txt", "setup.py"},
+		Lockfiles:   []string{"Pipfile.lock", "poetry.lock", "pdm.lock", "uv.lock"},
+		IgnoredDirs: []string{"site-packages"},
 	},
 	"ruby": {
-		Manifests: []string{"Gemfile"},
-		Lockfiles: []string{"Gemfile.lock"},
+		Manifests:   []string{"Gemfile"},
+		Lockfiles:   []string{"Gemfile.lock"},
+		IgnoredDirs: []string{"vendor/bundle"},
 	},
 	"php": {
-		Manifests: []string{"composer.json"},
-		Lockfiles: []string{"composer.lock"},
+		Manifests:   []string{"composer.json"},
+		Lockfiles:   []string{"composer.lock"},
+		IgnoredDirs: []string{"vendor"},
 	},
 	"rust": {
 		Manifests: []string{"Cargo.toml"},
 		Lockfiles: []string{"Cargo.lock"},
 	},
 	"go": {
-		Manifests: []string{"go.mod"},
-		Lockfiles: []string{"go.sum"},
+		Manifests:   []string{"go.mod"},
+		Lockfiles:   []string{"go.sum"},
+		IgnoredDirs: []string{"vendor"},
 	},
 	"java": {
 		Manifests: []string{"pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"},
@@ -57,8 +64,9 @@ var ecosystems = map[string]EcosystemConfig{
 		Lockfiles: []string{"Package.resolved"},
 	},
 	"dart": {
-		Manifests: []string{"pubspec.yaml"},
-		Lockfiles: []string{"pubspec.lock"},
+		Manifests:   []string{"pubspec.yaml"},
+		Lockfiles:   []string{"pubspec.lock"},
+		IgnoredDirs: []string{".dart_tool"},
 	},
 	"elixir": {
 		Manifests: []string{"mix.exs"},
@@ -85,8 +93,9 @@ var ecosystems = map[string]EcosystemConfig{
 		Lockfiles: []string{"stack.yaml.lock", "cabal.project.freeze"},
 	},
 	"cpp": {
-		Manifests: []string{"conanfile.txt", "conanfile.py", "vcpkg.json"},
-		Lockfiles: []string{"conan.lock", "vcpkg-lock.json"},
+		Manifests:   []string{"conanfile.txt", "conanfile.py", "vcpkg.json"},
+		Lockfiles:   []string{"conan.lock", "vcpkg-lock.json"},
+		IgnoredDirs: []string{"vcpkg_installed"},
 	},
 	"nim": {
 		Manifests: []string{},
@@ -183,6 +192,11 @@ func findFiles(filePaths map[string]bool, filenames []string) []string {
 	var matches []string
 
 	for path := range filePaths {
+		if IsIgnoredPath(path) {
+			slog.Debug("Skipping ignored dependency file", "path", path)
+			continue
+		}
+
 		basename := filepath.Base(path)
 		for _, filename := range filenames {
 			if basename == filename {
@@ -230,4 +244,53 @@ func GetAllDependencyfileNames() []string {
 	}
 
 	return result
+}
+
+// GetAllIgnoredDirs returns all unique ignored directory prefixes across all ecosystems
+func GetAllIgnoredDirs() []string {
+	dirSet := make(map[string]bool)
+
+	for _, config := range ecosystems {
+		for _, dir := range config.IgnoredDirs {
+			dirSet[dir] = true
+		}
+	}
+
+	result := make([]string, 0, len(dirSet))
+	for dir := range dirSet {
+		result = append(result, dir)
+	}
+
+	return result
+}
+
+var (
+	ignoredDirsOnce  sync.Once
+	ignoredDirsCache []string
+)
+
+// IsIgnoredPath returns true if the file path is inside an ignored directory
+func IsIgnoredPath(path string) bool {
+	ignoredDirsOnce.Do(func() {
+		ignoredDirsCache = GetAllIgnoredDirs()
+	})
+
+	normalizedPath := "/" + strings.Trim(path, "/") + "/"
+	parts := strings.Split(path, "/")
+
+	for _, ignored := range ignoredDirsCache {
+		if strings.Contains(ignored, "/") {
+			if strings.Contains(normalizedPath, "/"+ignored+"/") {
+				return true
+			}
+		} else {
+			for _, part := range parts {
+				if part == ignored {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
