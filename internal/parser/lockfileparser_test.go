@@ -205,6 +205,7 @@ func TestIsIgnoredPath(t *testing.T) {
 		{"site-packages/requests/setup.py", true},
 		{".venv/lib/site-packages/flask/setup.py", true},
 		{"vendor/bundle/gems/rails/Gemfile", true},
+		{"myvendor/bundle/gems/rails/Gemfile", false},
 		{"myvendor/package.json", false},
 		{"node_modules_extra/package.json", false},
 		{"vcpkg_installed/x64-linux/vcpkg.json", true},
