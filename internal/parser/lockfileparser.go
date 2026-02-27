@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/jonmartinstorm/reposnusern/internal/models"
 )
@@ -263,20 +264,30 @@ func GetAllIgnoredDirs() []string {
 	return result
 }
 
+var (
+	ignoredDirsOnce  sync.Once
+	ignoredDirsCache []string
+)
+
 // IsIgnoredPath returns true if the file path is inside an ignored directory
 func IsIgnoredPath(path string) bool {
+	ignoredDirsOnce.Do(func() {
+		ignoredDirsCache = GetAllIgnoredDirs()
+	})
+
+	normalizedPath := "/" + strings.Trim(path, "/") + "/"
 	parts := strings.Split(path, "/")
 
-	ignoredDirs := GetAllIgnoredDirs()
-
-	for _, part := range parts {
-		for _, ignored := range ignoredDirs {
-			if strings.Contains(ignored, "/") {
-				if strings.Contains(path, ignored+"/") {
+	for _, ignored := range ignoredDirsCache {
+		if strings.Contains(ignored, "/") {
+			if strings.Contains(normalizedPath, "/"+ignored+"/") {
+				return true
+			}
+		} else {
+			for _, part := range parts {
+				if part == ignored {
 					return true
 				}
-			} else if part == ignored {
-				return true
 			}
 		}
 	}

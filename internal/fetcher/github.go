@@ -667,7 +667,7 @@ func (r *RepoFetcher) FetchDependencyfilesFromTree(ctx context.Context, owner, r
 		}
 
 		if parser.IsIgnoredPath(entry.Path) {
-			slog.Info("Skipping ignored dependency file", "repo", owner+"/"+repo, "path", entry.Path)
+			slog.Debug("Skipping ignored dependency file", "repo", owner+"/"+repo, "path", entry.Path)
 			continue
 		}
 
