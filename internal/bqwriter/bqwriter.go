@@ -362,7 +362,7 @@ func marshalToJSONString(v interface{}) string {
 		return ""
 	}
 	jsonBytes, err := json.Marshal(v)
-	if err != nil || len(jsonBytes) == 0 {
+	if err != nil || len(jsonBytes) == 0 || string(jsonBytes) == "null" {
 		return ""
 	}
 	return string(jsonBytes)

@@ -6,6 +6,7 @@ package storage
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 )
 
@@ -70,7 +71,7 @@ type Repo struct {
 	HasDependabot        bool
 	HasCodeql            bool
 	HasCompleteLockfiles bool
-	LockfilePairings     sql.NullString
+	LockfilePairings     json.RawMessage
 	LockfilePairCount    int32
 }
 
