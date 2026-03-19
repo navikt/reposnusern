@@ -1,0 +1,432 @@
+[
+  {
+    "table": "repos",
+    "columns": [
+      {
+        "field": "RepoID",
+        "go_type": "int64",
+        "bq_name": "repo_id"
+      },
+      {
+        "field": "WhenCollected",
+        "go_type": "time.Time",
+        "bq_name": "when_collected"
+      },
+      {
+        "field": "Name",
+        "go_type": "string",
+        "bq_name": "name"
+      },
+      {
+        "field": "FullName",
+        "go_type": "string",
+        "bq_name": "full_name"
+      },
+      {
+        "field": "Description",
+        "go_type": "string",
+        "bq_name": "description"
+      },
+      {
+        "field": "Stars",
+        "go_type": "int64",
+        "bq_name": "stars"
+      },
+      {
+        "field": "Forks",
+        "go_type": "int64",
+        "bq_name": "forks"
+      },
+      {
+        "field": "Archived",
+        "go_type": "bool",
+        "bq_name": "archived"
+      },
+      {
+        "field": "Private",
+        "go_type": "bool",
+        "bq_name": "private"
+      },
+      {
+        "field": "IsFork",
+        "go_type": "bool",
+        "bq_name": "is_fork"
+      },
+      {
+        "field": "Language",
+        "go_type": "string",
+        "bq_name": "language"
+      },
+      {
+        "field": "SizeMB",
+        "go_type": "float32",
+        "bq_name": "size_mb"
+      },
+      {
+        "field": "UpdatedAt",
+        "go_type": "time.Time",
+        "bq_name": "updated_at"
+      },
+      {
+        "field": "PushedAt",
+        "go_type": "time.Time",
+        "bq_name": "pushed_at"
+      },
+      {
+        "field": "CreatedAt",
+        "go_type": "time.Time",
+        "bq_name": "created_at"
+      },
+      {
+        "field": "HtmlUrl",
+        "go_type": "string",
+        "bq_name": "html_url"
+      },
+      {
+        "field": "Topics",
+        "go_type": "string",
+        "bq_name": "topics"
+      },
+      {
+        "field": "Visibility",
+        "go_type": "string",
+        "bq_name": "visibility"
+      },
+      {
+        "field": "License",
+        "go_type": "string",
+        "bq_name": "license"
+      },
+      {
+        "field": "OpenIssues",
+        "go_type": "int64",
+        "bq_name": "open_issues"
+      },
+      {
+        "field": "LanguagesUrl",
+        "go_type": "string",
+        "bq_name": "languages_url"
+      },
+      {
+        "field": "ReadmeContent",
+        "go_type": "string",
+        "bq_name": "readme_content"
+      },
+      {
+        "field": "HasSecurityMD",
+        "go_type": "bool",
+        "bq_name": "has_security_md"
+      },
+      {
+        "field": "HasDependabot",
+        "go_type": "bool",
+        "bq_name": "has_dependabot"
+      },
+      {
+        "field": "HasCodeQL",
+        "go_type": "bool",
+        "bq_name": "has_codeql"
+      },
+      {
+        "field": "HasCompleteLockfiles",
+        "go_type": "bool",
+        "bq_name": "has_complete_lockfiles"
+      },
+      {
+        "field": "LockfilePairings",
+        "go_type": "string",
+        "bq_name": "lockfile_pairings"
+      },
+      {
+        "field": "LockfilePairCount",
+        "go_type": "int",
+        "bq_name": "lockfile_pair_count"
+      }
+    ]
+  },
+  {
+    "table": "repo_languages",
+    "columns": [
+      {
+        "field": "RepoID",
+        "go_type": "int64",
+        "bq_name": "repo_id"
+      },
+      {
+        "field": "WhenCollected",
+        "go_type": "time.Time",
+        "bq_name": "when_collected"
+      },
+      {
+        "field": "Language",
+        "go_type": "string",
+        "bq_name": "language"
+      },
+      {
+        "field": "Bytes",
+        "go_type": "int64",
+        "bq_name": "bytes"
+      }
+    ]
+  },
+  {
+    "table": "dockerfile_features",
+    "columns": [
+      {
+        "field": "RepoID",
+        "go_type": "int64",
+        "bq_name": "repo_id"
+      },
+      {
+        "field": "WhenCollected",
+        "go_type": "time.Time",
+        "bq_name": "when_collected"
+      },
+      {
+        "field": "FileType",
+        "go_type": "string",
+        "bq_name": "file_type"
+      },
+      {
+        "field": "Content",
+        "go_type": "string",
+        "bq_name": "content"
+      },
+      {
+        "field": "Path",
+        "go_type": "string",
+        "bq_name": "path"
+      },
+      {
+        "field": "UsesLatestTag",
+        "go_type": "bool",
+        "bq_name": "uses_latest_tag"
+      },
+      {
+        "field": "HasUserInstruction",
+        "go_type": "bool",
+        "bq_name": "has_user_instruction"
+      },
+      {
+        "field": "HasCopySensitive",
+        "go_type": "bool",
+        "bq_name": "has_copy_sensitive"
+      },
+      {
+        "field": "HasPackageInstalls",
+        "go_type": "bool",
+        "bq_name": "has_package_installs"
+      },
+      {
+        "field": "UsesMultistage",
+        "go_type": "bool",
+        "bq_name": "uses_multistage"
+      },
+      {
+        "field": "HasHealthcheck",
+        "go_type": "bool",
+        "bq_name": "has_healthcheck"
+      },
+      {
+        "field": "UsesAddInstruction",
+        "go_type": "bool",
+        "bq_name": "uses_add_instruction"
+      },
+      {
+        "field": "HasLabelMetadata",
+        "go_type": "bool",
+        "bq_name": "has_label_metadata"
+      },
+      {
+        "field": "HasExpose",
+        "go_type": "bool",
+        "bq_name": "has_expose"
+      },
+      {
+        "field": "HasEntrypointOrCmd",
+        "go_type": "bool",
+        "bq_name": "has_entrypoint_or_cmd"
+      },
+      {
+        "field": "InstallsCurlOrWget",
+        "go_type": "bool",
+        "bq_name": "installs_curl_or_wget"
+      },
+      {
+        "field": "InstallsBuildTools",
+        "go_type": "bool",
+        "bq_name": "installs_build_tools"
+      },
+      {
+        "field": "HasAptGetClean",
+        "go_type": "bool",
+        "bq_name": "has_apt_get_clean"
+      },
+      {
+        "field": "WorldWritable",
+        "go_type": "bool",
+        "bq_name": "world_writable"
+      },
+      {
+        "field": "HasSecretsInEnvOrArg",
+        "go_type": "bool",
+        "bq_name": "has_secrets_in_env_or_arg"
+      },
+      {
+        "field": "UsesNpmInstall",
+        "go_type": "bool",
+        "bq_name": "uses_npm_install"
+      },
+      {
+        "field": "UsesNpmCiWithoutIgnoreScripts",
+        "go_type": "bool",
+        "bq_name": "uses_npm_ci_without_ignore_scripts"
+      },
+      {
+        "field": "UsesYarnInstallWithoutFrozen",
+        "go_type": "bool",
+        "bq_name": "uses_yarn_install_without_frozen"
+      },
+      {
+        "field": "UsesPipInstallWithoutNoCache",
+        "go_type": "bool",
+        "bq_name": "uses_pip_install_without_no_cache"
+      },
+      {
+        "field": "UsesCurlBashPipe",
+        "go_type": "bool",
+        "bq_name": "uses_curl_bash_pipe"
+      }
+    ]
+  },
+  {
+    "table": "dockerfile_stages",
+    "columns": [
+      {
+        "field": "RepoID",
+        "go_type": "int64",
+        "bq_name": "repo_id"
+      },
+      {
+        "field": "WhenCollected",
+        "go_type": "time.Time",
+        "bq_name": "when_collected"
+      },
+      {
+        "field": "Path",
+        "go_type": "string",
+        "bq_name": "path"
+      },
+      {
+        "field": "StageIndex",
+        "go_type": "int",
+        "bq_name": "stage_index"
+      },
+      {
+        "field": "BaseImage",
+        "go_type": "string",
+        "bq_name": "base_image"
+      },
+      {
+        "field": "BaseTag",
+        "go_type": "string",
+        "bq_name": "base_tag"
+      }
+    ]
+  },
+  {
+    "table": "ci_config",
+    "columns": [
+      {
+        "field": "RepoID",
+        "go_type": "int64",
+        "bq_name": "repo_id"
+      },
+      {
+        "field": "WhenCollected",
+        "go_type": "time.Time",
+        "bq_name": "when_collected"
+      },
+      {
+        "field": "Path",
+        "go_type": "string",
+        "bq_name": "path"
+      },
+      {
+        "field": "Content",
+        "go_type": "string",
+        "bq_name": "content"
+      },
+      {
+        "field": "UsesNpmInstall",
+        "go_type": "bool",
+        "bq_name": "uses_npm_install"
+      },
+      {
+        "field": "UsesNpmCiWithoutIgnoreScripts",
+        "go_type": "bool",
+        "bq_name": "uses_npm_ci_without_ignore_scripts"
+      },
+      {
+        "field": "UsesYarnInstallWithoutFrozen",
+        "go_type": "bool",
+        "bq_name": "uses_yarn_install_without_frozen"
+      },
+      {
+        "field": "UsesPipInstallWithoutNoCache",
+        "go_type": "bool",
+        "bq_name": "uses_pip_install_without_no_cache"
+      },
+      {
+        "field": "UsesPipInstallWithoutHashes",
+        "go_type": "bool",
+        "bq_name": "uses_pip_install_without_hashes"
+      },
+      {
+        "field": "UsesCurlBashPipe",
+        "go_type": "bool",
+        "bq_name": "uses_curl_bash_pipe"
+      },
+      {
+        "field": "UsesSudo",
+        "go_type": "bool",
+        "bq_name": "uses_sudo"
+      }
+    ]
+  },
+  {
+    "table": "sbom_packages",
+    "columns": [
+      {
+        "field": "RepoID",
+        "go_type": "int64",
+        "bq_name": "repo_id"
+      },
+      {
+        "field": "WhenCollected",
+        "go_type": "time.Time",
+        "bq_name": "when_collected"
+      },
+      {
+        "field": "Name",
+        "go_type": "string",
+        "bq_name": "name"
+      },
+      {
+        "field": "Version",
+        "go_type": "string",
+        "bq_name": "version"
+      },
+      {
+        "field": "License",
+        "go_type": "string",
+        "bq_name": "license"
+      },
+      {
+        "field": "PURL",
+        "go_type": "string",
+        "bq_name": "purl"
+      }
+    ]
+  }
+]
