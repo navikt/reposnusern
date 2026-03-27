@@ -22,6 +22,11 @@ type DockerfileFeatures struct {
 	HasAptGetClean       bool
 	WorldWritable        bool
 	HasSecretsInEnvOrArg bool
+	UsesNpmInstall                bool
+	UsesNpmCiWithoutIgnoreScripts bool
+	UsesYarnInstallWithoutFrozen  bool
+	UsesPipInstallWithoutNoCache  bool
+	UsesCurlBashPipe              bool
 }
 
 type DockerStageMeta struct {
@@ -129,6 +134,21 @@ func ParseDockerfile(content string) (DockerfileFeatures, []DockerStageMeta) {
 		if (strings.Contains(line, "env ") || strings.Contains(line, "arg ")) &&
 			(strings.Contains(line, "password") || strings.Contains(line, "token") || strings.Contains(line, "secret")) {
 			features.HasSecretsInEnvOrArg = true
+		}
+		if isNpmInstall(line) {
+			features.UsesNpmInstall = true
+		}
+		if isNpmCiWithoutIgnoreScripts(line) {
+			features.UsesNpmCiWithoutIgnoreScripts = true
+		}
+		if isYarnInstallWithoutFrozen(line) {
+			features.UsesYarnInstallWithoutFrozen = true
+		}
+		if isPipInstallWithoutNoCache(line) {
+			features.UsesPipInstallWithoutNoCache = true
+		}
+		if isCurlBashPipe(line) {
+			features.UsesCurlBashPipe = true
 		}
 	}
 

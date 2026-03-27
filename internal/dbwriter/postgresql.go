@@ -153,6 +153,11 @@ func insertDockerfiles(
 				HasAptGetClean:       sql.NullBool{Bool: features.HasAptGetClean, Valid: true},
 				WorldWritable:        sql.NullBool{Bool: features.WorldWritable, Valid: true},
 				HasSecretsInEnvOrArg: sql.NullBool{Bool: features.HasSecretsInEnvOrArg, Valid: true},
+				UsesNpmInstall:                sql.NullBool{Bool: features.UsesNpmInstall, Valid: true},
+				UsesNpmCiWithoutIgnoreScripts: sql.NullBool{Bool: features.UsesNpmCiWithoutIgnoreScripts, Valid: true},
+				UsesYarnInstallWithoutFrozen:  sql.NullBool{Bool: features.UsesYarnInstallWithoutFrozen, Valid: true},
+				UsesPipInstallWithoutNoCache:  sql.NullBool{Bool: features.UsesPipInstallWithoutNoCache, Valid: true},
+				UsesCurlBashPipe:              sql.NullBool{Bool: features.UsesCurlBashPipe, Valid: true},
 			})
 			if err != nil {
 				slog.Warn("Dockerfile-feil", "repo", name, "fil", f.Path, "error", err)

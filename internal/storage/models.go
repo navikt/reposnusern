@@ -26,29 +26,34 @@ type CiConfig struct {
 }
 
 type Dockerfile struct {
-	ID                   int32
-	RepoID               int64
-	HentetDato           time.Time
-	FullName             string
-	Path                 string
-	Content              string
-	BaseImage            sql.NullString
-	BaseTag              sql.NullString
-	UsesLatestTag        sql.NullBool
-	HasUserInstruction   sql.NullBool
-	HasCopySensitive     sql.NullBool
-	HasPackageInstalls   sql.NullBool
-	UsesMultistage       sql.NullBool
-	HasHealthcheck       sql.NullBool
-	UsesAddInstruction   sql.NullBool
-	HasLabelMetadata     sql.NullBool
-	HasExpose            sql.NullBool
-	HasEntrypointOrCmd   sql.NullBool
-	InstallsCurlOrWget   sql.NullBool
-	InstallsBuildTools   sql.NullBool
-	HasAptGetClean       sql.NullBool
-	WorldWritable        sql.NullBool
-	HasSecretsInEnvOrArg sql.NullBool
+	ID                            int32
+	RepoID                        int64
+	HentetDato                    time.Time
+	FullName                      string
+	Path                          string
+	Content                       string
+	BaseImage                     sql.NullString
+	BaseTag                       sql.NullString
+	UsesLatestTag                 sql.NullBool
+	HasUserInstruction            sql.NullBool
+	HasCopySensitive              sql.NullBool
+	HasPackageInstalls            sql.NullBool
+	UsesMultistage                sql.NullBool
+	HasHealthcheck                sql.NullBool
+	UsesAddInstruction            sql.NullBool
+	HasLabelMetadata              sql.NullBool
+	HasExpose                     sql.NullBool
+	HasEntrypointOrCmd            sql.NullBool
+	InstallsCurlOrWget            sql.NullBool
+	InstallsBuildTools            sql.NullBool
+	HasAptGetClean                sql.NullBool
+	WorldWritable                 sql.NullBool
+	HasSecretsInEnvOrArg          sql.NullBool
+	UsesNpmInstall                sql.NullBool
+	UsesNpmCiWithoutIgnoreScripts sql.NullBool
+	UsesYarnInstallWithoutFrozen  sql.NullBool
+	UsesPipInstallWithoutNoCache  sql.NullBool
+	UsesCurlBashPipe              sql.NullBool
 }
 
 type Repo struct {

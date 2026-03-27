@@ -6,7 +6,10 @@ INSERT INTO dockerfiles (
   uses_multistage, has_healthcheck, uses_add_instruction,
   has_label_metadata, has_expose, has_entrypoint_or_cmd,
   installs_curl_or_wget, installs_build_tools, has_apt_get_clean,
-  world_writable, has_secrets_in_env_or_arg
+  world_writable, has_secrets_in_env_or_arg,
+  uses_npm_install, uses_npm_ci_without_ignore_scripts,
+  uses_yarn_install_without_frozen, uses_pip_install_without_no_cache,
+  uses_curl_bash_pipe
 )
 VALUES (
   $1, $2, $3, $4, $5,
@@ -15,7 +18,10 @@ VALUES (
   $12, $13, $14,
   $15, $16, $17,
   $18, $19, $20,
-  $21, $22
+  $21, $22,
+  $23, $24,
+  $25, $26,
+  $27
 )
 ON CONFLICT (repo_id, hentet_dato, path) DO UPDATE SET
   full_name = EXCLUDED.full_name,
@@ -36,5 +42,10 @@ ON CONFLICT (repo_id, hentet_dato, path) DO UPDATE SET
   installs_build_tools = EXCLUDED.installs_build_tools,
   has_apt_get_clean = EXCLUDED.has_apt_get_clean,
   world_writable = EXCLUDED.world_writable,
-  has_secrets_in_env_or_arg = EXCLUDED.has_secrets_in_env_or_arg
+  has_secrets_in_env_or_arg = EXCLUDED.has_secrets_in_env_or_arg,
+  uses_npm_install = EXCLUDED.uses_npm_install,
+  uses_npm_ci_without_ignore_scripts = EXCLUDED.uses_npm_ci_without_ignore_scripts,
+  uses_yarn_install_without_frozen = EXCLUDED.uses_yarn_install_without_frozen,
+  uses_pip_install_without_no_cache = EXCLUDED.uses_pip_install_without_no_cache,
+  uses_curl_bash_pipe = EXCLUDED.uses_curl_bash_pipe
 RETURNING id;

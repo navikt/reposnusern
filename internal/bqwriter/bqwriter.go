@@ -153,6 +153,11 @@ type BGDockerfileFeatures struct {
 	HasAptGetClean       bool      `bigquery:"has_apt_get_clean"`
 	WorldWritable        bool      `bigquery:"world_writable"`
 	HasSecretsInEnvOrArg bool      `bigquery:"has_secrets_in_env_or_arg"`
+	UsesNpmInstall                bool      `bigquery:"uses_npm_install"`
+	UsesNpmCiWithoutIgnoreScripts bool      `bigquery:"uses_npm_ci_without_ignore_scripts"`
+	UsesYarnInstallWithoutFrozen  bool      `bigquery:"uses_yarn_install_without_frozen"`
+	UsesPipInstallWithoutNoCache  bool      `bigquery:"uses_pip_install_without_no_cache"`
+	UsesCurlBashPipe              bool      `bigquery:"uses_curl_bash_pipe"`
 }
 
 type BGDockerStageMeta struct {
@@ -269,6 +274,11 @@ func ConvertDockerfileFeatures(entry models.RepoEntry, snapshot time.Time) ([]BG
 				HasAptGetClean:       features.HasAptGetClean,
 				WorldWritable:        features.WorldWritable,
 				HasSecretsInEnvOrArg: features.HasSecretsInEnvOrArg,
+				UsesNpmInstall:                features.UsesNpmInstall,
+				UsesNpmCiWithoutIgnoreScripts: features.UsesNpmCiWithoutIgnoreScripts,
+				UsesYarnInstallWithoutFrozen:  features.UsesYarnInstallWithoutFrozen,
+				UsesPipInstallWithoutNoCache:  features.UsesPipInstallWithoutNoCache,
+				UsesCurlBashPipe:              features.UsesCurlBashPipe,
 			})
 
 			for _, stage := range stages {

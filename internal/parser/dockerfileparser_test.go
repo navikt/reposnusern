@@ -156,5 +156,95 @@ ADD file.tar.gz /opt/`,
 				UsesAddInstruction: true,
 			},
 		),
+
+		Entry("npm install in RUN is flagged",
+			`FROM node:18
+RUN npm install`,
+			parser.DockerfileFeatures{
+				BaseImage:      "node",
+				BaseTag:        "18",
+				UsesNpmInstall: true,
+			},
+		),
+
+		Entry("npm ci with --ignore-scripts is NOT flagged",
+			`FROM node:18
+RUN npm ci --ignore-scripts`,
+			parser.DockerfileFeatures{
+				BaseImage: "node",
+				BaseTag:   "18",
+			},
+		),
+
+		Entry("npm ci without --ignore-scripts is flagged",
+			`FROM node:18
+RUN npm ci`,
+			parser.DockerfileFeatures{
+				BaseImage:                     "node",
+				BaseTag:                       "18",
+				UsesNpmCiWithoutIgnoreScripts: true,
+			},
+		),
+
+		Entry("yarn install without --frozen-lockfile is flagged",
+			`FROM node:18
+RUN yarn install`,
+			parser.DockerfileFeatures{
+				BaseImage:                    "node",
+				BaseTag:                      "18",
+				UsesYarnInstallWithoutFrozen: true,
+			},
+		),
+
+		Entry("yarn install with --frozen-lockfile is NOT flagged",
+			`FROM node:18
+RUN yarn install --frozen-lockfile`,
+			parser.DockerfileFeatures{
+				BaseImage: "node",
+				BaseTag:   "18",
+			},
+		),
+
+		Entry("pip install without --no-cache-dir is flagged",
+			`FROM python:3.12
+RUN pip install requests`,
+			parser.DockerfileFeatures{
+				BaseImage:                   "python",
+				BaseTag:                     "3.12",
+				UsesPipInstallWithoutNoCache: true,
+			},
+		),
+
+		Entry("pip install with --no-cache-dir is NOT flagged",
+			`FROM python:3.12
+RUN pip install --no-cache-dir requests`,
+			parser.DockerfileFeatures{
+				BaseImage: "python",
+				BaseTag:   "3.12",
+			},
+		),
+
+		Entry("curl piped to bash in RUN is flagged",
+			`FROM ubuntu
+RUN curl https://get.example.com/install.sh | bash`,
+			parser.DockerfileFeatures{
+				BaseImage:          "ubuntu",
+				BaseTag:            "latest",
+				UsesLatestTag:      true,
+				InstallsCurlOrWget: true,
+				UsesCurlBashPipe:   true,
+			},
+		),
+
+		Entry("curl to output file is NOT flagged as pipe",
+			`FROM ubuntu
+RUN curl https://example.com/file.txt -o /tmp/file.txt`,
+			parser.DockerfileFeatures{
+				BaseImage:          "ubuntu",
+				BaseTag:            "latest",
+				UsesLatestTag:      true,
+				InstallsCurlOrWget: true,
+			},
+		),
 	)
 })
