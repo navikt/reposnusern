@@ -5,23 +5,23 @@ import (
 )
 
 type DockerfileFeatures struct {
-	BaseImage            string
-	BaseTag              string
-	UsesLatestTag        bool
-	HasUserInstruction   bool
-	HasCopySensitive     bool
-	HasPackageInstalls   bool
-	UsesMultistage       bool
-	HasHealthcheck       bool
-	UsesAddInstruction   bool
-	HasLabelMetadata     bool
-	HasExpose            bool
-	HasEntrypointOrCmd   bool
-	InstallsCurlOrWget   bool
-	InstallsBuildTools   bool
-	HasAptGetClean       bool
-	WorldWritable        bool
-	HasSecretsInEnvOrArg bool
+	BaseImage                     string
+	BaseTag                       string
+	UsesLatestTag                 bool
+	HasUserInstruction            bool
+	HasCopySensitive              bool
+	HasPackageInstalls            bool
+	UsesMultistage                bool
+	HasHealthcheck                bool
+	UsesAddInstruction            bool
+	HasLabelMetadata              bool
+	HasExpose                     bool
+	HasEntrypointOrCmd            bool
+	InstallsCurlOrWget            bool
+	InstallsBuildTools            bool
+	HasAptGetClean                bool
+	WorldWritable                 bool
+	HasSecretsInEnvOrArg          bool
 	UsesNpmInstall                bool
 	UsesNpmCiWithoutIgnoreScripts bool
 	UsesYarnInstallWithoutFrozen  bool
