@@ -5,23 +5,28 @@ import (
 )
 
 type DockerfileFeatures struct {
-	BaseImage            string
-	BaseTag              string
-	UsesLatestTag        bool
-	HasUserInstruction   bool
-	HasCopySensitive     bool
-	HasPackageInstalls   bool
-	UsesMultistage       bool
-	HasHealthcheck       bool
-	UsesAddInstruction   bool
-	HasLabelMetadata     bool
-	HasExpose            bool
-	HasEntrypointOrCmd   bool
-	InstallsCurlOrWget   bool
-	InstallsBuildTools   bool
-	HasAptGetClean       bool
-	WorldWritable        bool
-	HasSecretsInEnvOrArg bool
+	BaseImage                     string
+	BaseTag                       string
+	UsesLatestTag                 bool
+	HasUserInstruction            bool
+	HasCopySensitive              bool
+	HasPackageInstalls            bool
+	UsesMultistage                bool
+	HasHealthcheck                bool
+	UsesAddInstruction            bool
+	HasLabelMetadata              bool
+	HasExpose                     bool
+	HasEntrypointOrCmd            bool
+	InstallsCurlOrWget            bool
+	InstallsBuildTools            bool
+	HasAptGetClean                bool
+	WorldWritable                 bool
+	HasSecretsInEnvOrArg          bool
+	UsesNpmInstall                bool
+	UsesNpmCiWithoutIgnoreScripts bool
+	UsesYarnInstallWithoutFrozen  bool
+	UsesPipInstallWithoutNoCache  bool
+	UsesCurlBashPipe              bool
 }
 
 type DockerStageMeta struct {
@@ -129,6 +134,21 @@ func ParseDockerfile(content string) (DockerfileFeatures, []DockerStageMeta) {
 		if (strings.Contains(line, "env ") || strings.Contains(line, "arg ")) &&
 			(strings.Contains(line, "password") || strings.Contains(line, "token") || strings.Contains(line, "secret")) {
 			features.HasSecretsInEnvOrArg = true
+		}
+		if isNpmInstall(line) {
+			features.UsesNpmInstall = true
+		}
+		if isNpmCiWithoutIgnoreScripts(line) {
+			features.UsesNpmCiWithoutIgnoreScripts = true
+		}
+		if isYarnInstallWithoutFrozen(line) {
+			features.UsesYarnInstallWithoutFrozen = true
+		}
+		if isPipInstallWithoutNoCache(line) {
+			features.UsesPipInstallWithoutNoCache = true
+		}
+		if isCurlBashPipe(line) {
+			features.UsesCurlBashPipe = true
 		}
 	}
 

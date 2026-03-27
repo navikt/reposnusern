@@ -133,26 +133,31 @@ type BGRepoLanguage struct {
 }
 
 type BGDockerfileFeatures struct {
-	RepoID               int64     `bigquery:"repo_id"`
-	WhenCollected        time.Time `bigquery:"when_collected"`
-	FileType             string    `bigquery:"file_type"`
-	Content              string    `bigquery:"content"`
-	Path                 string    `bigquery:"path"`
-	UsesLatestTag        bool      `bigquery:"uses_latest_tag"`
-	HasUserInstruction   bool      `bigquery:"has_user_instruction"`
-	HasCopySensitive     bool      `bigquery:"has_copy_sensitive"`
-	HasPackageInstalls   bool      `bigquery:"has_package_installs"`
-	UsesMultistage       bool      `bigquery:"uses_multistage"`
-	HasHealthcheck       bool      `bigquery:"has_healthcheck"`
-	UsesAddInstruction   bool      `bigquery:"uses_add_instruction"`
-	HasLabelMetadata     bool      `bigquery:"has_label_metadata"`
-	HasExpose            bool      `bigquery:"has_expose"`
-	HasEntrypointOrCmd   bool      `bigquery:"has_entrypoint_or_cmd"`
-	InstallsCurlOrWget   bool      `bigquery:"installs_curl_or_wget"`
-	InstallsBuildTools   bool      `bigquery:"installs_build_tools"`
-	HasAptGetClean       bool      `bigquery:"has_apt_get_clean"`
-	WorldWritable        bool      `bigquery:"world_writable"`
-	HasSecretsInEnvOrArg bool      `bigquery:"has_secrets_in_env_or_arg"`
+	RepoID                        int64     `bigquery:"repo_id"`
+	WhenCollected                 time.Time `bigquery:"when_collected"`
+	FileType                      string    `bigquery:"file_type"`
+	Content                       string    `bigquery:"content"`
+	Path                          string    `bigquery:"path"`
+	UsesLatestTag                 bool      `bigquery:"uses_latest_tag"`
+	HasUserInstruction            bool      `bigquery:"has_user_instruction"`
+	HasCopySensitive              bool      `bigquery:"has_copy_sensitive"`
+	HasPackageInstalls            bool      `bigquery:"has_package_installs"`
+	UsesMultistage                bool      `bigquery:"uses_multistage"`
+	HasHealthcheck                bool      `bigquery:"has_healthcheck"`
+	UsesAddInstruction            bool      `bigquery:"uses_add_instruction"`
+	HasLabelMetadata              bool      `bigquery:"has_label_metadata"`
+	HasExpose                     bool      `bigquery:"has_expose"`
+	HasEntrypointOrCmd            bool      `bigquery:"has_entrypoint_or_cmd"`
+	InstallsCurlOrWget            bool      `bigquery:"installs_curl_or_wget"`
+	InstallsBuildTools            bool      `bigquery:"installs_build_tools"`
+	HasAptGetClean                bool      `bigquery:"has_apt_get_clean"`
+	WorldWritable                 bool      `bigquery:"world_writable"`
+	HasSecretsInEnvOrArg          bool      `bigquery:"has_secrets_in_env_or_arg"`
+	UsesNpmInstall                bool      `bigquery:"uses_npm_install"`
+	UsesNpmCiWithoutIgnoreScripts bool      `bigquery:"uses_npm_ci_without_ignore_scripts"`
+	UsesYarnInstallWithoutFrozen  bool      `bigquery:"uses_yarn_install_without_frozen"`
+	UsesPipInstallWithoutNoCache  bool      `bigquery:"uses_pip_install_without_no_cache"`
+	UsesCurlBashPipe              bool      `bigquery:"uses_curl_bash_pipe"`
 }
 
 type BGDockerStageMeta struct {
@@ -165,10 +170,17 @@ type BGDockerStageMeta struct {
 }
 
 type BGCIConfig struct {
-	RepoID        int64     `bigquery:"repo_id"`
-	WhenCollected time.Time `bigquery:"when_collected"`
-	Path          string    `bigquery:"path"`
-	Content       string    `bigquery:"content"`
+	RepoID                        int64     `bigquery:"repo_id"`
+	WhenCollected                 time.Time `bigquery:"when_collected"`
+	Path                          string    `bigquery:"path"`
+	Content                       string    `bigquery:"content"`
+	UsesNpmInstall                bool      `bigquery:"uses_npm_install"`
+	UsesNpmCiWithoutIgnoreScripts bool      `bigquery:"uses_npm_ci_without_ignore_scripts"`
+	UsesYarnInstallWithoutFrozen  bool      `bigquery:"uses_yarn_install_without_frozen"`
+	UsesPipInstallWithoutNoCache  bool      `bigquery:"uses_pip_install_without_no_cache"`
+	UsesPipInstallWithoutHashes   bool      `bigquery:"uses_pip_install_without_hashes"`
+	UsesCurlBashPipe              bool      `bigquery:"uses_curl_bash_pipe"`
+	UsesSudo                      bool      `bigquery:"uses_sudo"`
 }
 
 type BGSBOMPackages struct {
@@ -242,26 +254,31 @@ func ConvertDockerfileFeatures(entry models.RepoEntry, snapshot time.Time) ([]BG
 			features, stages := parser.ParseDockerfile(f.Content)
 
 			dff = append(dff, BGDockerfileFeatures{
-				RepoID:               entry.Repo.ID,
-				WhenCollected:        snapshot,
-				FileType:             typ,
-				Path:                 f.Path,
-				Content:              f.Content,
-				UsesLatestTag:        features.UsesLatestTag,
-				HasUserInstruction:   features.HasUserInstruction,
-				HasCopySensitive:     features.HasCopySensitive,
-				HasPackageInstalls:   features.HasPackageInstalls,
-				UsesMultistage:       features.UsesMultistage,
-				HasHealthcheck:       features.HasHealthcheck,
-				UsesAddInstruction:   features.UsesAddInstruction,
-				HasLabelMetadata:     features.HasLabelMetadata,
-				HasExpose:            features.HasExpose,
-				HasEntrypointOrCmd:   features.HasEntrypointOrCmd,
-				InstallsCurlOrWget:   features.InstallsCurlOrWget,
-				InstallsBuildTools:   features.InstallsBuildTools,
-				HasAptGetClean:       features.HasAptGetClean,
-				WorldWritable:        features.WorldWritable,
-				HasSecretsInEnvOrArg: features.HasSecretsInEnvOrArg,
+				RepoID:                        entry.Repo.ID,
+				WhenCollected:                 snapshot,
+				FileType:                      typ,
+				Path:                          f.Path,
+				Content:                       f.Content,
+				UsesLatestTag:                 features.UsesLatestTag,
+				HasUserInstruction:            features.HasUserInstruction,
+				HasCopySensitive:              features.HasCopySensitive,
+				HasPackageInstalls:            features.HasPackageInstalls,
+				UsesMultistage:                features.UsesMultistage,
+				HasHealthcheck:                features.HasHealthcheck,
+				UsesAddInstruction:            features.UsesAddInstruction,
+				HasLabelMetadata:              features.HasLabelMetadata,
+				HasExpose:                     features.HasExpose,
+				HasEntrypointOrCmd:            features.HasEntrypointOrCmd,
+				InstallsCurlOrWget:            features.InstallsCurlOrWget,
+				InstallsBuildTools:            features.InstallsBuildTools,
+				HasAptGetClean:                features.HasAptGetClean,
+				WorldWritable:                 features.WorldWritable,
+				HasSecretsInEnvOrArg:          features.HasSecretsInEnvOrArg,
+				UsesNpmInstall:                features.UsesNpmInstall,
+				UsesNpmCiWithoutIgnoreScripts: features.UsesNpmCiWithoutIgnoreScripts,
+				UsesYarnInstallWithoutFrozen:  features.UsesYarnInstallWithoutFrozen,
+				UsesPipInstallWithoutNoCache:  features.UsesPipInstallWithoutNoCache,
+				UsesCurlBashPipe:              features.UsesCurlBashPipe,
 			})
 
 			for _, stage := range stages {
@@ -283,11 +300,19 @@ func ConvertDockerfileFeatures(entry models.RepoEntry, snapshot time.Time) ([]BG
 func ConvertCI(entry models.RepoEntry, snapshot time.Time) []BGCIConfig {
 	var result []BGCIConfig
 	for _, f := range entry.CIConfig {
+		features := parser.ParseCIConfig(f.Content)
 		result = append(result, BGCIConfig{
-			RepoID:        entry.Repo.ID,
-			WhenCollected: snapshot,
-			Path:          f.Path,
-			Content:       f.Content,
+			RepoID:                        entry.Repo.ID,
+			WhenCollected:                 snapshot,
+			Path:                          f.Path,
+			Content:                       f.Content,
+			UsesNpmInstall:                features.UsesNpmInstall,
+			UsesNpmCiWithoutIgnoreScripts: features.UsesNpmCiWithoutIgnoreScripts,
+			UsesYarnInstallWithoutFrozen:  features.UsesYarnInstallWithoutFrozen,
+			UsesPipInstallWithoutNoCache:  features.UsesPipInstallWithoutNoCache,
+			UsesPipInstallWithoutHashes:   features.UsesPipInstallWithoutHashes,
+			UsesCurlBashPipe:              features.UsesCurlBashPipe,
+			UsesSudo:                      features.UsesSudo,
 		})
 	}
 	return result

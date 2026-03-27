@@ -63,6 +63,13 @@ CREATE TABLE IF NOT EXISTS dockerfiles (
     world_writable BOOLEAN,
     has_secrets_in_env_or_arg BOOLEAN,
 
+    -- Shell antipattern features
+    uses_npm_install BOOLEAN,
+    uses_npm_ci_without_ignore_scripts BOOLEAN,
+    uses_yarn_install_without_frozen BOOLEAN,
+    uses_pip_install_without_no_cache BOOLEAN,
+    uses_curl_bash_pipe BOOLEAN,
+
     UNIQUE (repo_id, hentet_dato, path)
 );
 
@@ -84,6 +91,15 @@ CREATE TABLE IF NOT EXISTS ci_configs (
 
     path TEXT NOT NULL,
     content TEXT NOT NULL,
+
+    -- Antipatterns
+    uses_npm_install BOOLEAN,
+    uses_npm_ci_without_ignore_scripts BOOLEAN,
+    uses_yarn_install_without_frozen BOOLEAN,
+    uses_pip_install_without_no_cache BOOLEAN,
+    uses_pip_install_without_hashes BOOLEAN,
+    uses_curl_bash_pipe BOOLEAN,
+    uses_sudo BOOLEAN,
 
     UNIQUE (repo_id, hentet_dato, path)
 );
