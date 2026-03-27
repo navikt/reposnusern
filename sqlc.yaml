@@ -7,3 +7,9 @@ sql:
       go:
         out: "internal/storage"
         package: "storage"
+        overrides:
+          - db_type: "jsonb"
+            go_type:
+              import: "encoding/json"
+              type: "RawMessage"
+            nullable: true

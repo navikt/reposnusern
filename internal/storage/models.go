@@ -11,11 +11,18 @@ import (
 )
 
 type CiConfig struct {
-	ID         int32
-	RepoID     int64
-	HentetDato time.Time
-	Path       string
-	Content    string
+	ID                            int32
+	RepoID                        int64
+	HentetDato                    time.Time
+	Path                          string
+	Content                       string
+	UsesNpmInstall                sql.NullBool
+	UsesNpmCiWithoutIgnoreScripts sql.NullBool
+	UsesYarnInstallWithoutFrozen  sql.NullBool
+	UsesPipInstallWithoutNoCache  sql.NullBool
+	UsesPipInstallWithoutHashes   sql.NullBool
+	UsesCurlBashPipe              sql.NullBool
+	UsesSudo                      sql.NullBool
 }
 
 type Dockerfile struct {

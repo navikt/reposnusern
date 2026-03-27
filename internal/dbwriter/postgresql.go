@@ -172,11 +172,19 @@ func insertCIConfig(
 	snapshotDate time.Time,
 ) {
 	for _, f := range files {
+		features := parser.ParseCIConfig(f.Content)
 		if err := queries.InsertOrUpdateCIConfig(ctx, storage.InsertOrUpdateCIConfigParams{
-			RepoID:     repoID,
-			HentetDato: snapshotDate,
-			Path:       f.Path,
-			Content:    f.Content,
+			RepoID:                        repoID,
+			HentetDato:                    snapshotDate,
+			Path:                          f.Path,
+			Content:                       f.Content,
+			UsesNpmInstall:                sql.NullBool{Bool: features.UsesNpmInstall, Valid: true},
+			UsesNpmCiWithoutIgnoreScripts: sql.NullBool{Bool: features.UsesNpmCiWithoutIgnoreScripts, Valid: true},
+			UsesYarnInstallWithoutFrozen:  sql.NullBool{Bool: features.UsesYarnInstallWithoutFrozen, Valid: true},
+			UsesPipInstallWithoutNoCache:  sql.NullBool{Bool: features.UsesPipInstallWithoutNoCache, Valid: true},
+			UsesPipInstallWithoutHashes:   sql.NullBool{Bool: features.UsesPipInstallWithoutHashes, Valid: true},
+			UsesCurlBashPipe:              sql.NullBool{Bool: features.UsesCurlBashPipe, Valid: true},
+			UsesSudo:                      sql.NullBool{Bool: features.UsesSudo, Valid: true},
 		}); err != nil {
 			slog.Warn("CI-feil", "repo", name, "fil", f.Path, "error", err)
 		}

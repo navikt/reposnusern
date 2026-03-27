@@ -165,10 +165,17 @@ type BGDockerStageMeta struct {
 }
 
 type BGCIConfig struct {
-	RepoID        int64     `bigquery:"repo_id"`
-	WhenCollected time.Time `bigquery:"when_collected"`
-	Path          string    `bigquery:"path"`
-	Content       string    `bigquery:"content"`
+	RepoID                        int64     `bigquery:"repo_id"`
+	WhenCollected                 time.Time `bigquery:"when_collected"`
+	Path                          string    `bigquery:"path"`
+	Content                       string    `bigquery:"content"`
+	UsesNpmInstall                bool      `bigquery:"uses_npm_install"`
+	UsesNpmCiWithoutIgnoreScripts bool      `bigquery:"uses_npm_ci_without_ignore_scripts"`
+	UsesYarnInstallWithoutFrozen  bool      `bigquery:"uses_yarn_install_without_frozen"`
+	UsesPipInstallWithoutNoCache  bool      `bigquery:"uses_pip_install_without_no_cache"`
+	UsesPipInstallWithoutHashes   bool      `bigquery:"uses_pip_install_without_hashes"`
+	UsesCurlBashPipe              bool      `bigquery:"uses_curl_bash_pipe"`
+	UsesSudo                      bool      `bigquery:"uses_sudo"`
 }
 
 type BGSBOMPackages struct {
@@ -283,11 +290,19 @@ func ConvertDockerfileFeatures(entry models.RepoEntry, snapshot time.Time) ([]BG
 func ConvertCI(entry models.RepoEntry, snapshot time.Time) []BGCIConfig {
 	var result []BGCIConfig
 	for _, f := range entry.CIConfig {
+		features := parser.ParseCIConfig(f.Content)
 		result = append(result, BGCIConfig{
-			RepoID:        entry.Repo.ID,
-			WhenCollected: snapshot,
-			Path:          f.Path,
-			Content:       f.Content,
+			RepoID:                        entry.Repo.ID,
+			WhenCollected:                 snapshot,
+			Path:                          f.Path,
+			Content:                       f.Content,
+			UsesNpmInstall:                features.UsesNpmInstall,
+			UsesNpmCiWithoutIgnoreScripts: features.UsesNpmCiWithoutIgnoreScripts,
+			UsesYarnInstallWithoutFrozen:  features.UsesYarnInstallWithoutFrozen,
+			UsesPipInstallWithoutNoCache:  features.UsesPipInstallWithoutNoCache,
+			UsesPipInstallWithoutHashes:   features.UsesPipInstallWithoutHashes,
+			UsesCurlBashPipe:              features.UsesCurlBashPipe,
+			UsesSudo:                      features.UsesSudo,
 		})
 	}
 	return result
