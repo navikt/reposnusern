@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/jonmartinstorm/reposnusern/internal/bqwriter"
 	"github.com/jonmartinstorm/reposnusern/internal/config"
@@ -14,7 +16,8 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
+	defer stop()
 
 	logger.SetupLogger()
 
