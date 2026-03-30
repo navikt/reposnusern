@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -42,8 +41,18 @@ type TreeFile struct {
 	Type string `json:"type"`
 }
 
-// Injecter en klient (for testbarhet)
-var HttpClient = http.DefaultClient
+// HttpClient is the HTTP client used for all GitHub API requests.
+// It can be overridden in tests. The default client has a 30-second timeout
+// to prevent requests from hanging indefinitely.
+var HttpClient = &http.Client{
+	Timeout: 30 * time.Second,
+}
+
+// RetryBackoff returns the wait duration before retry attempt n (1-indexed).
+// Can be overridden in tests to speed up retry logic.
+var RetryBackoff = func(attempt int) time.Duration {
+	return time.Duration(1<<uint(attempt-1)) * time.Second
+}
 
 func NewRepoFetcher(cfg config.Config) *RepoFetcher {
 	return &RepoFetcher{
@@ -185,10 +194,36 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 	return entry, nil
 }
 
-func DoRequestWithRateLimit(ctx context.Context, method, url, token string, body []byte, out interface{}) error {
-	for {
-		slog.Info("Henter URL", "url", url)
+// sleepWithContext sleeps for duration d but returns early with ctx.Err() if the
+// context is cancelled. This allows rate-limit and retry waits to be interrupted
+// by a SIGTERM signal, which is essential for graceful Kubernetes job shutdown.
+func sleepWithContext(ctx context.Context, d time.Duration) error {
+	select {
+	case <-time.After(d):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
 
+// MaxAttempts is the total number of attempts (including the initial call) for
+// transient errors (5xx responses and network failures). E.g. MaxAttempts=3
+// means: 1st call → wait 1s → 2nd call → wait 2s → 3rd call → give up.
+// Rate-limit retries are unlimited and do not count against this total.
+const MaxAttempts = 3
+
+// doRequest is the shared implementation for all GitHub API calls. It handles
+// rate limiting (unlimited retries waiting for GitHub's reset time), transient
+// errors (up to MaxAttempts total with exponential backoff), and context
+// cancellation at every wait point.
+// Set allow404=true for optional endpoints where 404 means "not available".
+func doRequest(ctx context.Context, method, url, token string, body []byte, out interface{}, allow404 bool) error {
+	for attempt := 1; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		slog.Info("Henter URL", "url", url)
 		apiCallCounter.Add(1)
 
 		req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))
@@ -203,32 +238,65 @@ func DoRequestWithRateLimit(ctx context.Context, method, url, token string, body
 
 		resp, err := HttpClient.Do(req)
 		if err != nil {
-			return err
-		}
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				log.Printf("advarsel: klarte ikke å lukke body: %v", err)
+			if attempt >= MaxAttempts {
+				return err
 			}
-		}()
+			wait := RetryBackoff(attempt)
+			slog.Warn("Nettverksfeil, prøver igjen", "forsøk", attempt, "venter", wait, "error", err)
+			if sleepErr := sleepWithContext(ctx, wait); sleepErr != nil {
+				return sleepErr
+			}
+			continue
+		}
 
 		if rl := resp.Header.Get("X-RateLimit-Remaining"); rl == "0" {
 			reset := resp.Header.Get("X-RateLimit-Reset")
+			_ = resp.Body.Close()
 			if ts, err := strconv.ParseInt(reset, 10, 64); err == nil {
 				wait := time.Until(time.Unix(ts, 0)) + time.Second
 				slog.Warn("Rate limit nådd", "venter", wait.Truncate(time.Second))
-				time.Sleep(wait)
+				if sleepErr := sleepWithContext(ctx, wait); sleepErr != nil {
+					return sleepErr
+				}
+				attempt = 0 // reset transient counter; incremented to 1 at top of next iteration
 				continue
 			}
 		}
 
+		if allow404 && resp.StatusCode == 404 {
+			slog.Info("Ressurs ikke tilgjengelig (404)", "url", url)
+			_ = resp.Body.Close()
+			return nil
+		}
+
+		if resp.StatusCode >= 500 {
+			_ = resp.Body.Close()
+			if attempt >= MaxAttempts {
+				return fmt.Errorf("GitHub API-feil etter %d forsøk: status %d", MaxAttempts, resp.StatusCode)
+			}
+			wait := RetryBackoff(attempt)
+			slog.Warn("Serverfeil, prøver igjen", "status", resp.StatusCode, "forsøk", attempt, "venter", wait)
+			if sleepErr := sleepWithContext(ctx, wait); sleepErr != nil {
+				return sleepErr
+			}
+			continue
+		}
+
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			bodyBytes, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
 			slog.Error("GitHub-feil", "status", resp.StatusCode, "body", string(bodyBytes))
 			return fmt.Errorf("GitHub API-feil: status %d – %s", resp.StatusCode, string(bodyBytes))
 		}
 
-		return json.NewDecoder(resp.Body).Decode(out)
+		err = json.NewDecoder(resp.Body).Decode(out)
+		_ = resp.Body.Close()
+		return err
 	}
+}
+
+func DoRequestWithRateLimit(ctx context.Context, method, url, token string, body []byte, out interface{}) error {
+	return doRequest(ctx, method, url, token, body, out, false)
 }
 
 func (r *RepoFetcher) fetchSBOM(ctx context.Context, owner, repo string) map[string]interface{} {
@@ -250,53 +318,7 @@ func (r *RepoFetcher) fetchSBOM(ctx context.Context, owner, repo string) map[str
 }
 
 func doRequestWithRateLimitAndOptional404(ctx context.Context, method, url, token string, body []byte, out interface{}) error {
-	for {
-		apiCallCounter.Add(1)
-
-		req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))
-		if err != nil {
-			return err
-		}
-		req.Header.Set("Authorization", "Bearer "+token)
-		req.Header.Set("Accept", "application/vnd.github+json")
-		if method == "POST" {
-			req.Header.Set("Content-Type", "application/json")
-		}
-
-		resp, err := HttpClient.Do(req)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				log.Printf("advarsel: klarte ikke å lukke body: %v", err)
-			}
-		}()
-
-		if rl := resp.Header.Get("X-RateLimit-Remaining"); rl == "0" {
-			reset := resp.Header.Get("X-RateLimit-Reset")
-			if ts, err := strconv.ParseInt(reset, 10, 64); err == nil {
-				wait := time.Until(time.Unix(ts, 0)) + time.Second
-				slog.Warn("Rate limit nådd", "venter", wait.Truncate(time.Second))
-				time.Sleep(wait)
-				continue
-			}
-		}
-
-		// 404 is acceptable for SBOM - it just means no SBOM is available
-		if resp.StatusCode == 404 {
-			slog.Info("SBOM ikke tilgjengelig (404)", "url", url)
-			return nil
-		}
-
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			bodyBytes, _ := io.ReadAll(resp.Body)
-			slog.Error("GitHub-feil", "status", resp.StatusCode, "body", string(bodyBytes))
-			return fmt.Errorf("GitHub API-feil: status %d – %s", resp.StatusCode, string(bodyBytes))
-		}
-
-		return json.NewDecoder(resp.Body).Decode(out)
-	}
+	return doRequest(ctx, method, url, token, body, out, true)
 }
 
 func ParseRepoData(data map[string]interface{}, baseRepo models.RepoMeta) *models.RepoEntry {

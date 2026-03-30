@@ -2,6 +2,7 @@ package fetcher_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -251,13 +252,17 @@ var _ = Describe("GraphQL-relaterte hjelpefunksjoner", func() {
 
 var _ = Describe("doRequestWithRateLimit", func() {
 	var originalClient *http.Client
+	var originalBackoff func(int) time.Duration
 
 	BeforeEach(func() {
 		originalClient = fetcher.HttpClient
+		originalBackoff = fetcher.RetryBackoff
+		fetcher.RetryBackoff = func(_ int) time.Duration { return time.Millisecond }
 	})
 
 	AfterEach(func() {
 		fetcher.HttpClient = originalClient
+		fetcher.RetryBackoff = originalBackoff
 	})
 
 	It("skal håndtere rate limit og retry riktig", func() {
@@ -336,5 +341,73 @@ var _ = Describe("doRequestWithRateLimit", func() {
 		Expect(err.Error()).To(ContainSubstring("GitHub API-feil"))
 		Expect(err.Error()).To(ContainSubstring("403"))
 		Expect(err.Error()).To(ContainSubstring("access denied"))
+	})
+
+	It("skal avbryte rate limit-ventetid ved kontekstkansellering", func() {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-RateLimit-Remaining", "0")
+			w.Header().Set("X-RateLimit-Reset", fmt.Sprint(time.Now().Add(60*time.Second).Unix()))
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintln(w, `{}`)
+		}))
+		defer ts.Close()
+
+		fetcher.HttpClient = ts.Client()
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			cancel()
+		}()
+
+		start := time.Now()
+		var result any
+		err := fetcher.DoRequestWithRateLimit(ctx, "GET", ts.URL, "dummy-token", nil, &result)
+
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, context.Canceled)).To(BeTrue())
+		Expect(time.Since(start)).To(BeNumerically("<", 5*time.Second))
+	})
+
+	It("skal prøve igjen ved serverfeil og lykkes til slutt", func() {
+		callCount := 0
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			callCount++
+			if callCount < 3 {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = fmt.Fprintln(w, `{"message":"internal error"}`)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintln(w, `{"message":"ok"}`)
+		}))
+		defer ts.Close()
+
+		fetcher.HttpClient = ts.Client()
+		ctx := context.Background()
+		var result struct{ Message string }
+		err := fetcher.DoRequestWithRateLimit(ctx, "GET", ts.URL, "token", nil, &result)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(result.Message).To(Equal("ok"))
+		Expect(callCount).To(Equal(3))
+	})
+
+	It("skal gi opp etter max antall serverfeilforsøk", func() {
+		callCount := 0
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			callCount++
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = fmt.Fprintln(w, `{"message":"always fails"}`)
+		}))
+		defer ts.Close()
+
+		fetcher.HttpClient = ts.Client()
+		ctx := context.Background()
+		var result any
+		err := fetcher.DoRequestWithRateLimit(ctx, "GET", ts.URL, "token", nil, &result)
+
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("GitHub API-feil etter"))
+		Expect(callCount).To(Equal(fetcher.MaxAttempts))
 	})
 })
