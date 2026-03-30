@@ -9,15 +9,25 @@ func splitRunSegments(line string) []string {
 	return strings.Split(replacer.Replace(line), "\x00")
 }
 
-// containsCmd returns true if segment contains cmd as a standalone command:
-// cmd must be followed by a space or end-of-string.
+// isWordChar returns true for characters that can appear in a command name.
+func isWordChar(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || b == '-' || b == '_'
+}
+
+// containsCmd returns true if segment contains cmd as a standalone command.
+// cmd must be preceded by a space or start-of-string, and followed by a
+// non-word character or end-of-string. This prevents "pnpm install" from
+// matching "npm install", and allows trailing YAML quotes like `npm install"`.
 func containsCmd(segment, cmd string) bool {
 	idx := strings.Index(segment, cmd)
 	if idx < 0 {
 		return false
 	}
+	if idx > 0 && segment[idx-1] != ' ' {
+		return false
+	}
 	end := idx + len(cmd)
-	return end == len(segment) || segment[end] == ' '
+	return end == len(segment) || !isWordChar(segment[end])
 }
 
 // isNpmInstall detects bare `npm install` (not `npm install-ci-test` or similar).

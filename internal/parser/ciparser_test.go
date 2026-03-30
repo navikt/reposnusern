@@ -18,6 +18,21 @@ var _ = Describe("ParseCIConfig", func() {
 			parser.CIFeatures{UsesNpmInstall: true},
 		),
 
+		Entry("pnpm install --frozen-lockfile is not detected as npm install",
+			`run: "pnpm install --frozen-lockfile --ignore-scripts"`,
+			parser.CIFeatures{},
+		),
+
+		Entry("chained commands like npm install must also be found ",
+			`run: "echo 'hello world'&&npm install"`,
+			parser.CIFeatures{UsesNpmInstall: true},
+		),
+		
+		Entry("chained commands like npm install must also be found ",
+			`run: "echo 'hello world';npm install"`,
+			parser.CIFeatures{UsesNpmInstall: true},
+		),
+
 		Entry("npm ci with --ignore-scripts is NOT flagged as npm install",
 			`run: npm ci --ignore-scripts`,
 			parser.CIFeatures{},
