@@ -39,6 +39,7 @@ var _ = Describe("runner.App", Ordered, func() {
 			Org:         "testorg",
 			Token:       "123",
 			Debug:       true,
+			MaxDebugRepos: 10,
 			Parallelism: 2,
 			PostgresDSN: "ignored-in-test",
 		}
