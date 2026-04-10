@@ -1,0 +1,15 @@
+[
+  {
+    "RepoID": 42,
+    "WhenCollected": "2025-06-17T12:00:00Z",
+    "Path": ".github/workflows/ci.yml",
+    "Content": "name: CI",
+    "UsesNpmInstall": false,
+    "UsesNpmCiWithoutIgnoreScripts": false,
+    "UsesYarnInstallWithoutFrozen": false,
+    "UsesPipInstallWithoutNoCache": false,
+    "UsesPipInstallWithoutHashes": false,
+    "UsesCurlBashPipe": false,
+    "UsesSudo": false
+  }
+]

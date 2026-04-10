@@ -120,7 +120,42 @@ REPOSNUSERN_PARALL=4 setter antall parallele kjøring, kan ikke love at det fung
 
 Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. Koden håndterer dette automatisk ved å pause og fortsette når grensen er nådd.
 
-## Testing
+## BigQuery-skjema og outputkontrakt
+
+BigQuery-outputen er beskyttet av tre testlag som fanger opp utilsiktede endringer.
+
+### Når du legger til et nytt felt i en BG*-struct
+
+1. Legg til feltet i riktig struct i `internal/bqwriter/bqwriter.go`
+2. Oppdater `Convert*`-funksjonen til å populere det nye feltet
+3. Kjør testene — du vil få to feil:
+   - **Struct contract test** (`BigQuery schema contract`) — legg til feltet i den hardkodede feltlisten i `bqwriter_test.go`
+   - **Golden file test** (`Convert* golden file tests`) — oppdater `internal/bqwriter/testdata/golden_*.json` manuelt med det nye feltet og forventet verdi
+4. Regenerer `schema/bigquery_schema.json`:
+   ```bash
+   go test ./internal/bqwriter/ -update-schema
+   ```
+5. Kjør testene på nytt og bekreft at alt er grønt:
+   ```bash
+   make unit
+   ```
+
+> **Merk:** Golden-filene skal oppdateres manuelt — ikke med et script. Det tvinger deg til å ta bevisst stilling til hva outputen faktisk skal være.
+
+### Når du endrer logikk i en Convert*-funksjon
+
+Kjør `make unit`. Hvis golden-filen feiler, sammenlign diff-en nøye og oppdater filen hvis endringen er tilsiktet.
+
+### Filene du kan redigere manuelt
+
+| Fil | Når |
+|-----|-----|
+| `internal/bqwriter/bqwriter.go` | Endre BG*-structs eller Convert*-funksjoner |
+| `internal/bqwriter/bqwriter_test.go` | Oppdater hardkodede feltlister i contract-testene |
+| `internal/bqwriter/testdata/golden_*.json` | Oppdater forventet output ved tilsiktede endringer |
+| `schema/bigquery_schema.json` | Regenereres med `-update-schema`, aldri manuelt |
+
+
 
 Prosjektet har støtte for både enhetstester og integrasjonstester:
 
