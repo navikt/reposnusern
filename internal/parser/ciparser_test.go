@@ -7,7 +7,7 @@ import (
 )
 
 var _ = Describe("ParseCIConfig", func() {
-	DescribeTable("CI config parsing detects antipatterns",
+	DescribeTable("CI config parsing correctly detects antipatterns",
 		func(content string, expected parser.CIFeatures) {
 			result := parser.ParseCIConfig(content)
 			Expect(result).To(Equal(expected))
@@ -27,7 +27,7 @@ var _ = Describe("ParseCIConfig", func() {
 			`run: "echo 'hello world'&&npm install"`,
 			parser.CIFeatures{UsesNpmInstall: true},
 		),
-		
+
 		Entry("chained commands like npm install must also be found ",
 			`run: "echo 'hello world';npm install"`,
 			parser.CIFeatures{UsesNpmInstall: true},
@@ -128,6 +128,34 @@ jobs:
         run: sudo chmod +x ./run.sh`,
 			parser.CIFeatures{
 				UsesNpmInstall:               true,
+				UsesYarnInstallWithoutFrozen: true,
+				UsesPipInstallWithoutNoCache: true,
+				UsesPipInstallWithoutHashes:  true,
+				UsesCurlBashPipe:             true,
+				UsesSudo:                     true,
+			},
+		),
+
+		Entry("ci antipatterns should not trigger on step names",
+			`name: CI
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: npm install 
+        run: echo 'hello world' 
+      - name: Install js deps
+        run: yarn install
+      - name: Setup python
+        run: pip install requests
+      - name: Fetch tool
+        run: curl https://example.com/setup.sh | bash
+      - name: Fix perms
+        run: sudo chmod +x ./run.sh`,
+			parser.CIFeatures{
+				UsesNpmInstall:               false,
 				UsesYarnInstallWithoutFrozen: true,
 				UsesPipInstallWithoutNoCache: true,
 				UsesPipInstallWithoutHashes:  true,
