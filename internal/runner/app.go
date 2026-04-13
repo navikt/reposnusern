@@ -47,6 +47,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	page := 1
 	var repoIndex int64
+	var skippedRepos int64
 
 	sem := make(chan struct{}, a.Cfg.Parallelism)
 	g, ctx := errgroup.WithContext(ctx)
@@ -83,6 +84,7 @@ loop:
 				entry, err := a.Fetcher.FetchRepoGraphQL(ctx, repo)
 				if err != nil {
 					slog.Error("Kunne ikke hente repo via GraphQL", "repo", repo.FullName, "error", err)
+					atomic.AddInt64(&skippedRepos, 1)
 					return nil // ikke fatal
 				}
 
@@ -115,7 +117,7 @@ loop:
 	apiCalls := fetcher.GetAPICallCount()
 	slog.Info("Totalt antall eksterne API-kall", "antall", apiCalls)
 
-	slog.Info("Ferdig med alle repos!", "varighet", time.Since(snapshotTime).String())
+	slog.Info("Ferdig med alle repos!", "behandlet", atomic.LoadInt64(&repoIndex), "hoppet_over", atomic.LoadInt64(&skippedRepos), "varighet", time.Since(snapshotTime).String())
 	return nil
 }
 
