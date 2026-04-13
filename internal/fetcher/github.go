@@ -249,7 +249,7 @@ func doRequest(ctx context.Context, method, url, token string, body []byte, out 
 			continue
 		}
 
-		if rl := resp.Header.Get("X-RateLimit-Remaining"); rl == "0" {
+		if rl := resp.Header.Get("X-RateLimit-Remaining"); rl == "0" && resp.StatusCode >= 400 {
 			reset := resp.Header.Get("X-RateLimit-Reset")
 			_ = resp.Body.Close()
 			if ts, err := strconv.ParseInt(reset, 10, 64); err == nil {

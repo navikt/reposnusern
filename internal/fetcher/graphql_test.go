@@ -265,15 +265,15 @@ var _ = Describe("doRequestWithRateLimit", func() {
 		fetcher.RetryBackoff = originalBackoff
 	})
 
-	It("skal håndtere rate limit og retry riktig", func() {
+	It("skal håndtere rate limit (403) og retry riktig", func() {
 		callCount := 0
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			callCount++
 			if callCount == 1 {
-				// Simuler at vi har truffet rate limit
+				// Simuler at vi har truffet rate limit — GitHub sender 403 med X-RateLimit-Remaining: 0
 				w.Header().Set("X-RateLimit-Remaining", "0")
 				w.Header().Set("X-RateLimit-Reset", fmt.Sprint(time.Now().Add(50*time.Millisecond).Unix()))
-				w.WriteHeader(http.StatusOK)
+				w.WriteHeader(http.StatusForbidden)
 				_, _ = fmt.Fprintln(w, `{}`)
 				return
 			}
@@ -291,6 +291,26 @@ var _ = Describe("doRequestWithRateLimit", func() {
 		Expect(err).To(BeNil())
 		Expect(result.Message).To(Equal("ok"))
 		Expect(callCount).To(BeNumerically(">=", 2))
+	})
+
+	It("skal ikke retry når X-RateLimit-Remaining er 0 men svaret er 200", func() {
+		callCount := 0
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			callCount++
+			w.Header().Set("X-RateLimit-Remaining", "0")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintln(w, `{"message": "last-call"}`)
+		}))
+		defer ts.Close()
+
+		fetcher.HttpClient = ts.Client()
+		ctx := context.Background()
+		var result struct{ Message string }
+		err := fetcher.DoRequestWithRateLimit(ctx, "GET", ts.URL, "dummy-token", nil, &result)
+		Expect(err).To(BeNil())
+		Expect(result.Message).To(Equal("last-call"))
+		Expect(callCount).To(Equal(1))
 	})
 
 	It("skal sette Content-Type header for POST", func() {
@@ -347,7 +367,7 @@ var _ = Describe("doRequestWithRateLimit", func() {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("X-RateLimit-Remaining", "0")
 			w.Header().Set("X-RateLimit-Reset", fmt.Sprint(time.Now().Add(60*time.Second).Unix()))
-			w.WriteHeader(http.StatusOK)
+			w.WriteHeader(http.StatusForbidden)
 			_, _ = fmt.Fprintln(w, `{}`)
 		}))
 		defer ts.Close()
