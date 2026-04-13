@@ -41,6 +41,9 @@ type TreeFile struct {
 	Type string `json:"type"`
 }
 
+// GraphQLEndpoint is the GitHub GraphQL API URL. Can be overridden in tests.
+var GraphQLEndpoint = "https://api.github.com/graphql"
+
 // HttpClient is the HTTP client used for all GitHub API requests.
 // It can be overridden in tests. The default client has a 30-second timeout
 // to prevent requests from hanging indefinitely.
@@ -129,14 +132,14 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 	}
 
 	var result map[string]interface{}
-	err = DoRequestWithRateLimit(ctx, "POST", "https://api.github.com/graphql", token, bodyBytes, &result)
+	err = DoRequestWithRateLimit(ctx, "POST", GraphQLEndpoint, token, bodyBytes, &result)
 	if err != nil {
 		slog.Error("GraphQL-kall feilet", "repo", r.Cfg.Org+"/"+baseRepo.Name, "error", err)
 		return nil, err
 	}
 
 	if errs, ok := result["errors"]; ok {
-		slog.Warn("GraphQL-resultat har feil", "repo", r.Cfg.Org+"/"+baseRepo.Name, "errors", errs)
+		return nil, fmt.Errorf("GraphQL returnerte feil for %s/%s: %v", r.Cfg.Org, baseRepo.Name, errs)
 	}
 
 	data, ok := result["data"].(map[string]interface{})

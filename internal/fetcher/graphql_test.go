@@ -12,6 +12,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/jonmartinstorm/reposnusern/internal/config"
 	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
 	"github.com/jonmartinstorm/reposnusern/internal/models"
 )
@@ -247,6 +248,38 @@ var _ = Describe("GraphQL-relaterte hjelpefunksjoner", func() {
 			Expect(got["dockerfile"][0].Path).To(Equal("Dockerfile"))
 			Expect(got["dockerfile"][0].Content).To(Equal("FROM alpine"))
 		})
+	})
+})
+
+var _ = Describe("FetchRepoGraphQL", func() {
+	var originalClient *http.Client
+	var originalEndpoint string
+
+	BeforeEach(func() {
+		originalClient = fetcher.HttpClient
+		originalEndpoint = fetcher.GraphQLEndpoint
+	})
+
+	AfterEach(func() {
+		fetcher.HttpClient = originalClient
+		fetcher.GraphQLEndpoint = originalEndpoint
+	})
+
+	It("skal returnere feil når GraphQL-svaret inneholder errors-felt", func() {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintln(w, `{"errors":[{"message":"Could not resolve to a Repository"}]}`)
+		}))
+		defer ts.Close()
+
+		fetcher.HttpClient = ts.Client()
+		fetcher.GraphQLEndpoint = ts.URL
+
+		f := fetcher.NewRepoFetcher(config.Config{Org: "testorg", Token: "fake-token"})
+		_, err := f.FetchRepoGraphQL(context.Background(), models.RepoMeta{Name: "missing"})
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("GraphQL returnerte feil"))
 	})
 })
 
