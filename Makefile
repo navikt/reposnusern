@@ -25,6 +25,9 @@ unit:
 integration:
 	@go test -v -tags=integration $(shell go list ./... | grep -v /test/)
 
+gha-integration:
+	@go test -v ./test/integration_postgres
+
 e2e:
 	@go test -v -tags=e2e ./tests/e2e/...
 

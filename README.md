@@ -181,6 +181,7 @@ Kjør integrasjonstester:
 
 ```bash
 make integration
+make gha-integration   # Samme kommando som brukes i GitHub Actions
 ```
 
 > Merk: Du må ha støtte for Podman eller Docker for å kjøre integrasjonstestene.
