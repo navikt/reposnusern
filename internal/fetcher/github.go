@@ -156,38 +156,8 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 		entry.SBOM = sbom
 	}
 
-	// Fetch tree once if we need to search deeper for files
-	var treeEntries []TreeEntry
-	var treeErr error
+	entry = r.needsFiletreeFetching(ctx, baseRepo, entry)
 
-	if IsMonorepoCandidate(entry) {
-		slog.Info("Monorepo-kandidat – henter dype Dockerfiles og dependencyfiles", "repo", baseRepo.FullName)
-
-		treeEntries, treeErr = r.fetchRepoTreeREST(ctx, r.Cfg.Org, baseRepo.Name)
-		if treeErr != nil {
-			slog.Warn("Klarte ikke hente repo-tree", "repo", baseRepo.FullName, "error", treeErr)
-		}
-
-		if treeEntries != nil {
-			files := r.FetchDockerfilesFromTree(ctx, r.Cfg.Org, baseRepo.Name, treeEntries)
-			entry.Files["dockerfile"] = append(entry.Files["dockerfile"], files...)
-
-			manifests := r.FetchDependencyfilesFromTree(ctx, r.Cfg.Org, baseRepo.Name, treeEntries)
-			entry.Files["dependencies"] = append(entry.Files["dependencies"], manifests...)
-		}
-	} else if shouldSearchDeepForManifests(entry) {
-		slog.Info("Ikke monorepo, men ingen rot-manifester funnet, søker i underkataloger", "repo", baseRepo.FullName)
-
-		treeEntries, treeErr = r.fetchRepoTreeREST(ctx, r.Cfg.Org, baseRepo.Name)
-		if treeErr != nil {
-			slog.Warn("Klarte ikke hente repo-tree", "repo", baseRepo.FullName, "error", treeErr)
-		}
-
-		if treeEntries != nil {
-			manifests := r.FetchDependencyfilesFromTree(ctx, r.Cfg.Org, baseRepo.Name, treeEntries)
-			entry.Files["dependencies"] = append(entry.Files["dependencies"], manifests...)
-		}
-	}
 
 	// Analyze lockfile pairings now that all files have been fetched
 	entry.Repo.LockfilePairings = parser.DetectLockfilePairings(entry.Files)
@@ -196,6 +166,46 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 
 	return entry, nil
 }
+
+// Checks if we should fetch the entire filetree
+func (r *RepoFetcher) needsFiletreeFetching(ctx context.Context, baseRepo models.RepoMeta, entry *models.RepoEntry) *models.RepoEntry {
+
+	if IsMonorepoCandidate(entry) {
+		slog.Info("Monorepo-kandidat – henter dype Dockerfiles og dependencyfiles", "repo", baseRepo.FullName)
+		updatedEntry := r.fetchAndParseFiletree(ctx, baseRepo, entry)
+		return updatedEntry
+
+	} else if shouldSearchDeepForManifests(entry) {
+		slog.Info("Ikke monorepo, men ingen rot-manifester funnet, søker i underkataloger", "repo", baseRepo.FullName)
+		updatedEntry := r.fetchAndParseFiletree(ctx, baseRepo, entry)
+		return updatedEntry
+	}
+    return entry
+}
+
+// Extracts all relevant files from the tree, since we fetch them regardless
+func (r *RepoFetcher) fetchAndParseFiletree(ctx context.Context, baseRepo models.RepoMeta, entry *models.RepoEntry) *models.RepoEntry {
+	// Fetch tree once if we need to search deeper for files
+	var treeEntries []TreeEntry
+	var treeErr error
+
+	treeEntries, treeErr = r.fetchRepoTreeREST(ctx, r.Cfg.Org, baseRepo.Name)
+	if treeErr != nil {
+		slog.Warn("Klarte ikke hente repo-tree", "repo", baseRepo.FullName, "error", treeErr)
+	}
+	if treeEntries != nil {
+		files := r.FetchDockerfilesFromTree(ctx, r.Cfg.Org, baseRepo.Name, treeEntries)
+		entry.Files["dockerfile"] = append(entry.Files["dockerfile"], files...)
+
+		manifests := r.FetchDependencyfilesFromTree(ctx, r.Cfg.Org, baseRepo.Name, treeEntries)
+		entry.Files["dependencies"] = append(entry.Files["dependencies"], manifests...)
+	    return entry
+	}
+	return entry
+}
+
+
+
 
 // sleepWithContext sleeps for duration d but returns early with ctx.Err() if the
 // context is cancelled. This allows rate-limit and retry waits to be interrupted
@@ -366,6 +376,7 @@ func IsMonorepoCandidate(entry *models.RepoEntry) bool {
 
 	return noDockerfiles && (langs > 0 || hasMatrix || hasSecuritySignals)
 }
+
 
 // shouldSearchDeepForManifests implements the hybrid approach:
 // Only search subdirectories if no root-level manifests exist but the repo has code
