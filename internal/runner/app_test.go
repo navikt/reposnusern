@@ -88,4 +88,15 @@ var _ = Describe("App.Run", func() {
 		Expect(err).To(BeNil())
 		Expect(writer.Calls).To(HaveLen(10))
 	})
+
+	It("hopper over repo der GraphQL feiler og fortsetter", func() {
+		repo := models.RepoMeta{FullName: "testorg/fails", Name: "fails"}
+		fetcher.On("GetReposPage", mock.Anything, cfg, 1).Return([]models.RepoMeta{repo}, nil)
+		fetcher.On("GetReposPage", mock.Anything, cfg, 2).Return([]models.RepoMeta{}, nil)
+		fetcher.On("FetchRepoGraphQL", mock.Anything, repo).Return(nil, errors.New("graphql error"))
+
+		err := app.Run(ctx)
+		Expect(err).To(BeNil())
+		writer.AssertNotCalled(GinkgoT(), "ImportRepo")
+	})
 })
