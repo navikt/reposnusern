@@ -139,6 +139,7 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 	}
 
 	if errs, ok := result["errors"]; ok {
+		// TODO: Denne trigger når vi blir rate-limited på GraphQL!!! Og da skipper vi repoet!!
 		return nil, fmt.Errorf("GraphQL returnerte feil for %s/%s: %v", r.Cfg.Org, baseRepo.Name, errs)
 	}
 
