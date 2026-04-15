@@ -254,15 +254,48 @@ var _ = Describe("GraphQL-relaterte hjelpefunksjoner", func() {
 var _ = Describe("FetchRepoGraphQL", func() {
 	var originalClient *http.Client
 	var originalEndpoint string
+	var originalBackoff func(int) time.Duration
 
 	BeforeEach(func() {
 		originalClient = fetcher.HttpClient
 		originalEndpoint = fetcher.GraphQLEndpoint
+		originalBackoff = fetcher.RetryBackoff
 	})
 
 	AfterEach(func() {
 		fetcher.HttpClient = originalClient
 		fetcher.GraphQLEndpoint = originalEndpoint
+		fetcher.RetryBackoff = originalBackoff
+	})
+
+	It("skal retrye når GraphQL-svaret inneholder rate-limit-feil", func() {
+		callCount := 0
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			callCount++
+			w.Header().Set("Content-Type", "application/json")
+
+			if callCount == 1 {
+				w.Header().Set("X-RateLimit-Reset", "invalid")
+				w.WriteHeader(http.StatusOK)
+				_, _ = fmt.Fprintln(w, `{"errors":[{"message":"API rate limit already exceeded","type":"RATE_LIMIT","code":"graphql_rate_limit"}]}`)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintln(w, `{"data":{"repository":{"languages":{"edges":[]},"README":{"text":"ok"},"SECURITY":null,"dependabot":null,"codeql":null,"dependencies":{"entries":[]},"workflows":{"entries":[]}}}}`)
+		}))
+		defer ts.Close()
+
+		fetcher.HttpClient = ts.Client()
+		fetcher.GraphQLEndpoint = ts.URL
+		fetcher.RetryBackoff = func(_ int) time.Duration { return time.Millisecond }
+
+		f := fetcher.NewRepoFetcher(config.Config{Org: "testorg", Token: "fake-token"})
+		entry, err := f.FetchRepoGraphQL(context.Background(), models.RepoMeta{Name: "missing"})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(entry).NotTo(BeNil())
+		Expect(entry.Repo.Readme).To(Equal("ok"))
+		Expect(callCount).To(Equal(2))
 	})
 
 	It("skal returnere feil når GraphQL-svaret inneholder errors-felt", func() {
