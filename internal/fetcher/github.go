@@ -131,40 +131,49 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 		return nil, fmt.Errorf("failed to get auth token: %w", err)
 	}
 
-	var result map[string]interface{}
-	err = DoRequestWithRateLimit(ctx, "POST", GraphQLEndpoint, token, bodyBytes, &result)
-	if err != nil {
-		slog.Error("GraphQL-kall feilet", "repo", r.Cfg.Org+"/"+baseRepo.Name, "error", err)
-		return nil, err
+	for rateLimitAttempt := 1; ; rateLimitAttempt++ {
+		var result map[string]interface{}
+		headers, err := doRequestWithHeaders(ctx, "POST", GraphQLEndpoint, token, bodyBytes, &result, false)
+		if err != nil {
+			slog.Error("GraphQL-kall feilet", "repo", r.Cfg.Org+"/"+baseRepo.Name, "error", err)
+			return nil, err
+		}
+
+		if errs, ok := result["errors"]; ok {
+			if isGraphQLRateLimitError(errs) {
+				wait := graphQLRateLimitWait(headers, rateLimitAttempt)
+				slog.Warn("GraphQL rate limit nådd", "repo", r.Cfg.Org+"/"+baseRepo.Name, "venter", wait.Truncate(time.Second))
+				if sleepErr := sleepWithContext(ctx, wait); sleepErr != nil {
+					return nil, sleepErr
+				}
+				continue
+			}
+			return nil, fmt.Errorf("GraphQL returnerte feil for %s/%s: %v", r.Cfg.Org, baseRepo.Name, errs)
+		}
+
+		data, ok := result["data"].(map[string]interface{})
+		if !ok || data["repository"] == nil {
+			slog.Warn("Ingen repository-data fra GraphQL", "repo", r.Cfg.Org+"/"+baseRepo.Name)
+			return nil, fmt.Errorf("ingen repository-data for %s/%s", r.Cfg.Org, baseRepo.Name)
+		}
+
+		entry := ParseRepoData(data, baseRepo)
+
+		// Hent SBOM hvis feature_sbom er true
+		if r.Cfg.Feature_Sbom {
+			sbom := r.fetchSBOM(ctx, r.Cfg.Org, baseRepo.Name)
+			entry.SBOM = sbom
+		}
+
+		entry = r.needsFiletreeFetching(ctx, baseRepo, entry)
+
+		// Analyze lockfile pairings now that all files have been fetched
+		entry.Repo.LockfilePairings = parser.DetectLockfilePairings(entry.Files)
+		entry.Repo.HasCompleteLockfiles = parser.HasCompleteLockfiles(entry.Repo.LockfilePairings)
+		entry.Repo.Lockfile_pair_count = len(entry.Repo.LockfilePairings)
+
+		return entry, nil
 	}
-
-	if errs, ok := result["errors"]; ok {
-		return nil, fmt.Errorf("GraphQL returnerte feil for %s/%s: %v", r.Cfg.Org, baseRepo.Name, errs)
-	}
-
-	data, ok := result["data"].(map[string]interface{})
-	if !ok || data["repository"] == nil {
-		slog.Warn("Ingen repository-data fra GraphQL", "repo", r.Cfg.Org+"/"+baseRepo.Name)
-		return nil, fmt.Errorf("ingen repository-data for %s/%s", r.Cfg.Org, baseRepo.Name)
-	}
-
-	entry := ParseRepoData(data, baseRepo)
-
-	// Hent SBOM hvis feature_sbom er true
-	if r.Cfg.Feature_Sbom {
-		sbom := r.fetchSBOM(ctx, r.Cfg.Org, baseRepo.Name)
-		entry.SBOM = sbom
-	}
-
-	entry = r.needsFiletreeFetching(ctx, baseRepo, entry)
-
-
-	// Analyze lockfile pairings now that all files have been fetched
-	entry.Repo.LockfilePairings = parser.DetectLockfilePairings(entry.Files)
-	entry.Repo.HasCompleteLockfiles = parser.HasCompleteLockfiles(entry.Repo.LockfilePairings)
-	entry.Repo.Lockfile_pair_count = len(entry.Repo.LockfilePairings)
-
-	return entry, nil
 }
 
 // Checks if we should fetch the entire filetree
@@ -180,7 +189,7 @@ func (r *RepoFetcher) needsFiletreeFetching(ctx context.Context, baseRepo models
 		updatedEntry := r.fetchAndParseFiletree(ctx, baseRepo, entry)
 		return updatedEntry
 	}
-    return entry
+	return entry
 }
 
 // Extracts all relevant files from the tree, since we fetch them regardless
@@ -199,13 +208,10 @@ func (r *RepoFetcher) fetchAndParseFiletree(ctx context.Context, baseRepo models
 
 		manifests := r.FetchDependencyfilesFromTree(ctx, r.Cfg.Org, baseRepo.Name, treeEntries)
 		entry.Files["dependencies"] = append(entry.Files["dependencies"], manifests...)
-	    return entry
+		return entry
 	}
 	return entry
 }
-
-
-
 
 // sleepWithContext sleeps for duration d but returns early with ctx.Err() if the
 // context is cancelled. This allows rate-limit and retry waits to be interrupted
@@ -231,9 +237,14 @@ const MaxAttempts = 3
 // cancellation at every wait point.
 // Set allow404=true for optional endpoints where 404 means "not available".
 func doRequest(ctx context.Context, method, url, token string, body []byte, out interface{}, allow404 bool) error {
+	_, err := doRequestWithHeaders(ctx, method, url, token, body, out, allow404)
+	return err
+}
+
+func doRequestWithHeaders(ctx context.Context, method, url, token string, body []byte, out interface{}, allow404 bool) (http.Header, error) {
 	for attempt := 1; ; attempt++ {
 		if err := ctx.Err(); err != nil {
-			return err
+			return nil, err
 		}
 
 		slog.Info("Henter URL", "url", url)
@@ -241,7 +252,7 @@ func doRequest(ctx context.Context, method, url, token string, body []byte, out 
 
 		req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))
 		if err != nil {
-			return err
+			return nil, err
 		}
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Accept", "application/vnd.github+json")
@@ -252,12 +263,12 @@ func doRequest(ctx context.Context, method, url, token string, body []byte, out 
 		resp, err := HttpClient.Do(req)
 		if err != nil {
 			if attempt >= MaxAttempts {
-				return err
+				return nil, err
 			}
 			wait := RetryBackoff(attempt)
 			slog.Warn("Nettverksfeil, prøver igjen", "forsøk", attempt, "venter", wait, "error", err)
 			if sleepErr := sleepWithContext(ctx, wait); sleepErr != nil {
-				return sleepErr
+				return nil, sleepErr
 			}
 			continue
 		}
@@ -269,7 +280,7 @@ func doRequest(ctx context.Context, method, url, token string, body []byte, out 
 				wait := time.Until(time.Unix(ts, 0)) + time.Second
 				slog.Warn("Rate limit nådd", "venter", wait.Truncate(time.Second))
 				if sleepErr := sleepWithContext(ctx, wait); sleepErr != nil {
-					return sleepErr
+					return nil, sleepErr
 				}
 				attempt = 0 // reset transient counter; incremented to 1 at top of next iteration
 				continue
@@ -279,18 +290,18 @@ func doRequest(ctx context.Context, method, url, token string, body []byte, out 
 		if allow404 && resp.StatusCode == 404 {
 			slog.Info("Ressurs ikke tilgjengelig (404)", "url", url)
 			_ = resp.Body.Close()
-			return nil
+			return nil, nil
 		}
 
 		if resp.StatusCode >= 500 {
 			_ = resp.Body.Close()
 			if attempt >= MaxAttempts {
-				return fmt.Errorf("GitHub API-feil etter %d forsøk: status %d", MaxAttempts, resp.StatusCode)
+				return nil, fmt.Errorf("GitHub API-feil etter %d forsøk: status %d", MaxAttempts, resp.StatusCode)
 			}
 			wait := RetryBackoff(attempt)
 			slog.Warn("Serverfeil, prøver igjen", "status", resp.StatusCode, "forsøk", attempt, "venter", wait)
 			if sleepErr := sleepWithContext(ctx, wait); sleepErr != nil {
-				return sleepErr
+				return nil, sleepErr
 			}
 			continue
 		}
@@ -299,12 +310,12 @@ func doRequest(ctx context.Context, method, url, token string, body []byte, out 
 			bodyBytes, _ := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
 			slog.Error("GitHub-feil", "status", resp.StatusCode, "body", string(bodyBytes))
-			return fmt.Errorf("GitHub API-feil: status %d – %s", resp.StatusCode, string(bodyBytes))
+			return nil, fmt.Errorf("GitHub API-feil: status %d – %s", resp.StatusCode, string(bodyBytes))
 		}
 
 		err = json.NewDecoder(resp.Body).Decode(out)
 		_ = resp.Body.Close()
-		return err
+		return resp.Header, err
 	}
 }
 
@@ -332,6 +343,53 @@ func (r *RepoFetcher) fetchSBOM(ctx context.Context, owner, repo string) map[str
 
 func doRequestWithRateLimitAndOptional404(ctx context.Context, method, url, token string, body []byte, out interface{}) error {
 	return doRequest(ctx, method, url, token, body, out, true)
+}
+
+func isGraphQLRateLimitError(errs interface{}) bool {
+	errorList, ok := errs.([]interface{})
+	if !ok || len(errorList) == 0 {
+		return false
+	}
+
+	for _, rawErr := range errorList {
+		errMap, ok := rawErr.(map[string]interface{})
+		if !ok || !isRateLimitGraphQLErrorMap(errMap) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func isRateLimitGraphQLErrorMap(errMap map[string]interface{}) bool {
+	if strings.EqualFold(fmt.Sprint(errMap["type"]), "RATE_LIMIT") {
+		return true
+	}
+	if strings.EqualFold(fmt.Sprint(errMap["code"]), "graphql_rate_limit") {
+		return true
+	}
+
+	extensions, ok := errMap["extensions"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+
+	code := fmt.Sprint(extensions["code"])
+	return strings.EqualFold(code, "RATE_LIMIT") || strings.EqualFold(code, "graphql_rate_limit")
+}
+
+func graphQLRateLimitWait(headers http.Header, attempt int) time.Duration {
+	if headers != nil {
+		reset := headers.Get("X-RateLimit-Reset")
+		if ts, err := strconv.ParseInt(reset, 10, 64); err == nil {
+			wait := time.Until(time.Unix(ts, 0)) + time.Second
+			if wait > 0 {
+				return wait
+			}
+		}
+	}
+
+	return RetryBackoff(attempt)
 }
 
 func ParseRepoData(data map[string]interface{}, baseRepo models.RepoMeta) *models.RepoEntry {
@@ -376,7 +434,6 @@ func IsMonorepoCandidate(entry *models.RepoEntry) bool {
 
 	return noDockerfiles && (langs > 0 || hasMatrix || hasSecuritySignals)
 }
-
 
 // shouldSearchDeepForManifests implements the hybrid approach:
 // Only search subdirectories if no root-level manifests exist but the repo has code
