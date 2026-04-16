@@ -45,6 +45,7 @@ func (a *App) Run(ctx context.Context) error {
 	fetcher.ResetRateLimitStats()
 	snapshotTime := time.Now()
 	slog.Info("Starter snapshot", "dato", snapshotTime.Format("2006-01-02"))
+	slog.Debug(a.Cfg.DebugPrint())
 
 	page := 1
 	var repoIndex int64
