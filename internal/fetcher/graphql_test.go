@@ -255,17 +255,21 @@ var _ = Describe("FetchRepoGraphQL", func() {
 	var originalClient *http.Client
 	var originalEndpoint string
 	var originalBackoff func(int) time.Duration
+	var originalLimiter *fetcher.ResourceRateLimiter
 
 	BeforeEach(func() {
 		originalClient = fetcher.HttpClient
 		originalEndpoint = fetcher.GraphQLEndpoint
 		originalBackoff = fetcher.RetryBackoff
+		originalLimiter = fetcher.SharedRateLimiter
+		fetcher.SharedRateLimiter = fetcher.NewResourceRateLimiter()
 	})
 
 	AfterEach(func() {
 		fetcher.HttpClient = originalClient
 		fetcher.GraphQLEndpoint = originalEndpoint
 		fetcher.RetryBackoff = originalBackoff
+		fetcher.SharedRateLimiter = originalLimiter
 	})
 
 	It("skal retrye når GraphQL-svaret inneholder rate-limit-feil", func() {
@@ -314,21 +318,48 @@ var _ = Describe("FetchRepoGraphQL", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("GraphQL returnerte feil"))
 	})
+
+	It("skal respektere delt GraphQL-cooldown før neste request", func() {
+		callCount := 0
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			callCount++
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintln(w, `{"data":{"repository":{"languages":{"edges":[]},"README":{"text":"ok"},"SECURITY":null,"dependabot":null,"codeql":null,"dependencies":{"entries":[]},"workflows":{"entries":[]}}}}`)
+		}))
+		defer ts.Close()
+
+		fetcher.HttpClient = ts.Client()
+		fetcher.GraphQLEndpoint = ts.URL
+		fetcher.SharedRateLimiter.BlockFor(fetcher.RateLimitResourceGraphQL, 40*time.Millisecond)
+
+		f := fetcher.NewRepoFetcher(config.Config{Org: "testorg", Token: "fake-token"})
+		start := time.Now()
+		entry, err := f.FetchRepoGraphQL(context.Background(), models.RepoMeta{Name: "missing"})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(entry).NotTo(BeNil())
+		Expect(time.Since(start)).To(BeNumerically(">=", 30*time.Millisecond))
+		Expect(callCount).To(Equal(1))
+	})
 })
 
 var _ = Describe("doRequestWithRateLimit", func() {
 	var originalClient *http.Client
 	var originalBackoff func(int) time.Duration
+	var originalLimiter *fetcher.ResourceRateLimiter
 
 	BeforeEach(func() {
 		originalClient = fetcher.HttpClient
 		originalBackoff = fetcher.RetryBackoff
+		originalLimiter = fetcher.SharedRateLimiter
 		fetcher.RetryBackoff = func(_ int) time.Duration { return time.Millisecond }
+		fetcher.SharedRateLimiter = fetcher.NewResourceRateLimiter()
 	})
 
 	AfterEach(func() {
 		fetcher.HttpClient = originalClient
 		fetcher.RetryBackoff = originalBackoff
+		fetcher.SharedRateLimiter = originalLimiter
 	})
 
 	It("skal håndtere rate limit (403) og retry riktig", func() {

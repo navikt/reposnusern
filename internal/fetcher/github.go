@@ -116,6 +116,7 @@ func (r *RepoFetcher) GetReposPage(ctx context.Context, cfg config.Config, page 
 	return pageRepos, nil
 }
 
+// FetchRepoGraphQL fetches and enriches one repo through the GraphQL resource bucket.
 func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.RepoMeta) (*models.RepoEntry, error) {
 	query := BuildRepoQuery(r.Cfg.Org, baseRepo.Name)
 
@@ -133,7 +134,7 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 
 	for rateLimitAttempt := 1; ; rateLimitAttempt++ {
 		var result map[string]interface{}
-		headers, err := doRequestWithHeaders(ctx, "POST", GraphQLEndpoint, token, bodyBytes, &result, false)
+		headers, err := doRequestWithHeaders(ctx, RateLimitResourceGraphQL, "POST", GraphQLEndpoint, token, bodyBytes, &result, false)
 		if err != nil {
 			slog.Error("GraphQL-kall feilet", "repo", r.Cfg.Org+"/"+baseRepo.Name, "error", err)
 			return nil, err
@@ -142,10 +143,8 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 		if errs, ok := result["errors"]; ok {
 			if isGraphQLRateLimitError(errs) {
 				wait := graphQLRateLimitWait(headers, rateLimitAttempt)
+				SharedRateLimiter.BlockFor(RateLimitResourceGraphQL, wait)
 				slog.Warn("GraphQL rate limit nådd", "repo", r.Cfg.Org+"/"+baseRepo.Name, "venter", wait.Truncate(time.Second))
-				if sleepErr := sleepWithContext(ctx, wait); sleepErr != nil {
-					return nil, sleepErr
-				}
 				continue
 			}
 			return nil, fmt.Errorf("GraphQL returnerte feil for %s/%s: %v", r.Cfg.Org, baseRepo.Name, errs)
@@ -231,19 +230,20 @@ func sleepWithContext(ctx context.Context, d time.Duration) error {
 // Rate-limit retries are unlimited and do not count against this total.
 const MaxAttempts = 3
 
-// doRequest is the shared implementation for all GitHub API calls. It handles
-// rate limiting (unlimited retries waiting for GitHub's reset time), transient
-// errors (up to MaxAttempts total with exponential backoff), and context
-// cancellation at every wait point.
+// doRequest runs a GitHub request through the shared per-resource limiter and retry policy.
 // Set allow404=true for optional endpoints where 404 means "not available".
-func doRequest(ctx context.Context, method, url, token string, body []byte, out interface{}, allow404 bool) error {
-	_, err := doRequestWithHeaders(ctx, method, url, token, body, out, allow404)
+func doRequest(ctx context.Context, resource RateLimitResource, method, url, token string, body []byte, out interface{}, allow404 bool) error {
+	_, err := doRequestWithHeaders(ctx, resource, method, url, token, body, out, allow404)
 	return err
 }
 
-func doRequestWithHeaders(ctx context.Context, method, url, token string, body []byte, out interface{}, allow404 bool) (http.Header, error) {
+// doRequestWithHeaders behaves like doRequest but also returns the response headers.
+func doRequestWithHeaders(ctx context.Context, resource RateLimitResource, method, url, token string, body []byte, out interface{}, allow404 bool) (http.Header, error) {
 	for attempt := 1; ; attempt++ {
 		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if err := SharedRateLimiter.Wait(ctx, resource); err != nil {
 			return nil, err
 		}
 
@@ -273,18 +273,12 @@ func doRequestWithHeaders(ctx context.Context, method, url, token string, body [
 			continue
 		}
 
-		if rl := resp.Header.Get("X-RateLimit-Remaining"); rl == "0" && resp.StatusCode >= 400 {
-			reset := resp.Header.Get("X-RateLimit-Reset")
+		if wait, ok := rateLimitWait(resp.Header, resp.StatusCode); ok {
 			_ = resp.Body.Close()
-			if ts, err := strconv.ParseInt(reset, 10, 64); err == nil {
-				wait := time.Until(time.Unix(ts, 0)) + time.Second
-				slog.Warn("Rate limit nådd", "venter", wait.Truncate(time.Second))
-				if sleepErr := sleepWithContext(ctx, wait); sleepErr != nil {
-					return nil, sleepErr
-				}
-				attempt = 0 // reset transient counter; incremented to 1 at top of next iteration
-				continue
-			}
+			SharedRateLimiter.BlockFor(resource, wait)
+			slog.Warn("Rate limit nådd", "ressurs", resource, "venter", wait.Truncate(time.Second))
+			attempt = 0 // reset transient counter; incremented to 1 at top of next iteration
+			continue
 		}
 
 		if allow404 && resp.StatusCode == 404 {
@@ -319,8 +313,9 @@ func doRequestWithHeaders(ctx context.Context, method, url, token string, body [
 	}
 }
 
+// DoRequestWithRateLimit issues a core REST request with shared rate-limit handling.
 func DoRequestWithRateLimit(ctx context.Context, method, url, token string, body []byte, out interface{}) error {
-	return doRequest(ctx, method, url, token, body, out, false)
+	return doRequest(ctx, RateLimitResourceCore, method, url, token, body, out, false)
 }
 
 func (r *RepoFetcher) fetchSBOM(ctx context.Context, owner, repo string) map[string]interface{} {
@@ -341,8 +336,9 @@ func (r *RepoFetcher) fetchSBOM(ctx context.Context, owner, repo string) map[str
 	return sbom
 }
 
+// doRequestWithRateLimitAndOptional404 is the core REST variant where 404 is non-fatal.
 func doRequestWithRateLimitAndOptional404(ctx context.Context, method, url, token string, body []byte, out interface{}) error {
-	return doRequest(ctx, method, url, token, body, out, true)
+	return doRequest(ctx, RateLimitResourceCore, method, url, token, body, out, true)
 }
 
 func isGraphQLRateLimitError(errs interface{}) bool {
@@ -378,8 +374,12 @@ func isRateLimitGraphQLErrorMap(errMap map[string]interface{}) bool {
 	return strings.EqualFold(code, "RATE_LIMIT") || strings.EqualFold(code, "graphql_rate_limit")
 }
 
+// graphQLRateLimitWait prefers server-provided wait hints, then falls back to retry backoff.
 func graphQLRateLimitWait(headers http.Header, attempt int) time.Duration {
 	if headers != nil {
+		if wait, ok := retryAfterWait(headers.Get("Retry-After")); ok {
+			return wait
+		}
 		reset := headers.Get("X-RateLimit-Reset")
 		if ts, err := strconv.ParseInt(reset, 10, 64); err == nil {
 			wait := time.Until(time.Unix(ts, 0)) + time.Second
@@ -390,6 +390,57 @@ func graphQLRateLimitWait(headers http.Header, attempt int) time.Duration {
 	}
 
 	return RetryBackoff(attempt)
+}
+
+// rateLimitWait derives a shared cooldown from a failed REST response.
+func rateLimitWait(headers http.Header, statusCode int) (time.Duration, bool) {
+	if headers == nil || statusCode < 400 {
+		return 0, false
+	}
+
+	if wait, ok := retryAfterWait(headers.Get("Retry-After")); ok {
+		return wait, true
+	}
+
+	if headers.Get("X-RateLimit-Remaining") != "0" {
+		return 0, false
+	}
+
+	reset := headers.Get("X-RateLimit-Reset")
+	ts, err := strconv.ParseInt(reset, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+
+	wait := time.Until(time.Unix(ts, 0)) + time.Second
+	if wait <= 0 {
+		return 0, false
+	}
+	return wait, true
+}
+
+// retryAfterWait parses Retry-After as either seconds or an HTTP date.
+func retryAfterWait(retryAfter string) (time.Duration, bool) {
+	if retryAfter == "" {
+		return 0, false
+	}
+
+	if seconds, err := strconv.Atoi(retryAfter); err == nil {
+		wait := time.Duration(seconds) * time.Second
+		if wait > 0 {
+			return wait, true
+		}
+		return 0, false
+	}
+
+	if ts, err := http.ParseTime(retryAfter); err == nil {
+		wait := time.Until(ts)
+		if wait > 0 {
+			return wait, true
+		}
+	}
+
+	return 0, false
 }
 
 func ParseRepoData(data map[string]interface{}, baseRepo models.RepoMeta) *models.RepoEntry {
