@@ -65,6 +65,12 @@ func TestResourceRateLimiterTracksSharedBlockedWindowOnce(t *testing.T) {
 	wg.Wait()
 
 	stats := limiter.Stats()[RateLimitResourceGraphQL]
+	if stats.Hits != 1 {
+		t.Fatalf("expected 1 hit, got %d", stats.Hits)
+	}
+	if stats.Extensions != 0 {
+		t.Fatalf("expected 0 extensions, got %d", stats.Extensions)
+	}
 	if stats.Waits != 3 {
 		t.Fatalf("expected 3 waits, got %d", stats.Waits)
 	}
@@ -113,5 +119,13 @@ func TestResourceRateLimiterBlockForReportsCooldownLifecycle(t *testing.T) {
 	}
 	if fourth.ExtendedBlock {
 		t.Fatal("did not expect new window after expiry to count as an extension")
+	}
+
+	stats := limiter.Stats()[RateLimitResourceGraphQL]
+	if stats.Hits != 2 {
+		t.Fatalf("expected 2 hits, got %d", stats.Hits)
+	}
+	if stats.Extensions != 1 {
+		t.Fatalf("expected 1 extension, got %d", stats.Extensions)
 	}
 }

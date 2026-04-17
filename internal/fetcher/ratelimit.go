@@ -15,14 +15,16 @@ const (
 
 // RateLimitStats summarizes how often a resource was blocked and waited on.
 type RateLimitStats struct {
-	Hits      int64
-	Waits     int64
-	TotalWait time.Duration
+	Hits       int64
+	Extensions int64
+	Waits      int64
+	TotalWait  time.Duration
 }
 
 type rateLimitState struct {
 	blockedUntil time.Time
 	hits         int64
+	extensions   int64
 	waits        int64
 	totalWait    time.Duration
 }
@@ -104,7 +106,12 @@ func (l *ResourceRateLimiter) BlockUntil(resource RateLimitResource, until time.
 		state.totalWait += until.Sub(start)
 		result.ExtendedBlock = prevUntil.After(now)
 	}
-	state.hits++
+	if result.StartedNewBlock {
+		state.hits++
+	}
+	if result.ExtendedBlock {
+		state.extensions++
+	}
 	result.RemainingCooldown = time.Until(state.blockedUntil)
 	if result.RemainingCooldown < 0 {
 		result.RemainingCooldown = 0
@@ -120,9 +127,10 @@ func (l *ResourceRateLimiter) Stats() map[RateLimitResource]RateLimitStats {
 	stats := make(map[RateLimitResource]RateLimitStats, len(l.states))
 	for resource, state := range l.states {
 		stats[resource] = RateLimitStats{
-			Hits:      state.hits,
-			Waits:     state.waits,
-			TotalWait: state.totalWait,
+			Hits:       state.hits,
+			Extensions: state.extensions,
+			Waits:      state.waits,
+			TotalWait:  state.totalWait,
 		}
 	}
 	return stats
