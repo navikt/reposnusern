@@ -75,3 +75,20 @@ func TestResourceRateLimiterTracksSharedBlockedWindowOnce(t *testing.T) {
 		t.Fatalf("expected shared blocked window to stay under 80ms, got %s", stats.TotalWait)
 	}
 }
+
+func TestResourceRateLimiterBlockForReportsOnlyNewCooldownWindow(t *testing.T) {
+	limiter := NewResourceRateLimiter()
+
+	if started := limiter.BlockFor(RateLimitResourceGraphQL, 40*time.Millisecond); !started {
+		t.Fatal("expected first block to start a new cooldown window")
+	}
+	if started := limiter.BlockFor(RateLimitResourceGraphQL, 40*time.Millisecond); started {
+		t.Fatal("expected second block during active cooldown to reuse the window")
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	if started := limiter.BlockFor(RateLimitResourceGraphQL, 40*time.Millisecond); !started {
+		t.Fatal("expected block after cooldown expiry to start a new window")
+	}
+}

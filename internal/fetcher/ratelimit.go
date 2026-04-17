@@ -65,25 +65,29 @@ func (l *ResourceRateLimiter) Wait(ctx context.Context, resource RateLimitResour
 }
 
 // BlockFor marks a resource as unavailable for the next wait duration.
-func (l *ResourceRateLimiter) BlockFor(resource RateLimitResource, wait time.Duration) {
+// It returns true when this call started a new active cooldown window.
+func (l *ResourceRateLimiter) BlockFor(resource RateLimitResource, wait time.Duration) bool {
 	if wait <= 0 {
-		return
+		return false
 	}
-	l.BlockUntil(resource, time.Now().Add(wait))
+	return l.BlockUntil(resource, time.Now().Add(wait))
 }
 
 // BlockUntil extends a resource cooldown if the new deadline is later.
-func (l *ResourceRateLimiter) BlockUntil(resource RateLimitResource, until time.Time) {
+// It returns true when this call started a new active cooldown window.
+func (l *ResourceRateLimiter) BlockUntil(resource RateLimitResource, until time.Time) bool {
 	if until.IsZero() {
-		return
+		return false
 	}
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
 	state := l.state(resource)
+	now := time.Now()
+	startedNewBlock := !state.blockedUntil.After(now) && until.After(now)
 	if until.After(state.blockedUntil) {
-		start := time.Now()
+		start := now
 		if state.blockedUntil.After(start) {
 			start = state.blockedUntil
 		}
@@ -91,6 +95,7 @@ func (l *ResourceRateLimiter) BlockUntil(resource RateLimitResource, until time.
 		state.totalWait += until.Sub(start)
 	}
 	state.hits++
+	return startedNewBlock
 }
 
 // Stats returns a snapshot of the accumulated limiter counters per resource.
