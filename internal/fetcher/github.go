@@ -57,6 +57,14 @@ var RetryBackoff = func(attempt int) time.Duration {
 	return time.Duration(1<<uint(attempt-1)) * time.Second
 }
 
+func formatWaitForLog(wait time.Duration) string {
+	if wait >= time.Second {
+		return wait.Truncate(time.Second).String()
+	}
+
+	return wait.String()
+}
+
 func NewRepoFetcher(cfg config.Config) *RepoFetcher {
 	return &RepoFetcher{
 		Cfg: cfg,
@@ -144,7 +152,7 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 			if isGraphQLRateLimitError(errs) {
 				wait := graphQLRateLimitWait(headers, rateLimitAttempt)
 				SharedRateLimiter.BlockFor(RateLimitResourceGraphQL, wait)
-				slog.Warn("GraphQL rate limit nådd", "repo", r.Cfg.Org+"/"+baseRepo.Name, "venter", wait.Truncate(time.Second))
+				slog.Warn("GraphQL rate limit nådd", "repo", r.Cfg.Org+"/"+baseRepo.Name, "venter", formatWaitForLog(wait))
 				continue
 			}
 			return nil, fmt.Errorf("GraphQL returnerte feil for %s/%s: %v", r.Cfg.Org, baseRepo.Name, errs)
@@ -265,7 +273,7 @@ func doRequestWithHeaders(ctx context.Context, resource RateLimitResource, metho
 				return nil, err
 			}
 			wait := RetryBackoff(attempt)
-			slog.Warn("Nettverksfeil, prøver igjen", "forsøk", attempt, "venter", wait, "error", err)
+			slog.Warn("Nettverksfeil, prøver igjen", "forsøk", attempt, "venter", formatWaitForLog(wait), "error", err)
 			if sleepErr := sleepWithContext(ctx, wait); sleepErr != nil {
 				return nil, sleepErr
 			}
@@ -275,7 +283,7 @@ func doRequestWithHeaders(ctx context.Context, resource RateLimitResource, metho
 		if wait, ok := rateLimitWait(resp.Header, resp.StatusCode); ok {
 			_ = resp.Body.Close()
 			SharedRateLimiter.BlockFor(resource, wait)
-			slog.Warn("Rate limit nådd", "ressurs", resource, "venter", wait.Truncate(time.Second))
+			slog.Warn("Rate limit nådd", "ressurs", resource, "venter", formatWaitForLog(wait))
 			attempt = 0 // reset transient counter; incremented to 1 at top of next iteration
 			continue
 		}
@@ -292,7 +300,7 @@ func doRequestWithHeaders(ctx context.Context, resource RateLimitResource, metho
 				return nil, fmt.Errorf("GitHub API-feil etter %d forsøk: status %d", MaxAttempts, resp.StatusCode)
 			}
 			wait := RetryBackoff(attempt)
-			slog.Warn("Serverfeil, prøver igjen", "status", resp.StatusCode, "forsøk", attempt, "venter", wait)
+			slog.Warn("Serverfeil, prøver igjen", "status", resp.StatusCode, "forsøk", attempt, "venter", formatWaitForLog(wait))
 			if sleepErr := sleepWithContext(ctx, wait); sleepErr != nil {
 				return nil, sleepErr
 			}

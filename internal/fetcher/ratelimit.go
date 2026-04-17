@@ -56,7 +56,6 @@ func (l *ResourceRateLimiter) Wait(ctx context.Context, resource RateLimitResour
 			return nil
 		}
 		state.waits++
-		state.totalWait += wait
 		l.mu.Unlock()
 
 		if err := sleepWithContext(ctx, wait); err != nil {
@@ -84,7 +83,12 @@ func (l *ResourceRateLimiter) BlockUntil(resource RateLimitResource, until time.
 
 	state := l.state(resource)
 	if until.After(state.blockedUntil) {
+		start := time.Now()
+		if state.blockedUntil.After(start) {
+			start = state.blockedUntil
+		}
 		state.blockedUntil = until
+		state.totalWait += until.Sub(start)
 	}
 	state.hits++
 }
