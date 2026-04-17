@@ -65,6 +65,14 @@ func formatWaitForLog(wait time.Duration) string {
 	return wait.String()
 }
 
+func formatResetAtForLog(resetAt time.Time) string {
+	if resetAt.IsZero() {
+		return ""
+	}
+
+	return resetAt.Local().Format(time.RFC3339)
+}
+
 func NewRepoFetcher(cfg config.Config) *RepoFetcher {
 	return &RepoFetcher{
 		Cfg: cfg,
@@ -154,9 +162,9 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 				blockResult := SharedRateLimiter.BlockFor(RateLimitResourceGraphQL, wait)
 				switch {
 				case blockResult.StartedNewBlock:
-					slog.Warn("GraphQL rate limit nådd", "repo", r.Cfg.Org+"/"+baseRepo.Name, "venter", formatWaitForLog(blockResult.RemainingCooldown))
+					slog.Warn("GraphQL rate limit nådd", "repo", r.Cfg.Org+"/"+baseRepo.Name, "venter", formatWaitForLog(blockResult.RemainingCooldown), "reset_at", formatResetAtForLog(blockResult.BlockedUntil))
 				case blockResult.ExtendedBlock:
-					slog.Warn("GraphQL rate limit forlenget", "repo", r.Cfg.Org+"/"+baseRepo.Name, "venter", formatWaitForLog(blockResult.RemainingCooldown))
+					slog.Warn("GraphQL rate limit forlenget", "repo", r.Cfg.Org+"/"+baseRepo.Name, "venter", formatWaitForLog(blockResult.RemainingCooldown), "reset_at", formatResetAtForLog(blockResult.BlockedUntil))
 				}
 				continue
 			}
@@ -290,9 +298,9 @@ func doRequestWithHeaders(ctx context.Context, resource RateLimitResource, metho
 			blockResult := SharedRateLimiter.BlockFor(resource, wait)
 			switch {
 			case blockResult.StartedNewBlock:
-				slog.Warn("Rate limit nådd", "ressurs", resource, "venter", formatWaitForLog(blockResult.RemainingCooldown))
+				slog.Warn("Rate limit nådd", "ressurs", resource, "venter", formatWaitForLog(blockResult.RemainingCooldown), "reset_at", formatResetAtForLog(blockResult.BlockedUntil))
 			case blockResult.ExtendedBlock:
-				slog.Warn("Rate limit forlenget", "ressurs", resource, "venter", formatWaitForLog(blockResult.RemainingCooldown))
+				slog.Warn("Rate limit forlenget", "ressurs", resource, "venter", formatWaitForLog(blockResult.RemainingCooldown), "reset_at", formatResetAtForLog(blockResult.BlockedUntil))
 			}
 			attempt = 0 // reset transient counter; incremented to 1 at top of next iteration
 			continue

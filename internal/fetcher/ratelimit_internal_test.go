@@ -80,6 +80,9 @@ func TestResourceRateLimiterTracksSharedBlockedWindowOnce(t *testing.T) {
 	if stats.TotalWait >= 80*time.Millisecond {
 		t.Fatalf("expected shared blocked window to stay under 80ms, got %s", stats.TotalWait)
 	}
+	if firstWait := limiter.BlockFor(RateLimitResourceGraphQL, 40*time.Millisecond); firstWait.BlockedUntil.IsZero() {
+		t.Fatal("expected blocked-until timestamp to be populated")
+	}
 }
 
 func TestResourceRateLimiterBlockForReportsCooldownLifecycle(t *testing.T) {
@@ -119,6 +122,9 @@ func TestResourceRateLimiterBlockForReportsCooldownLifecycle(t *testing.T) {
 	}
 	if fourth.ExtendedBlock {
 		t.Fatal("did not expect new window after expiry to count as an extension")
+	}
+	if fourth.BlockedUntil.IsZero() {
+		t.Fatal("expected block result to include blocked-until timestamp")
 	}
 
 	stats := limiter.Stats()[RateLimitResourceGraphQL]

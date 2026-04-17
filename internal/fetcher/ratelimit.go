@@ -33,6 +33,7 @@ type BlockResult struct {
 	StartedNewBlock   bool
 	ExtendedBlock     bool
 	RemainingCooldown time.Duration
+	BlockedUntil      time.Time
 }
 
 type ResourceRateLimiter struct {
@@ -116,6 +117,7 @@ func (l *ResourceRateLimiter) BlockUntil(resource RateLimitResource, until time.
 	if result.RemainingCooldown < 0 {
 		result.RemainingCooldown = 0
 	}
+	result.BlockedUntil = state.blockedUntil
 	return result
 }
 
