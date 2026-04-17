@@ -107,6 +107,21 @@ func NewConfig() (Config, error) {
 	return cfg, nil
 }
 
+func (cfg Config) DebugPrint() string {
+	// Printing the raw object reveals GitHub token, use this instead
+	return fmt.Sprintf("Org: %v, Token: %v, Debug: %v, MaxDebugRepos: %v, SkipArchived: %v, Storage: %v, Parallelism: %v, Feature_Sbom: %v, Feature_GitHubApp: %v",
+			cfg.Org, 
+			(cfg.Token!=""), 
+			cfg.Debug, 
+			cfg.MaxDebugRepos, 
+			cfg.SkipArchived, 
+			cfg.Storage,
+			cfg.Parallelism, 
+			cfg.Feature_Sbom, 
+			cfg.Feature_GitHubApp,
+		)
+}
+
 func LoadGitHubAppConfig() (*GitHubAppConfig, error) {
 	// Get installation ID from env
 	installationID := os.Getenv("GITHUB_APP_INSTALLATION_ID")

@@ -42,8 +42,10 @@ func NewApp(cfg config.Config, writer DBWriter, fetcher Fetcher) *App {
 }
 
 func (a *App) Run(ctx context.Context) error {
+	fetcher.ResetRateLimitStats()
 	snapshotTime := time.Now()
 	slog.Info("Starter snapshot", "dato", snapshotTime.Format("2006-01-02"))
+	slog.Debug(a.Cfg.DebugPrint())
 
 	page := 1
 	var repoIndex int64
@@ -80,7 +82,6 @@ loop:
 			g.Go(func() error {
 				defer func() { <-sem }()
 
-				slog.Info("Henter detaljer via GraphQL", "repo", repo.FullName)
 				entry, err := a.Fetcher.FetchRepoGraphQL(ctx, repo)
 				if err != nil {
 					slog.Error("Kunne ikke hente repo via GraphQL", "repo", repo.FullName, "error", err)
@@ -115,9 +116,24 @@ loop:
 
 	// Log API call statistics
 	apiCalls := fetcher.GetAPICallCount()
-	slog.Info("Totalt antall eksterne API-kall", "antall", apiCalls)
-
-	slog.Info("Ferdig med alle repos!", "behandlet", atomic.LoadInt64(&repoIndex), "Feilet gql-import", atomic.LoadInt64(&skippedForGraphqlFailure), "varighet", time.Since(snapshotTime).String())
+	rateLimitStats := fetcher.GetRateLimitStats()
+	coreStats := rateLimitStats[fetcher.RateLimitResourceCore]
+	graphQLStats := rateLimitStats[fetcher.RateLimitResourceGraphQL]
+	slog.Info(
+		"Ferdig med alle repos!",
+		"behandlet", atomic.LoadInt64(&repoIndex),
+		"Feilet gql-import", atomic.LoadInt64(&skippedForGraphqlFailure),
+		"core_rate_limit_hits", coreStats.Hits,
+		"core_rate_limit_extensions", coreStats.Extensions,
+		"core_rate_limit_waits", coreStats.Waits,
+		"core_rate_limit_wait_time", coreStats.TotalWait.String(),
+		"graphql_rate_limit_hits", graphQLStats.Hits,
+		"graphql_rate_limit_extensions", graphQLStats.Extensions,
+		"graphql_rate_limit_waits", graphQLStats.Waits,
+		"graphql_rate_limit_wait_time", graphQLStats.TotalWait.String(),
+		"varighet", time.Since(snapshotTime).String(),
+		"Totalt antall eksterne API-kall", apiCalls,
+	)
 	return nil
 }
 
