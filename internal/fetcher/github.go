@@ -179,12 +179,12 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 func (r *RepoFetcher) needsFiletreeFetching(ctx context.Context, baseRepo models.RepoMeta, entry *models.RepoEntry) *models.RepoEntry {
 
 	if IsMonorepoCandidate(entry) {
-		slog.Info("Monorepo-kandidat – henter dype Dockerfiles og dependencyfiles", "repo", baseRepo.FullName)
+		slog.Debug("Monorepo-kandidat – henter dype Dockerfiles og dependencyfiles", "repo", baseRepo.FullName)
 		updatedEntry := r.fetchAndParseFiletree(ctx, baseRepo, entry)
 		return updatedEntry
 
 	} else if shouldSearchDeepForManifests(entry) {
-		slog.Info("Ikke monorepo, men ingen rot-manifester funnet, søker i underkataloger", "repo", baseRepo.FullName)
+		slog.Debug("Ikke monorepo, men ingen rot-manifester funnet, søker i underkataloger", "repo", baseRepo.FullName)
 		updatedEntry := r.fetchAndParseFiletree(ctx, baseRepo, entry)
 		return updatedEntry
 	}
@@ -247,7 +247,6 @@ func doRequestWithHeaders(ctx context.Context, resource RateLimitResource, metho
 			return nil, err
 		}
 
-		slog.Info("Henter URL", "url", url)
 		apiCallCounter.Add(1)
 
 		req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))
@@ -832,7 +831,7 @@ func (r *RepoFetcher) FetchDependencyfilesFromTree(ctx context.Context, owner, r
 		slog.Debug("Fant dependency file i underkatalog", "repo", owner+"/"+repo, "path", entry.Path)
 	}
 
-	slog.Info("Hentet dependency files fra underkataloger", "repo", owner+"/"+repo, "count", len(results))
+	slog.Debug("Antall dependency files fra underkataloger", "repo", owner+"/"+repo, "count", len(results))
 	return results
 }
 

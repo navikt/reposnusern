@@ -82,7 +82,6 @@ loop:
 			g.Go(func() error {
 				defer func() { <-sem }()
 
-				slog.Info("Henter detaljer via GraphQL", "repo", repo.FullName)
 				entry, err := a.Fetcher.FetchRepoGraphQL(ctx, repo)
 				if err != nil {
 					slog.Error("Kunne ikke hente repo via GraphQL", "repo", repo.FullName, "error", err)
@@ -120,8 +119,6 @@ loop:
 	rateLimitStats := fetcher.GetRateLimitStats()
 	coreStats := rateLimitStats[fetcher.RateLimitResourceCore]
 	graphQLStats := rateLimitStats[fetcher.RateLimitResourceGraphQL]
-	slog.Info("Totalt antall eksterne API-kall", "antall", apiCalls)
-
 	slog.Info(
 		"Ferdig med alle repos!",
 		"behandlet", atomic.LoadInt64(&repoIndex),
@@ -133,6 +130,7 @@ loop:
 		"graphql_rate_limit_waits", graphQLStats.Waits,
 		"graphql_rate_limit_wait_time", graphQLStats.TotalWait.String(),
 		"varighet", time.Since(snapshotTime).String(),
+		"Totalt antall eksterne API-kall", apiCalls,
 	)
 	return nil
 }
