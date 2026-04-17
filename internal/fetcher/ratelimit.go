@@ -27,6 +27,12 @@ type rateLimitState struct {
 	totalWait    time.Duration
 }
 
+type BlockResult struct {
+	StartedNewBlock   bool
+	ExtendedBlock     bool
+	RemainingCooldown time.Duration
+}
+
 type ResourceRateLimiter struct {
 	mu     sync.Mutex
 	states map[RateLimitResource]*rateLimitState
@@ -65,19 +71,19 @@ func (l *ResourceRateLimiter) Wait(ctx context.Context, resource RateLimitResour
 }
 
 // BlockFor marks a resource as unavailable for the next wait duration.
-// It returns true when this call started a new active cooldown window.
-func (l *ResourceRateLimiter) BlockFor(resource RateLimitResource, wait time.Duration) bool {
+// It returns whether this call started or extended the active cooldown window.
+func (l *ResourceRateLimiter) BlockFor(resource RateLimitResource, wait time.Duration) BlockResult {
 	if wait <= 0 {
-		return false
+		return BlockResult{}
 	}
 	return l.BlockUntil(resource, time.Now().Add(wait))
 }
 
 // BlockUntil extends a resource cooldown if the new deadline is later.
-// It returns true when this call started a new active cooldown window.
-func (l *ResourceRateLimiter) BlockUntil(resource RateLimitResource, until time.Time) bool {
+// It returns whether this call started or extended the active cooldown window.
+func (l *ResourceRateLimiter) BlockUntil(resource RateLimitResource, until time.Time) BlockResult {
 	if until.IsZero() {
-		return false
+		return BlockResult{}
 	}
 
 	l.mu.Lock()
@@ -85,17 +91,25 @@ func (l *ResourceRateLimiter) BlockUntil(resource RateLimitResource, until time.
 
 	state := l.state(resource)
 	now := time.Now()
-	startedNewBlock := !state.blockedUntil.After(now) && until.After(now)
-	if until.After(state.blockedUntil) {
+	prevUntil := state.blockedUntil
+	result := BlockResult{
+		StartedNewBlock: !prevUntil.After(now) && until.After(now),
+	}
+	if until.After(prevUntil) {
 		start := now
-		if state.blockedUntil.After(start) {
-			start = state.blockedUntil
+		if prevUntil.After(start) {
+			start = prevUntil
 		}
 		state.blockedUntil = until
 		state.totalWait += until.Sub(start)
+		result.ExtendedBlock = prevUntil.After(now)
 	}
 	state.hits++
-	return startedNewBlock
+	result.RemainingCooldown = time.Until(state.blockedUntil)
+	if result.RemainingCooldown < 0 {
+		result.RemainingCooldown = 0
+	}
+	return result
 }
 
 // Stats returns a snapshot of the accumulated limiter counters per resource.

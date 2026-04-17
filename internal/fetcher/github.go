@@ -151,8 +151,12 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 		if errs, ok := result["errors"]; ok {
 			if isGraphQLRateLimitError(errs) {
 				wait := graphQLRateLimitWait(headers, rateLimitAttempt)
-				if SharedRateLimiter.BlockFor(RateLimitResourceGraphQL, wait) {
-					slog.Warn("GraphQL rate limit nådd", "repo", r.Cfg.Org+"/"+baseRepo.Name, "venter", formatWaitForLog(wait))
+				blockResult := SharedRateLimiter.BlockFor(RateLimitResourceGraphQL, wait)
+				switch {
+				case blockResult.StartedNewBlock:
+					slog.Warn("GraphQL rate limit nådd", "repo", r.Cfg.Org+"/"+baseRepo.Name, "venter", formatWaitForLog(blockResult.RemainingCooldown))
+				case blockResult.ExtendedBlock:
+					slog.Warn("GraphQL rate limit forlenget", "repo", r.Cfg.Org+"/"+baseRepo.Name, "venter", formatWaitForLog(blockResult.RemainingCooldown))
 				}
 				continue
 			}
@@ -283,8 +287,12 @@ func doRequestWithHeaders(ctx context.Context, resource RateLimitResource, metho
 
 		if wait, ok := rateLimitWait(resp.Header, resp.StatusCode); ok {
 			_ = resp.Body.Close()
-			if SharedRateLimiter.BlockFor(resource, wait) {
-				slog.Warn("Rate limit nådd", "ressurs", resource, "venter", formatWaitForLog(wait))
+			blockResult := SharedRateLimiter.BlockFor(resource, wait)
+			switch {
+			case blockResult.StartedNewBlock:
+				slog.Warn("Rate limit nådd", "ressurs", resource, "venter", formatWaitForLog(blockResult.RemainingCooldown))
+			case blockResult.ExtendedBlock:
+				slog.Warn("Rate limit forlenget", "ressurs", resource, "venter", formatWaitForLog(blockResult.RemainingCooldown))
 			}
 			attempt = 0 // reset transient counter; incremented to 1 at top of next iteration
 			continue

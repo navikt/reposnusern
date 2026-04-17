@@ -76,19 +76,42 @@ func TestResourceRateLimiterTracksSharedBlockedWindowOnce(t *testing.T) {
 	}
 }
 
-func TestResourceRateLimiterBlockForReportsOnlyNewCooldownWindow(t *testing.T) {
+func TestResourceRateLimiterBlockForReportsCooldownLifecycle(t *testing.T) {
 	limiter := NewResourceRateLimiter()
 
-	if started := limiter.BlockFor(RateLimitResourceGraphQL, 40*time.Millisecond); !started {
+	first := limiter.BlockFor(RateLimitResourceGraphQL, 40*time.Millisecond)
+	if !first.StartedNewBlock {
 		t.Fatal("expected first block to start a new cooldown window")
 	}
-	if started := limiter.BlockFor(RateLimitResourceGraphQL, 40*time.Millisecond); started {
-		t.Fatal("expected second block during active cooldown to reuse the window")
+	if first.ExtendedBlock {
+		t.Fatal("did not expect first block to count as an extension")
+	}
+
+	second := limiter.BlockFor(RateLimitResourceGraphQL, 20*time.Millisecond)
+	if second.StartedNewBlock {
+		t.Fatal("expected shorter second block during active cooldown to reuse the window")
+	}
+	if second.ExtendedBlock {
+		t.Fatal("did not expect shorter second block to extend the cooldown")
+	}
+
+	time.Sleep(20 * time.Millisecond)
+
+	third := limiter.BlockFor(RateLimitResourceGraphQL, 40*time.Millisecond)
+	if third.StartedNewBlock {
+		t.Fatal("expected extension during active cooldown, not a new window")
+	}
+	if !third.ExtendedBlock {
+		t.Fatal("expected longer third block to extend the active cooldown")
 	}
 
 	time.Sleep(50 * time.Millisecond)
 
-	if started := limiter.BlockFor(RateLimitResourceGraphQL, 40*time.Millisecond); !started {
+	fourth := limiter.BlockFor(RateLimitResourceGraphQL, 40*time.Millisecond)
+	if !fourth.StartedNewBlock {
 		t.Fatal("expected block after cooldown expiry to start a new window")
+	}
+	if fourth.ExtendedBlock {
+		t.Fatal("did not expect new window after expiry to count as an extension")
 	}
 }
