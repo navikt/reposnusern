@@ -215,6 +215,7 @@ func (r *RepoFetcher) needsFiletreeFetching(ctx context.Context, baseRepo models
 // Extracts all relevant files from the tree, since we fetch them regardless
 func (r *RepoFetcher) fetchAndParseFiletree(ctx context.Context, baseRepo models.RepoMeta, entry *models.RepoEntry) *models.RepoEntry {
 	// Fetch tree once if we need to search deeper for files
+	// TODO: Should combine the "fetchDockerfileFromTree and fetchDependencyfilesFromTree into one function to avoid duplication!
 	var treeEntries []TreeEntry
 	var treeErr error
 
@@ -561,10 +562,10 @@ func ExtractLanguages(data map[string]interface{}) map[string]int {
 	return langs
 }
 
+// Extracts dockerfiles and dependencyfiles from graphql response
 func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 	files := map[string][]map[string]string{}
-
-	// Dependency files
+	
 	if deps, ok := data["dependencies"].(map[string]interface{}); ok {
 		if entries, ok := deps["entries"].([]interface{}); ok {
 			for _, raw := range entries {
@@ -578,9 +579,9 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 
 				// Check if this is a file we want to extract
 				var fileType string
-				if strings.Contains(lowerName, "dockerfile") {
-					fileType = lowerName
-				} else if isDependencyfile(name) {
+				if isDockerfile(lowerName) {
+					fileType = "dockerfile" 
+				} else if isDependencyfile(lowerName) {
 					fileType = "dependencies"
 				} else {
 					continue
@@ -611,6 +612,11 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 		}
 	}
 	return ConvertFiles(files)
+}
+
+// Heuristic for finding dockerfile by name
+func isDockerfile(filename string) bool {
+	return strings.Contains(filename, "dockerfile") && !strings.Contains(filename, "dockerignore");
 }
 
 // isDependencyfile checks if a filename is a dependency file we care about
@@ -791,13 +797,21 @@ func (r *RepoFetcher) FetchDockerfilesFromTree(ctx context.Context, owner, repo 
 	var results []models.FileEntry
 
 	for _, entry := range treeEntries {
+		// Extract just the filename from the path
+		pathParts := strings.Split(entry.Path, "/")
+		filename := pathParts[len(pathParts)-1]
+
+		// Skip root-level files (they were already fetched via GraphQL)
+		if len(pathParts) == 1 {
+			continue
+		}
 		if entry.Type != "blob" {
 			continue
 		}
-		if !strings.Contains(strings.ToLower(entry.Path), "dockerfile") {
+		if entry.Size == 0 {
 			continue
 		}
-		if entry.Size == 0 {
+		if !isDockerfile(filename) {
 			continue
 		}
 		content := r.fetchFileContent(ctx, owner, repo, entry.Path)
@@ -815,40 +829,32 @@ func (r *RepoFetcher) FetchDockerfilesFromTree(ctx context.Context, owner, repo 
 func (r *RepoFetcher) FetchDependencyfilesFromTree(ctx context.Context, owner, repo string, treeEntries []TreeEntry) []models.FileEntry {
 	var results []models.FileEntry
 
-	dependencyfileNames := parser.GetAllDependencyfileNames()
-	fileMap := make(map[string]bool)
-	for _, name := range dependencyfileNames {
-		fileMap[name] = true
-	}
-
 	for _, entry := range treeEntries {
-		if entry.Type != "blob" {
-			continue
-		}
-
 		// Extract just the filename from the path
 		pathParts := strings.Split(entry.Path, "/")
 		filename := pathParts[len(pathParts)-1]
-
-		// Check if this filename is a dependency file we care about
-		if !fileMap[filename] {
-			continue
-		}
-
-		if parser.IsIgnoredPath(entry.Path) {
-			slog.Debug("Skipping ignored dependency file", "repo", owner+"/"+repo, "path", entry.Path)
-			continue
-		}
 
 		// Skip root-level files (they were already fetched via GraphQL)
 		if len(pathParts) == 1 {
 			continue
 		}
-
+		if entry.Type != "blob" {
+			continue
+		}
 		// Skip empty files, should they exist in the tree
 		if entry.Size == 0 {
 			continue
 		}
+		if parser.IsIgnoredPath(entry.Path) {
+			slog.Debug("Skipping ignored dependency file", "repo", owner+"/"+repo, "path", entry.Path)
+			continue
+		}
+
+		// Check if this filename is a dependency file we care about
+		if !isDependencyfile(filename) {
+			continue
+		}
+
 		results = append(results, models.FileEntry{
 			Path:    entry.Path,
 			Content: "",
