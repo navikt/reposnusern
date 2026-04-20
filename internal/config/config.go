@@ -40,6 +40,8 @@ type GitHubAppConfig struct {
 
 // NewConfig oppretter en ny konfigurasjon basert på miljøvariabler
 func NewConfig() (Config, error) {
+	var errs []error
+
 	storage := StorageType(os.Getenv("REPO_STORAGE"))
 
 	parallelism := 1
@@ -47,7 +49,7 @@ func NewConfig() (Config, error) {
 		if p, err := strconv.Atoi(pStr); err == nil && p > 0 {
 			parallelism = p
 		} else {
-			return Config{}, errors.New("REPOSNUSERN_PARALL må være et positivt heltall")
+			errs = append(errs, errors.New("REPOSNUSERN_PARALL må være et positivt heltall"))
 		}
 	}
 
@@ -58,7 +60,15 @@ func NewConfig() (Config, error) {
 		}
 	}
 
-	var githubAppConfig, _ = LoadGitHubAppConfig()
+	featureGitHubApp := os.Getenv("GITHUB_APP_ENABLED") == "true"
+	var githubAppConfig *GitHubAppConfig
+	if featureGitHubApp {
+		var err error
+		githubAppConfig, err = LoadGitHubAppConfig()
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
 
 	cfg := Config{
 		Org:               os.Getenv("ORG"),
@@ -74,34 +84,43 @@ func NewConfig() (Config, error) {
 		BQCredentials:     os.Getenv("BQ_CREDENTIALS"),
 		Parallelism:       parallelism,
 		Feature_Sbom:      os.Getenv("SBOM") == "true",
-		Feature_GitHubApp: os.Getenv("GITHUB_APP_ENABLED") == "true",
+		Feature_GitHubApp: featureGitHubApp,
 		GitHubAppConfig:   githubAppConfig,
 	}
 
 	if cfg.Org == "" {
-		return Config{}, errors.New("ORG må være satt")
+		errs = append(errs, errors.New("ORG må være satt"))
 	}
 	if cfg.Token == "" && !cfg.Feature_GitHubApp {
-		return Config{}, errors.New("GITHUB_TOKEN må være satt, eller GitHub App må være aktivert")
-	}
-	if cfg.Feature_GitHubApp && cfg.GitHubAppConfig == nil {
-		return Config{}, errors.New("GitHub App er aktivert, men konfigurasjon mangler")
+		errs = append(errs, errors.New("GITHUB_TOKEN må være satt, eller GitHub App må være aktivert"))
 	}
 	if cfg.Storage == "" {
-		return Config{}, errors.New("REPO_STORAGE må være satt til 'postgres' eller 'bigquery'")
+		errs = append(errs, errors.New("REPO_STORAGE må være satt til 'postgres' eller 'bigquery'"))
 	}
 
 	switch cfg.Storage {
 	case StoragePostgres:
 		if cfg.PostgresDSN == "" {
-			return Config{}, errors.New("POSTGRES_DSN må være satt for postgres-lagring")
+			errs = append(errs, errors.New("POSTGRES_DSN må være satt for postgres-lagring"))
 		}
 	case StorageBigQuery:
-		if cfg.BQProjectID == "" || cfg.BQDataset == "" || cfg.BQTable == "" {
-			return Config{}, errors.New("BQ_PROJECT_ID, BQ_DATASET og BQ_TABLE må være satt for bigquery-lagring")
+		if cfg.BQProjectID == "" {
+			errs = append(errs, errors.New("GCP_TEAM_PROJECT_ID må være satt for bigquery-lagring"))
+		}
+		if cfg.BQDataset == "" {
+			errs = append(errs, errors.New("BQ_DATASET må være satt for bigquery-lagring"))
+		}
+		if cfg.BQTable == "" {
+			errs = append(errs, errors.New("BQ_TABLE må være satt for bigquery-lagring"))
 		}
 	default:
-		return Config{}, errors.New("ugyldig verdi for REPO_STORAGE – må være 'postgres' eller 'bigquery'")
+		if cfg.Storage != "" {
+			errs = append(errs, errors.New("ugyldig verdi for REPO_STORAGE – må være 'postgres' eller 'bigquery'"))
+		}
+	}
+
+	if len(errs) > 0 {
+		return Config{}, errors.Join(errs...)
 	}
 
 	return cfg, nil
@@ -110,53 +129,68 @@ func NewConfig() (Config, error) {
 func (cfg Config) DebugPrint() string {
 	// Printing the raw object reveals GitHub token, use this instead
 	return fmt.Sprintf("Org: %v, Token: %v, Debug: %v, MaxDebugRepos: %v, SkipArchived: %v, Storage: %v, Parallelism: %v, Feature_Sbom: %v, Feature_GitHubApp: %v",
-			cfg.Org, 
-			(cfg.Token!=""), 
-			cfg.Debug, 
-			cfg.MaxDebugRepos, 
-			cfg.SkipArchived, 
-			cfg.Storage,
-			cfg.Parallelism, 
-			cfg.Feature_Sbom, 
-			cfg.Feature_GitHubApp,
-		)
+		cfg.Org,
+		(cfg.Token != ""),
+		cfg.Debug,
+		cfg.MaxDebugRepos,
+		cfg.SkipArchived,
+		cfg.Storage,
+		cfg.Parallelism,
+		cfg.Feature_Sbom,
+		cfg.Feature_GitHubApp,
+	)
 }
 
 func LoadGitHubAppConfig() (*GitHubAppConfig, error) {
+	var errs []error
+
 	// Get installation ID from env
 	installationID := os.Getenv("GITHUB_APP_INSTALLATION_ID")
 	if installationID == "" {
-		return nil, fmt.Errorf("missing required environment variable: GITHUB_APP_INSTALLATION_ID")
+		errs = append(errs, errors.New("missing required environment variable: GITHUB_APP_INSTALLATION_ID"))
 	}
 
 	// Get app ID from env (only required for REST client)
 	appID := os.Getenv("GITHUB_APP_ID")
 	if appID == "" {
-		return nil, fmt.Errorf("missing required environment variable: GITHUB_APP_ID")
+		errs = append(errs, errors.New("missing required environment variable: GITHUB_APP_ID"))
 	}
 
 	// Load private key from env
 	privateKeyPEM := os.Getenv("GITHUB_APP_PRIVATE_KEY")
 	if privateKeyPEM == "" {
-		return nil, fmt.Errorf("missing required environment variable: GITHUB_APP_PRIVATE_KEY")
+		errs = append(errs, errors.New("missing required environment variable: GITHUB_APP_PRIVATE_KEY"))
 	}
-	privateKey := []byte(privateKeyPEM)
 
 	// Parse installation ID
-	installationIDInt, err := strconv.ParseInt(installationID, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("invalid GITHUB_APP_INSTALLATION_ID: %w", err)
+	var installationIDInt int64
+	if installationID != "" {
+		parsedInstallationID, err := strconv.ParseInt(installationID, 10, 64)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("invalid GITHUB_APP_INSTALLATION_ID: %w", err))
+		} else {
+			installationIDInt = parsedInstallationID
+		}
 	}
 
 	// Parse app ID
-	appIDInt, err := strconv.ParseInt(appID, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("invalid GITHUB_APP_ID: %w", err)
+	var appIDInt int64
+	if appID != "" {
+		parsedAppID, err := strconv.ParseInt(appID, 10, 64)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("invalid GITHUB_APP_ID: %w", err))
+		} else {
+			appIDInt = parsedAppID
+		}
+	}
+
+	if len(errs) > 0 {
+		return nil, errors.Join(errs...)
 	}
 
 	return &GitHubAppConfig{
 		AppID:          appIDInt,
 		InstallationID: installationIDInt,
-		PrivateKey:     privateKey,
+		PrivateKey:     []byte(privateKeyPEM),
 	}, nil
 }
