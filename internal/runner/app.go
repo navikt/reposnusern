@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"runtime"
@@ -41,7 +42,7 @@ func NewApp(cfg config.Config, writer DBWriter, fetcher Fetcher) *App {
 	}
 }
 
-func (a *App) Run(ctx context.Context) error {
+func (a *App) Run(processingCtx, shutdownCtx context.Context) error {
 	fetcher.ResetRateLimitStats()
 	snapshotTime := time.Now()
 	slog.Info("Starter snapshot", "dato", snapshotTime.Format("2006-01-02"))
@@ -50,14 +51,24 @@ func (a *App) Run(ctx context.Context) error {
 	page := 1
 	var repoIndex int64
 	var skippedForGraphqlFailure int64
+	gracefulShutdown := false
 
 	sem := make(chan struct{}, a.Cfg.Parallelism)
-	g, ctx := errgroup.WithContext(ctx)
+	g, groupCtx := errgroup.WithContext(processingCtx)
 
 loop:
 	for {
-		repos, err := a.Fetcher.GetReposPage(ctx, a.Cfg, page)
+		if shutdownRequested(shutdownCtx) {
+			gracefulShutdown = true
+			break
+		}
+
+		repos, err := a.Fetcher.GetReposPage(shutdownCtx, a.Cfg, page)
 		if err != nil {
+			if errors.Is(err, context.Canceled) && shutdownRequested(shutdownCtx) {
+				gracefulShutdown = true
+				break
+			}
 			return fmt.Errorf("klarte ikke hente repo-side: %w", err)
 		}
 		if len(repos) == 0 {
@@ -65,6 +76,11 @@ loop:
 		}
 
 		for _, repo := range repos {
+			if shutdownRequested(shutdownCtx) {
+				gracefulShutdown = true
+				break loop
+			}
+
 			repo := repo
 
 			if a.Cfg.SkipArchived && repo.Archived {
@@ -78,11 +94,19 @@ loop:
 				slog.Info("Debug-modus: nådd maks antall repos", "antall", a.Cfg.MaxDebugRepos)
 				break loop
 			}
-			sem <- struct{}{}
+
+			if err := acquireWorkerSlot(groupCtx, shutdownCtx, sem); err != nil {
+				if errors.Is(err, context.Canceled) && shutdownRequested(shutdownCtx) {
+					gracefulShutdown = true
+					break loop
+				}
+				return err
+			}
+
 			g.Go(func() error {
 				defer func() { <-sem }()
 
-				entry, err := a.Fetcher.FetchRepoGraphQL(ctx, repo)
+				entry, err := a.Fetcher.FetchRepoGraphQL(groupCtx, repo)
 				if err != nil {
 					slog.Error("Kunne ikke hente repo via GraphQL", "repo", repo.FullName, "error", err)
 					atomic.AddInt64(&skippedForGraphqlFailure, 1)
@@ -92,7 +116,7 @@ loop:
 				idx := atomic.AddInt64(&repoIndex, 1)
 				slog.Info("Behandler repo", "nummer", idx, "navn", repo.FullName)
 
-				if err := a.Writer.ImportRepo(ctx, *entry, snapshotTime); err != nil {
+				if err := a.Writer.ImportRepo(groupCtx, *entry, snapshotTime); err != nil {
 					slog.Error("Import feilet", "repo", repo.FullName, "error", err)
 					return fmt.Errorf("import repo: %w", err)
 				}
@@ -119,10 +143,15 @@ loop:
 	rateLimitStats := fetcher.GetRateLimitStats()
 	coreStats := rateLimitStats[fetcher.RateLimitResourceCore]
 	graphQLStats := rateLimitStats[fetcher.RateLimitResourceGraphQL]
+	logMessage := "Ferdig med alle repos!"
+	if gracefulShutdown {
+		logMessage = "Avslutter kontrollert etter signal"
+	}
 	slog.Info(
-		"Ferdig med alle repos!",
+		logMessage,
 		"behandlet", atomic.LoadInt64(&repoIndex),
 		"Feilet gql-import", atomic.LoadInt64(&skippedForGraphqlFailure),
+		"graceful_shutdown", gracefulShutdown,
 		"core_rate_limit_hits", coreStats.Hits,
 		"core_rate_limit_extensions", coreStats.Extensions,
 		"core_rate_limit_waits", coreStats.Waits,
@@ -135,6 +164,26 @@ loop:
 		"Totalt antall eksterne API-kall", apiCalls,
 	)
 	return nil
+}
+
+func shutdownRequested(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	default:
+		return false
+	}
+}
+
+func acquireWorkerSlot(processingCtx, shutdownCtx context.Context, sem chan struct{}) error {
+	select {
+	case sem <- struct{}{}:
+		return nil
+	case <-shutdownCtx.Done():
+		return shutdownCtx.Err()
+	case <-processingCtx.Done():
+		return processingCtx.Err()
+	}
 }
 
 func logMemoryStats() {

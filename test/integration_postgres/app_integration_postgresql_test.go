@@ -77,7 +77,7 @@ var _ = Describe("runner.App", Ordered, func() {
 	})
 
 	It("kjører hele appen og lagrer repos i databasen", func() {
-		err := app.Run(ctx)
+		err := app.Run(ctx, ctx)
 		Expect(err).To(BeNil())
 
 		row := testDB.DB.QueryRow(`SELECT COUNT(*) FROM repos WHERE full_name LIKE 'testorg/%'`)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -16,8 +17,25 @@ import (
 )
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
-	defer stop()
+	processingCtx, stopProcessing := context.WithCancel(context.Background())
+	defer stopProcessing()
+
+	shutdownCtx, stopShutdown := context.WithCancel(context.Background())
+	defer stopShutdown()
+
+	signals := make(chan os.Signal, 2)
+	signal.Notify(signals, syscall.SIGTERM, os.Interrupt)
+	defer signal.Stop(signals)
+
+	go func() {
+		sig := <-signals
+		slog.Warn("Mottok stoppsignal, stopper nye repositories og fullfører pågående arbeid", "signal", sig.String())
+		stopShutdown()
+
+		sig = <-signals
+		slog.Warn("Mottok nytt stoppsignal, avbryter pågående arbeid", "signal", sig.String())
+		stopProcessing()
+	}()
 
 	logger.SetupLogger()
 
@@ -54,7 +72,7 @@ func main() {
 
 	case config.StorageBigQuery:
 		slog.Info("Setter opp writer for BigQuery")
-		bqWriter, err := bqwriter.NewBigQueryWriter(ctx, &cfg)
+		bqWriter, err := bqwriter.NewBigQueryWriter(processingCtx, &cfg)
 		if err != nil {
 			slog.Error("Kunne ikke opprette BigQuery-klient", "error", err)
 			os.Exit(1)
@@ -72,7 +90,11 @@ func main() {
 
 	app := runner.NewApp(cfg, writer, getter)
 
-	if err := app.Run(ctx); err != nil {
+	if err := app.Run(processingCtx, shutdownCtx); err != nil {
+		if errors.Is(err, context.Canceled) && processingCtx.Err() != nil {
+			slog.Error("Applikasjonen ble avbrutt før pågående arbeid ble ferdig", "error", err)
+			os.Exit(1)
+		}
 		slog.Error("Applikasjonen feilet", "error", err)
 		os.Exit(1)
 	}

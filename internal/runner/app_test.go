@@ -22,21 +22,23 @@ func TestRunner(t *testing.T) {
 
 var _ = Describe("App.Run", func() {
 	var (
-		ctx     context.Context
-		cfg     config.Config
-		writer  *mocks.MockDBWriter
-		fetcher *mocks.MockFetcher
-		app     *runner.App
+		processingCtx context.Context
+		shutdownCtx   context.Context
+		cfg           config.Config
+		writer        *mocks.MockDBWriter
+		fetcher       *mocks.MockFetcher
+		app           *runner.App
 	)
 
 	BeforeEach(func() {
-		ctx = context.Background()
+		processingCtx = context.Background()
+		shutdownCtx = context.Background()
 		cfg = config.Config{
-			Org:         "testorg",
-			Token:       "fake-token",
-			PostgresDSN: "mockdsn",
-			Debug:       true,
-			Parallelism: 2,
+			Org:           "testorg",
+			Token:         "fake-token",
+			PostgresDSN:   "mockdsn",
+			Debug:         true,
+			Parallelism:   2,
 			MaxDebugRepos: 10,
 		}
 
@@ -49,7 +51,7 @@ var _ = Describe("App.Run", func() {
 		fetcher.On("GetReposPage", mock.Anything, cfg, 1).
 			Return(nil, errors.New("API-feil"))
 
-		err := app.Run(ctx)
+		err := app.Run(processingCtx, shutdownCtx)
 		Expect(err).To(MatchError(ContainSubstring("API-feil")))
 	})
 
@@ -61,7 +63,7 @@ var _ = Describe("App.Run", func() {
 		fetcher.On("GetReposPage", mock.Anything, cfg, 1).Return([]models.RepoMeta{archived}, nil)
 		fetcher.On("GetReposPage", mock.Anything, cfg, 2).Return([]models.RepoMeta{}, nil)
 
-		err := app.Run(ctx)
+		err := app.Run(processingCtx, shutdownCtx)
 		Expect(err).To(BeNil())
 	})
 
@@ -84,7 +86,7 @@ var _ = Describe("App.Run", func() {
 
 		}
 
-		err := app.Run(ctx)
+		err := app.Run(processingCtx, shutdownCtx)
 		Expect(err).To(BeNil())
 		Expect(writer.Calls).To(HaveLen(10))
 	})
@@ -95,8 +97,45 @@ var _ = Describe("App.Run", func() {
 		fetcher.On("GetReposPage", mock.Anything, cfg, 2).Return([]models.RepoMeta{}, nil)
 		fetcher.On("FetchRepoGraphQL", mock.Anything, repo).Return(nil, errors.New("graphql error"))
 
-		err := app.Run(ctx)
+		err := app.Run(processingCtx, shutdownCtx)
 		Expect(err).To(BeNil())
 		writer.AssertNotCalled(GinkgoT(), "ImportRepo")
+	})
+
+	It("stopper nye repos ved shutdown men fullfører pågående arbeid", func() {
+		cfg.Debug = false
+		cfg.Parallelism = 1
+		app = runner.NewApp(cfg, writer, fetcher)
+
+		shutdownCtx, stopShutdown := context.WithCancel(context.Background())
+		defer stopShutdown()
+
+		repo1 := models.RepoMeta{FullName: "testorg/repo1", Name: "repo1"}
+		repo2 := models.RepoMeta{FullName: "testorg/repo2", Name: "repo2"}
+		entry := &models.RepoEntry{}
+		repoStarted := make(chan struct{})
+		releaseRepo := make(chan struct{})
+
+		fetcher.On("GetReposPage", mock.MatchedBy(func(ctx context.Context) bool {
+			return ctx == shutdownCtx
+		}), cfg, 1).Return([]models.RepoMeta{repo1, repo2}, nil)
+		fetcher.On("FetchRepoGraphQL", mock.Anything, repo1).Run(func(mock.Arguments) {
+			close(repoStarted)
+			<-releaseRepo
+		}).Return(entry, nil)
+		writer.On("ImportRepo", mock.Anything, *entry, mock.AnythingOfType("time.Time")).Return(nil)
+
+		done := make(chan error, 1)
+		go func() {
+			done <- app.Run(processingCtx, shutdownCtx)
+		}()
+
+		<-repoStarted
+		stopShutdown()
+		close(releaseRepo)
+
+		Expect(<-done).To(Succeed())
+		writer.AssertNumberOfCalls(GinkgoT(), "ImportRepo", 1)
+		fetcher.AssertNotCalled(GinkgoT(), "FetchRepoGraphQL", mock.Anything, repo2)
 	})
 })
