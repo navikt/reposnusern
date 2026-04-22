@@ -72,3 +72,42 @@ jobs:
 		),
 	)
 })
+
+var _ = Describe("shell command detection", func() {
+	DescribeTable("checks mitigation flags per command segment",
+		func(line string, npmCi, yarnInstall, pipNoCache, pipHashes bool) {
+			Expect(isNpmCiWithoutIgnoreScripts(line)).To(Equal(npmCi))
+			Expect(isYarnInstallWithoutFrozen(line)).To(Equal(yarnInstall))
+			Expect(isPipInstallWithoutNoCache(line)).To(Equal(pipNoCache))
+			Expect(isPipInstallWithoutHashes(line)).To(Equal(pipHashes))
+		},
+		Entry("npm ci is still flagged when another segment has ignore-scripts",
+			"npm install --ignore-scripts && npm ci",
+			true, false, false, false,
+		),
+		Entry("yarn install is still flagged when another segment has frozen-lockfile",
+			"echo --frozen-lockfile && yarn install",
+			false, true, false, false,
+		),
+		Entry("pip install is still flagged when another segment has no-cache-dir",
+			"echo --no-cache-dir && pip install requests",
+			false, false, true, true,
+		),
+		Entry("pip install with both mitigations in the same segment is not flagged",
+			"pip install --no-cache-dir --require-hashes -r requirements.txt",
+			false, false, false, false,
+		),
+	)
+
+	DescribeTable("detects sudo across chained commands",
+		func(line string, expected bool) {
+			Expect(isSudo(line)).To(Equal(expected))
+		},
+		Entry("sudo at start", "sudo apt-get install -y git", true),
+		Entry("sudo after semicolon", "echo hi;sudo apt-get install -y git", true),
+		Entry("sudo after logical and without extra spaces", "echo hi&&sudo apt-get install -y git", true),
+		Entry("sudo after logical or", "false||sudo apt-get install -y git", true),
+		Entry("sudo after pipe", "cat file |sudo tee /tmp/file", true),
+		Entry("no sudo present", "apt-get install -y git", false),
+	)
+})

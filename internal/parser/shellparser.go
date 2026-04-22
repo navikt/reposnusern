@@ -40,69 +40,39 @@ func isNpmInstall(line string) bool {
 	return false
 }
 
+func commandMissingFlag(line string, commands []string, requiredFlag string) bool {
+	for _, segment := range splitRunSegments(line) {
+		s := strings.TrimSpace(segment)
+		for _, cmd := range commands {
+			if containsCmd(s, cmd) {
+				return !strings.Contains(s, requiredFlag)
+			}
+		}
+	}
+	return false
+}
+
 // isNpmCiWithoutIgnoreScripts returns true only when `npm ci` is present but
 // `--ignore-scripts` is absent. Returns false when npm ci is not used at all.
 func isNpmCiWithoutIgnoreScripts(line string) bool {
-	hasNpmCi := false
-	for _, segment := range splitRunSegments(line) {
-		if containsCmd(strings.TrimSpace(segment), "npm ci") {
-			hasNpmCi = true
-			break
-		}
-	}
-	if !hasNpmCi {
-		return false
-	}
-	return !strings.Contains(line, "--ignore-scripts")
+	return commandMissingFlag(line, []string{"npm ci"}, "--ignore-scripts")
 }
 
 // isYarnInstallWithoutFrozen detects `yarn install` without `--frozen-lockfile`.
 func isYarnInstallWithoutFrozen(line string) bool {
-	hasYarnInstall := false
-	for _, segment := range splitRunSegments(line) {
-		if containsCmd(strings.TrimSpace(segment), "yarn install") {
-			hasYarnInstall = true
-			break
-		}
-	}
-	if !hasYarnInstall {
-		return false
-	}
-	return !strings.Contains(line, "--frozen-lockfile")
+	return commandMissingFlag(line, []string{"yarn install"}, "--frozen-lockfile")
 }
 
 // isPipInstallWithoutNoCache detects `pip install` (or `pip3 install`) without
 // the `--no-cache-dir` flag.
 func isPipInstallWithoutNoCache(line string) bool {
-	hasPipInstall := false
-	for _, segment := range splitRunSegments(line) {
-		s := strings.TrimSpace(segment)
-		if containsCmd(s, "pip install") || containsCmd(s, "pip3 install") {
-			hasPipInstall = true
-			break
-		}
-	}
-	if !hasPipInstall {
-		return false
-	}
-	return !strings.Contains(line, "--no-cache-dir")
+	return commandMissingFlag(line, []string{"pip install", "pip3 install"}, "--no-cache-dir")
 }
 
 // isPipInstallWithoutHashes detects `pip install` (or `pip3 install`) without
 // the `--require-hashes` flag.
 func isPipInstallWithoutHashes(line string) bool {
-	hasPipInstall := false
-	for _, segment := range splitRunSegments(line) {
-		s := strings.TrimSpace(segment)
-		if containsCmd(s, "pip install") || containsCmd(s, "pip3 install") {
-			hasPipInstall = true
-			break
-		}
-	}
-	if !hasPipInstall {
-		return false
-	}
-	return !strings.Contains(line, "--require-hashes")
+	return commandMissingFlag(line, []string{"pip install", "pip3 install"}, "--require-hashes")
 }
 
 // isCurlBashPipe detects `curl ... | bash` or `wget ... | sh`.
@@ -119,9 +89,11 @@ func isCurlBashPipe(line string) bool {
 
 // isSudo detects usage of sudo.
 func isSudo(line string) bool {
-	return line == "sudo" ||
-		strings.HasPrefix(line, "sudo ") ||
-		strings.Contains(line, " sudo ") ||
-		strings.Contains(line, "&& sudo ") ||
-		strings.Contains(line, "| sudo ")
+	for _, segment := range splitRunSegments(line) {
+		s := strings.TrimSpace(segment)
+		if s == "sudo" || strings.HasPrefix(s, "sudo ") {
+			return true
+		}
+	}
+	return false
 }
