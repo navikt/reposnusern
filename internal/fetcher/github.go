@@ -136,7 +136,13 @@ func (r *RepoFetcher) GetReposPage(ctx context.Context, cfg config.Config, page 
 func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.RepoMeta) (*models.RepoEntry, error) {
 	query := BuildRepoQuery(r.Cfg.Org, baseRepo.Name)
 
-	reqBody := map[string]string{"query": query}
+	reqBody := map[string]interface{}{
+		"query": query,
+		"variables": map[string]string{
+			"owner": r.Cfg.Org,
+			"name":  baseRepo.Name,
+		},
+	}
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
 		slog.Error("Kunne ikke serialisere GraphQL-request", "repo", r.Cfg.Org+"/"+baseRepo.Name, "error", err)
@@ -697,9 +703,9 @@ func ExtractReadme(data map[string]interface{}) string {
 }
 
 func BuildRepoQuery(owner string, name string) string {
-	query := fmt.Sprintf(`
-	{
-		repository(owner: "%s", name: "%s") {
+	query := `
+	query RepoDetails($owner: String!, $name: String!) {
+		repository(owner: $owner, name: $name) {
 			defaultBranchRef {
 				name
 			}
@@ -756,7 +762,7 @@ func BuildRepoQuery(owner string, name string) string {
 				}
 			}
 		}
-	}`, owner, name)
+	}`
 	return query
 }
 

@@ -2,6 +2,7 @@ package fetcher_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -54,10 +55,13 @@ var _ = Describe("GraphQL-relaterte hjelpefunksjoner", func() {
 	})
 
 	Describe("buildRepoQuery", func() {
-		It("skal bygge en GraphQL-spørring som inneholder riktig owner og repo", func() {
+		It("skal bygge en GraphQL-spørring som bruker GraphQL-variabler", func() {
 			query := fetcher.BuildRepoQuery("navikt", "arbeidsgiver")
-			Expect(query).To(ContainSubstring(`repository(owner: "navikt", name: "arbeidsgiver")`))
+			Expect(query).To(ContainSubstring(`query RepoDetails($owner: String!, $name: String!)`))
+			Expect(query).To(ContainSubstring(`repository(owner: $owner, name: $name)`))
 			Expect(query).To(ContainSubstring("defaultBranchRef"))
+			Expect(query).NotTo(ContainSubstring(`"navikt"`))
+			Expect(query).NotTo(ContainSubstring(`"arbeidsgiver"`))
 		})
 	})
 
@@ -274,9 +278,11 @@ var _ = Describe("FetchRepoGraphQL", func() {
 
 	It("skal retrye når GraphQL-svaret inneholder rate-limit-feil", func() {
 		callCount := 0
+		var requestBody map[string]interface{}
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			callCount++
 			w.Header().Set("Content-Type", "application/json")
+			Expect(json.NewDecoder(r.Body).Decode(&requestBody)).To(Succeed())
 
 			if callCount == 1 {
 				w.Header().Set("X-RateLimit-Reset", "invalid")
@@ -300,6 +306,11 @@ var _ = Describe("FetchRepoGraphQL", func() {
 		Expect(entry).NotTo(BeNil())
 		Expect(entry.Repo.Readme).To(Equal("ok"))
 		Expect(callCount).To(Equal(2))
+		Expect(requestBody["query"]).To(Equal(fetcher.BuildRepoQuery("testorg", "missing")))
+		Expect(requestBody["variables"]).To(Equal(map[string]interface{}{
+			"owner": "testorg",
+			"name":  "missing",
+		}))
 	})
 
 	It("skal returnere feil når GraphQL-svaret inneholder errors-felt", func() {
