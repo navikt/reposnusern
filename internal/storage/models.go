@@ -53,6 +53,7 @@ type Dockerfile struct {
 	UsesNpmCiWithoutIgnoreScripts sql.NullBool
 	UsesYarnInstallWithoutFrozen  sql.NullBool
 	UsesPipInstallWithoutNoCache  sql.NullBool
+	UsesPipInstallWithoutHashes   sql.NullBool
 	UsesCurlBashPipe              sql.NullBool
 }
 

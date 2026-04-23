@@ -115,6 +115,7 @@ var _ = Describe("BigQuery schema contract", func() {
 			{"UsesNpmCiWithoutIgnoreScripts", "bool", "uses_npm_ci_without_ignore_scripts"},
 			{"UsesYarnInstallWithoutFrozen", "bool", "uses_yarn_install_without_frozen"},
 			{"UsesPipInstallWithoutNoCache", "bool", "uses_pip_install_without_no_cache"},
+			{"UsesPipInstallWithoutHashes", "bool", "uses_pip_install_without_hashes"},
 			{"UsesCurlBashPipe", "bool", "uses_curl_bash_pipe"},
 		}),
 

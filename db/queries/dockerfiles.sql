@@ -9,7 +9,7 @@ INSERT INTO dockerfiles (
   world_writable, has_secrets_in_env_or_arg,
   uses_npm_install, uses_npm_ci_without_ignore_scripts,
   uses_yarn_install_without_frozen, uses_pip_install_without_no_cache,
-  uses_curl_bash_pipe
+  uses_pip_install_without_hashes, uses_curl_bash_pipe
 )
 VALUES (
   $1, $2, $3, $4, $5,
@@ -21,7 +21,7 @@ VALUES (
   $21, $22,
   $23, $24,
   $25, $26,
-  $27
+  $27, $28
 )
 ON CONFLICT (repo_id, hentet_dato, path) DO UPDATE SET
   full_name = EXCLUDED.full_name,
@@ -47,5 +47,6 @@ ON CONFLICT (repo_id, hentet_dato, path) DO UPDATE SET
   uses_npm_ci_without_ignore_scripts = EXCLUDED.uses_npm_ci_without_ignore_scripts,
   uses_yarn_install_without_frozen = EXCLUDED.uses_yarn_install_without_frozen,
   uses_pip_install_without_no_cache = EXCLUDED.uses_pip_install_without_no_cache,
+  uses_pip_install_without_hashes = EXCLUDED.uses_pip_install_without_hashes,
   uses_curl_bash_pipe = EXCLUDED.uses_curl_bash_pipe
 RETURNING id;

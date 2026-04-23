@@ -157,6 +157,17 @@ ADD file.tar.gz /opt/`,
 			},
 		),
 
+		Entry("COPY with source named add is NOT flagged as ADD instruction",
+			`FROM debian
+COPY add /opt/`,
+			parser.DockerfileFeatures{
+				BaseImage:          "debian",
+				BaseTag:            "latest",
+				UsesLatestTag:      true,
+				UsesAddInstruction: false,
+			},
+		),
+
 		Entry("npm install in RUN is flagged",
 			`FROM node:18
 RUN npm install`,
@@ -209,15 +220,36 @@ RUN yarn install --frozen-lockfile`,
 			`FROM python:3.12
 RUN pip install requests`,
 			parser.DockerfileFeatures{
-				BaseImage:                   "python",
-				BaseTag:                     "3.12",
+				BaseImage:                    "python",
+				BaseTag:                      "3.12",
 				UsesPipInstallWithoutNoCache: true,
+				UsesPipInstallWithoutHashes:  true,
 			},
 		),
 
 		Entry("pip install with --no-cache-dir is NOT flagged",
 			`FROM python:3.12
 RUN pip install --no-cache-dir requests`,
+			parser.DockerfileFeatures{
+				BaseImage:                   "python",
+				BaseTag:                     "3.12",
+				UsesPipInstallWithoutHashes: true,
+			},
+		),
+
+		Entry("pip install with --require-hashes is NOT flagged for hashes",
+			`FROM python:3.12
+RUN pip install --require-hashes -r requirements.txt`,
+			parser.DockerfileFeatures{
+				BaseImage:                    "python",
+				BaseTag:                      "3.12",
+				UsesPipInstallWithoutNoCache: true,
+			},
+		),
+
+		Entry("pip install with both mitigations is NOT flagged",
+			`FROM python:3.12
+RUN pip install --no-cache-dir --require-hashes -r requirements.txt`,
 			parser.DockerfileFeatures{
 				BaseImage: "python",
 				BaseTag:   "3.12",

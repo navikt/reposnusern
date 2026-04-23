@@ -50,8 +50,9 @@ func (a *App) Run(processingCtx, shutdownCtx context.Context) error {
 
 	page := 1
 	var repoIndex int64
+	var debugDispatchCount int64
 	var skippedForGraphqlFailure int64
-	gracefulShutdown := false
+	var gracefulShutdown atomic.Bool
 
 	sem := make(chan struct{}, a.Cfg.Parallelism)
 	g, groupCtx := errgroup.WithContext(processingCtx)
@@ -59,14 +60,14 @@ func (a *App) Run(processingCtx, shutdownCtx context.Context) error {
 loop:
 	for {
 		if shutdownRequested(shutdownCtx) {
-			gracefulShutdown = true
+			gracefulShutdown.Store(true)
 			break
 		}
 
 		repos, err := a.Fetcher.GetReposPage(shutdownCtx, a.Cfg, page)
 		if err != nil {
 			if errors.Is(err, context.Canceled) && shutdownRequested(shutdownCtx) {
-				gracefulShutdown = true
+				gracefulShutdown.Store(true)
 				break
 			}
 			return fmt.Errorf("klarte ikke hente repo-side: %w", err)
@@ -77,7 +78,7 @@ loop:
 
 		for _, repo := range repos {
 			if shutdownRequested(shutdownCtx) {
-				gracefulShutdown = true
+				gracefulShutdown.Store(true)
 				break loop
 			}
 
@@ -88,16 +89,23 @@ loop:
 				continue
 			}
 
-			// Debug-grense-sjekk før goroutine
-			currentIndex := atomic.LoadInt64(&repoIndex)
-			if a.Cfg.Debug && currentIndex >= a.Cfg.MaxDebugRepos {
-				slog.Info("Debug-modus: nådd maks antall repos", "antall", a.Cfg.MaxDebugRepos)
-				break loop
+			reservedDebugSlot := false
+			if a.Cfg.Debug {
+				nextDispatchCount := atomic.AddInt64(&debugDispatchCount, 1)
+				if nextDispatchCount > a.Cfg.MaxDebugRepos {
+					atomic.AddInt64(&debugDispatchCount, -1)
+					slog.Info("Debug-modus: nådd maks antall repos", "antall", a.Cfg.MaxDebugRepos)
+					break loop
+				}
+				reservedDebugSlot = true
 			}
 
 			if err := acquireWorkerSlot(groupCtx, shutdownCtx, sem); err != nil {
+				if reservedDebugSlot {
+					atomic.AddInt64(&debugDispatchCount, -1)
+				}
 				if errors.Is(err, context.Canceled) && shutdownRequested(shutdownCtx) {
-					gracefulShutdown = true
+					gracefulShutdown.Store(true)
 					break loop
 				}
 				return err
@@ -106,8 +114,14 @@ loop:
 			g.Go(func() error {
 				defer func() { <-sem }()
 
-				entry, err := a.Fetcher.FetchRepoGraphQL(groupCtx, repo)
+				workerCtx := fetcher.WithWaitInterrupt(groupCtx, shutdownCtx)
+				entry, err := a.Fetcher.FetchRepoGraphQL(workerCtx, repo)
 				if err != nil {
+					if errors.Is(err, fetcher.ErrWaitInterrupted) && shutdownRequested(shutdownCtx) {
+						gracefulShutdown.Store(true)
+						slog.Info("Avbryter repo etter shutdown under venting", "repo", repo.FullName)
+						return nil
+					}
 					slog.Error("Kunne ikke hente repo via GraphQL", "repo", repo.FullName, "error", err)
 					atomic.AddInt64(&skippedForGraphqlFailure, 1)
 					return nil // ikke fatal
@@ -144,14 +158,14 @@ loop:
 	coreStats := rateLimitStats[fetcher.RateLimitResourceCore]
 	graphQLStats := rateLimitStats[fetcher.RateLimitResourceGraphQL]
 	logMessage := "Ferdig med alle repos!"
-	if gracefulShutdown {
+	if gracefulShutdown.Load() {
 		logMessage = "Avslutter kontrollert etter signal"
 	}
 	slog.Info(
 		logMessage,
 		"behandlet", atomic.LoadInt64(&repoIndex),
 		"Feilet gql-import", atomic.LoadInt64(&skippedForGraphqlFailure),
-		"graceful_shutdown", gracefulShutdown,
+		"graceful_shutdown", gracefulShutdown.Load(),
 		"core_rate_limit_hits", coreStats.Hits,
 		"core_rate_limit_extensions", coreStats.Extensions,
 		"core_rate_limit_waits", coreStats.Waits,

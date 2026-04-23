@@ -157,6 +157,7 @@ func insertDockerfiles(
 				UsesNpmCiWithoutIgnoreScripts: sql.NullBool{Bool: features.UsesNpmCiWithoutIgnoreScripts, Valid: true},
 				UsesYarnInstallWithoutFrozen:  sql.NullBool{Bool: features.UsesYarnInstallWithoutFrozen, Valid: true},
 				UsesPipInstallWithoutNoCache:  sql.NullBool{Bool: features.UsesPipInstallWithoutNoCache, Valid: true},
+				UsesPipInstallWithoutHashes:   sql.NullBool{Bool: features.UsesPipInstallWithoutHashes, Valid: true},
 				UsesCurlBashPipe:              sql.NullBool{Bool: features.UsesCurlBashPipe, Valid: true},
 			})
 			if err != nil {

@@ -157,6 +157,7 @@ type BGDockerfileFeatures struct {
 	UsesNpmCiWithoutIgnoreScripts bool      `bigquery:"uses_npm_ci_without_ignore_scripts"`
 	UsesYarnInstallWithoutFrozen  bool      `bigquery:"uses_yarn_install_without_frozen"`
 	UsesPipInstallWithoutNoCache  bool      `bigquery:"uses_pip_install_without_no_cache"`
+	UsesPipInstallWithoutHashes   bool      `bigquery:"uses_pip_install_without_hashes"`
 	UsesCurlBashPipe              bool      `bigquery:"uses_curl_bash_pipe"`
 }
 
@@ -278,6 +279,7 @@ func ConvertDockerfileFeatures(entry models.RepoEntry, snapshot time.Time) ([]BG
 				UsesNpmCiWithoutIgnoreScripts: features.UsesNpmCiWithoutIgnoreScripts,
 				UsesYarnInstallWithoutFrozen:  features.UsesYarnInstallWithoutFrozen,
 				UsesPipInstallWithoutNoCache:  features.UsesPipInstallWithoutNoCache,
+				UsesPipInstallWithoutHashes:   features.UsesPipInstallWithoutHashes,
 				UsesCurlBashPipe:              features.UsesCurlBashPipe,
 			})
 
