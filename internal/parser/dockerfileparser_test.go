@@ -329,6 +329,27 @@ RUN pip install \
 			},
 		),
 
+		Entry("Global ARG default resolves FROM image reference",
+			`ARG NODE_BUILD_IMG=node:20-alpine
+FROM --platform=${BUILDPLATFORM} ${NODE_BUILD_IMG} AS prepare`,
+			parser.DockerfileFeatures{
+				BaseImage:     "node",
+				BaseTag:       "20-alpine",
+				UsesLatestTag: false,
+			},
+		),
+
+		Entry("Chained global ARG defaults resolve before FROM parsing",
+			`ARG NODE_VERSION=20-alpine
+ARG NODE_BUILD_IMG=node:${NODE_VERSION}
+FROM ${NODE_BUILD_IMG} AS prepare`,
+			parser.DockerfileFeatures{
+				BaseImage:     "node",
+				BaseTag:       "20-alpine",
+				UsesLatestTag: false,
+			},
+		),
+
 		Entry("COPY with flags still detects sensitive paths",
 			`FROM alpine AS base
 COPY --from=builder .ssh /root/.ssh`,
@@ -342,14 +363,15 @@ COPY --from=builder .ssh /root/.ssh`,
 			},
 		),
 
-		Entry("Unresolved variable FROM falls through to the first parseable external stage",
+		Entry("Unresolved variable FROM remains visible as the first non-alias stage",
 			`ARG BASE_IMAGE
 FROM ${BASE_IMAGE} AS dynamic
 FROM alpine:3.20`,
 			parser.DockerfileFeatures{
-				BaseImage:     "alpine",
-				BaseTag:       "3.20",
-				UsesLatestTag: false,
+				BaseImage:      "${BASE_IMAGE}",
+				BaseTag:        "",
+				UsesLatestTag:  false,
+				UsesMultistage: true,
 			},
 		),
 	)
@@ -389,12 +411,21 @@ FROM base AS final`,
 			},
 		),
 
-		Entry("Unresolved variable FROM stages are skipped instead of emitting misleading metadata",
+		Entry("Global ARG default resolves stage metadata from FROM",
+			`ARG NODE_BUILD_IMG=node:20-alpine
+FROM --platform=${BUILDPLATFORM} ${NODE_BUILD_IMG} AS prepare`,
+			[]parser.DockerStageMeta{
+				{StageIndex: 0, BaseImage: "node", BaseTag: "20-alpine"},
+			},
+		),
+
+		Entry("Unresolved variable FROM stages are preserved as raw refs",
 			`ARG BASE_IMAGE
 FROM ${BASE_IMAGE} AS dynamic
 FROM alpine:3.20`,
 			[]parser.DockerStageMeta{
-				{StageIndex: 0, BaseImage: "alpine", BaseTag: "3.20"},
+				{StageIndex: 0, BaseImage: "${BASE_IMAGE}", BaseTag: ""},
+				{StageIndex: 1, BaseImage: "alpine", BaseTag: "3.20"},
 			},
 		),
 	)

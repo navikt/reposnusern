@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"regexp"
 	"strings"
 )
 
@@ -47,26 +48,44 @@ type fromInstruction struct {
 	baseTag    string
 	isAlias    bool
 	unresolved bool
+	parseable  bool
 }
 
 func ParseDockerfile(content string) (DockerfileFeatures, []DockerStageMeta) {
 	var features DockerfileFeatures
 	var stages []DockerStageMeta
+	globalArgs := map[string]string{}
 	knownAliases := map[string]struct{}{}
 	stageIndex := 0
+	seenFrom := false
 
 	for _, instruction := range parseDockerInstructions(content) {
 		switch instruction.keyword {
+		case "arg":
+			lowerValue := strings.ToLower(instruction.value)
+			if strings.Contains(lowerValue, "password") || strings.Contains(lowerValue, "token") || strings.Contains(lowerValue, "secret") {
+				features.HasSecretsInEnvOrArg = true
+			}
+			if seenFrom {
+				continue
+			}
+			name, defaultValue, hasDefault := parseArgInstruction(instruction.value)
+			if name == "" || !hasDefault {
+				continue
+			}
+			resolvedValue, _ := resolveArgReferences(defaultValue, globalArgs)
+			globalArgs[name] = resolvedValue
 		case "from":
-			parsed := parseFromInstruction(instruction.value, knownAliases)
+			seenFrom = true
+			parsed := parseFromInstruction(instruction.value, knownAliases, globalArgs)
 			if parsed.alias != "" {
 				knownAliases[strings.ToLower(parsed.alias)] = struct{}{}
 			}
-			if parsed.isAlias || parsed.unresolved || parsed.baseImage == "" {
+			if parsed.isAlias || parsed.baseImage == "" {
 				continue
 			}
 
-			if parsed.baseTag == "latest" {
+			if parsed.parseable && parsed.baseTag == "latest" {
 				features.UsesLatestTag = true
 			}
 			if features.BaseImage == "" {
@@ -136,7 +155,7 @@ func ParseDockerfile(content string) (DockerfileFeatures, []DockerStageMeta) {
 			if isCurlBashPipe(lowerValue) {
 				features.UsesCurlBashPipe = true
 			}
-		case "env", "arg":
+		case "env":
 			lowerValue := strings.ToLower(instruction.value)
 			if strings.Contains(lowerValue, "password") || strings.Contains(lowerValue, "token") || strings.Contains(lowerValue, "secret") {
 				features.HasSecretsInEnvOrArg = true
@@ -198,7 +217,7 @@ func parseDockerInstructions(content string) []dockerInstruction {
 	return instructions
 }
 
-func parseFromInstruction(value string, knownAliases map[string]struct{}) fromInstruction {
+func parseFromInstruction(value string, knownAliases map[string]struct{}, globalArgs map[string]string) fromInstruction {
 	fields := strings.Fields(value)
 	if len(fields) == 0 {
 		return fromInstruction{}
@@ -214,32 +233,70 @@ func parseFromInstruction(value string, knownAliases map[string]struct{}) fromIn
 
 	imageRef := fields[i]
 	i++
+	resolvedRef, unresolved := resolveArgReferences(imageRef, globalArgs)
 
 	var alias string
 	if i+1 < len(fields) && strings.EqualFold(fields[i], "as") {
 		alias = fields[i+1]
 	}
 
-	if strings.Contains(imageRef, "$") {
-		return fromInstruction{
-			alias:      alias,
-			unresolved: true,
-		}
-	}
-
-	if _, ok := knownAliases[strings.ToLower(imageRef)]; ok {
+	if _, ok := knownAliases[strings.ToLower(resolvedRef)]; ok {
 		return fromInstruction{
 			alias:   alias,
 			isAlias: true,
 		}
 	}
 
-	baseImage, baseTag := splitDockerImageReference(imageRef)
+	if unresolved {
+		return fromInstruction{
+			alias:      alias,
+			baseImage:  resolvedRef,
+			baseTag:    "",
+			unresolved: true,
+		}
+	}
+
+	baseImage, baseTag := splitDockerImageReference(resolvedRef)
 	return fromInstruction{
 		alias:     alias,
 		baseImage: baseImage,
 		baseTag:   baseTag,
+		parseable: true,
 	}
+}
+
+func parseArgInstruction(value string) (string, string, bool) {
+	fields := strings.Fields(value)
+	if len(fields) == 0 {
+		return "", "", false
+	}
+
+	assignment := fields[0]
+	if eq := strings.Index(assignment, "="); eq >= 0 {
+		return assignment[:eq], assignment[eq+1:], true
+	}
+
+	return assignment, "", false
+}
+
+var argReferencePattern = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)`)
+
+func resolveArgReferences(value string, args map[string]string) (string, bool) {
+	unresolved := false
+	resolved := argReferencePattern.ReplaceAllStringFunc(value, func(match string) string {
+		name := strings.TrimPrefix(match, "$")
+		name = strings.TrimPrefix(name, "{")
+		name = strings.TrimSuffix(name, "}")
+
+		argValue, ok := args[name]
+		if !ok {
+			unresolved = true
+			return match
+		}
+		return argValue
+	})
+
+	return resolved, unresolved
 }
 
 func splitDockerImageReference(ref string) (string, string) {
