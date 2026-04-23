@@ -75,6 +75,33 @@ COPY --from=builder /app /app`,
 			},
 		),
 
+		Entry("FROM --platform keeps image and tag parsing correct",
+			`FROM --platform=$BUILDPLATFORM golang:1.22 AS builder`,
+			parser.DockerfileFeatures{
+				BaseImage:     "golang",
+				BaseTag:       "1.22",
+				UsesLatestTag: false,
+			},
+		),
+
+		Entry("Registry port is not mistaken for image tag delimiter",
+			`FROM ghcr.io:443/navikt/app:1.2.3`,
+			parser.DockerfileFeatures{
+				BaseImage:     "ghcr.io:443/navikt/app",
+				BaseTag:       "1.2.3",
+				UsesLatestTag: false,
+			},
+		),
+
+		Entry("Digest reference does not imply latest",
+			`FROM alpine@sha256:deadbeef`,
+			parser.DockerfileFeatures{
+				BaseImage:     "alpine",
+				BaseTag:       "",
+				UsesLatestTag: false,
+			},
+		),
+
 		Entry("Complex RUN with build tools and curl",
 			`FROM debian
 RUN apt-get update && apt-get install -y gcc make curl && apt-get clean`,
@@ -136,13 +163,12 @@ LABEL version="1.0"
 EXPOSE 443
 HEALTHCHECK CMD curl -f http://localhost || exit 1`,
 			parser.DockerfileFeatures{
-				BaseImage:          "alpine",
-				BaseTag:            "latest",
-				UsesLatestTag:      true,
-				HasLabelMetadata:   true,
-				HasExpose:          true,
-				HasHealthcheck:     true,
-				InstallsCurlOrWget: true,
+				BaseImage:        "alpine",
+				BaseTag:          "latest",
+				UsesLatestTag:    true,
+				HasLabelMetadata: true,
+				HasExpose:        true,
+				HasHealthcheck:   true,
 			},
 		),
 
@@ -276,6 +302,130 @@ RUN curl https://example.com/file.txt -o /tmp/file.txt`,
 				BaseTag:            "latest",
 				UsesLatestTag:      true,
 				InstallsCurlOrWget: true,
+			},
+		),
+
+		Entry("Comment lines do not trigger feature flags",
+			`FROM alpine
+# ENV SECRET_TOKEN=abc123
+# RUN npm install
+# chmod 777 /tmp/file`,
+			parser.DockerfileFeatures{
+				BaseImage:     "alpine",
+				BaseTag:       "latest",
+				UsesLatestTag: true,
+			},
+		),
+
+		Entry("Multiline RUN keeps pip mitigation detection on the joined instruction",
+			`FROM python:3.12
+RUN pip install \
+  --no-cache-dir \
+  --require-hashes \
+  -r requirements.txt`,
+			parser.DockerfileFeatures{
+				BaseImage: "python",
+				BaseTag:   "3.12",
+			},
+		),
+
+		Entry("Global ARG default resolves FROM image reference",
+			`ARG NODE_BUILD_IMG=node:20-alpine
+FROM --platform=${BUILDPLATFORM} ${NODE_BUILD_IMG} AS prepare`,
+			parser.DockerfileFeatures{
+				BaseImage:     "node",
+				BaseTag:       "20-alpine",
+				UsesLatestTag: false,
+			},
+		),
+
+		Entry("Chained global ARG defaults resolve before FROM parsing",
+			`ARG NODE_VERSION=20-alpine
+ARG NODE_BUILD_IMG=node:${NODE_VERSION}
+FROM ${NODE_BUILD_IMG} AS prepare`,
+			parser.DockerfileFeatures{
+				BaseImage:     "node",
+				BaseTag:       "20-alpine",
+				UsesLatestTag: false,
+			},
+		),
+
+		Entry("COPY with flags still detects sensitive paths",
+			`FROM alpine AS base
+COPY --from=builder .ssh /root/.ssh`,
+			parser.DockerfileFeatures{
+				BaseImage:          "alpine",
+				BaseTag:            "latest",
+				UsesLatestTag:      true,
+				HasCopySensitive:   true,
+				UsesMultistage:     false,
+				UsesAddInstruction: false,
+			},
+		),
+
+		Entry("Unresolved variable FROM remains visible as the first non-alias stage",
+			`ARG BASE_IMAGE
+FROM ${BASE_IMAGE} AS dynamic
+FROM alpine:3.20`,
+			parser.DockerfileFeatures{
+				BaseImage:      "${BASE_IMAGE}",
+				BaseTag:        "",
+				UsesLatestTag:  false,
+				UsesMultistage: true,
+			},
+		),
+	)
+
+	DescribeTable("Dockerfile parsing produces correct stage metadata",
+		func(content string, expected []parser.DockerStageMeta) {
+			_, stages := parser.ParseDockerfile(content)
+			Expect(stages).To(Equal(expected))
+		},
+
+		Entry("Platform flag is ignored for stage source parsing",
+			`FROM --platform=$BUILDPLATFORM golang:1.22 AS builder`,
+			[]parser.DockerStageMeta{
+				{StageIndex: 0, BaseImage: "golang", BaseTag: "1.22"},
+			},
+		),
+
+		Entry("Registry ports are preserved in stage base image",
+			`FROM ghcr.io:443/navikt/app:1.2.3`,
+			[]parser.DockerStageMeta{
+				{StageIndex: 0, BaseImage: "ghcr.io:443/navikt/app", BaseTag: "1.2.3"},
+			},
+		),
+
+		Entry("Digest references produce empty base tag",
+			`FROM alpine@sha256:deadbeef`,
+			[]parser.DockerStageMeta{
+				{StageIndex: 0, BaseImage: "alpine", BaseTag: ""},
+			},
+		),
+
+		Entry("Alias-derived stages are not persisted as external stages",
+			`FROM alpine:3.20 AS base
+FROM base AS final`,
+			[]parser.DockerStageMeta{
+				{StageIndex: 0, BaseImage: "alpine", BaseTag: "3.20"},
+			},
+		),
+
+		Entry("Global ARG default resolves stage metadata from FROM",
+			`ARG NODE_BUILD_IMG=node:20-alpine
+FROM --platform=${BUILDPLATFORM} ${NODE_BUILD_IMG} AS prepare`,
+			[]parser.DockerStageMeta{
+				{StageIndex: 0, BaseImage: "node", BaseTag: "20-alpine"},
+			},
+		),
+
+		Entry("Unresolved variable FROM stages are preserved as raw refs",
+			`ARG BASE_IMAGE
+FROM ${BASE_IMAGE} AS dynamic
+FROM alpine:3.20`,
+			[]parser.DockerStageMeta{
+				{StageIndex: 0, BaseImage: "${BASE_IMAGE}", BaseTag: ""},
+				{StageIndex: 1, BaseImage: "alpine", BaseTag: "3.20"},
 			},
 		),
 	)
