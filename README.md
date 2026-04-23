@@ -94,7 +94,7 @@ podman run --rm \
   -e REPO_STORAGE=postgres \
   -e REPOSNUSERN_PARALL=4 \
   -e REPOSNUSERDEBUG=true \
-  -e REPOSNUSERARCHIVE=false \
+  -e REPOSNUSERARCHIVED=false \
   -v "$PWD/data":/data \
   reposnusnern
 
@@ -109,13 +109,13 @@ podman run --rm \
   -e REPO_STORAGE=bigquery \
   -e REPOSNUSERN_PARALL=4 \
   -e REPOSNUSERDEBUG=true \
-  -e REPOSNUSERARCHIVE=false \
+  -e REPOSNUSERARCHIVED=false \
   -v "$PWD/data":/data \
   reposnusnern
 ```
 
 REPOSNUSERDEBUG=true gjør at maks 10 repos blir hentet, for å teste ut uten å spamme github apiet.
-REPOSNUSERARCHIVE=true vil sette at arkiverte repos også blir hentet, ellers blir kun aktive hentet.
+REPOSNUSERARCHIVED=true vil sette at arkiverte repos også blir hentet, ellers blir kun aktive hentet.
 REPOSNUSERN_PARALL=4 setter antall parallele kjøring, kan ikke love at det fungerer bra over 4. 
 
 Merk: GitHub har en grense på 5000 API-kall per time for autentiserte brukere. Koden håndterer dette automatisk ved å pause og fortsette når grensen er nådd.

@@ -57,6 +57,8 @@ func NewConfig() (Config, error) {
 	if val := os.Getenv("REPOSNUSER_MAXDEBUGREPOS"); val != "" {
 		if i, err := strconv.Atoi(val); err == nil && i > 0 {
 			maxDebugRepos = int64(i)
+		} else {
+			errs = append(errs, errors.New("REPOSNUSER_MAXDEBUGREPOS må være et positivt heltall"))
 		}
 	}
 
