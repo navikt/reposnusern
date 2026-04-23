@@ -184,6 +184,9 @@ func (r *RepoFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.Repo
 		}
 
 		entry := ParseRepoData(data, baseRepo)
+		if entry == nil {
+			return nil, fmt.Errorf("klarte ikke parse repository-data for %s/%s", r.Cfg.Org, baseRepo.Name)
+		}
 
 		// Hent SBOM hvis feature_sbom er true
 		if r.Cfg.Feature_Sbom {

@@ -330,6 +330,23 @@ var _ = Describe("FetchRepoGraphQL", func() {
 		Expect(err.Error()).To(ContainSubstring("GraphQL returnerte feil"))
 	})
 
+	It("skal returnere feil når repository-data ikke kan parses", func() {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintln(w, `{"data":{"repository":"unexpected"}}`)
+		}))
+		defer ts.Close()
+
+		fetcher.HttpClient = ts.Client()
+		fetcher.GraphQLEndpoint = ts.URL
+
+		f := fetcher.NewRepoFetcher(config.Config{Org: "testorg", Token: "fake-token"})
+		_, err := f.FetchRepoGraphQL(context.Background(), models.RepoMeta{Name: "broken"})
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(ContainSubstring("klarte ikke parse repository-data"))
+	})
+
 	It("skal respektere delt GraphQL-cooldown før neste request", func() {
 		callCount := 0
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
