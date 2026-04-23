@@ -91,6 +91,38 @@ var _ = Describe("App.Run", func() {
 		Expect(writer.Calls).To(HaveLen(10))
 	})
 
+	It("dispatcher ikke flere repos enn debug-grensen selv med parallelle workere", func() {
+		cfg.MaxDebugRepos = 1
+		cfg.Parallelism = 2
+		app = runner.NewApp(cfg, writer, fetcher)
+
+		repo1 := models.RepoMeta{FullName: "testorg/repo1", Name: "repo1"}
+		repo2 := models.RepoMeta{FullName: "testorg/repo2", Name: "repo2"}
+		repos := []models.RepoMeta{repo1, repo2}
+		entry := &models.RepoEntry{}
+		repoStarted := make(chan struct{})
+		releaseRepo := make(chan struct{})
+
+		fetcher.On("GetReposPage", mock.Anything, cfg, 1).Return(repos, nil)
+		fetcher.On("FetchRepoGraphQL", mock.Anything, repo1).Run(func(mock.Arguments) {
+			close(repoStarted)
+			<-releaseRepo
+		}).Return(entry, nil).Once()
+		writer.On("ImportRepo", mock.Anything, *entry, mock.AnythingOfType("time.Time")).Return(nil).Once()
+
+		done := make(chan error, 1)
+		go func() {
+			done <- app.Run(processingCtx, shutdownCtx)
+		}()
+
+		<-repoStarted
+		close(releaseRepo)
+
+		Expect(<-done).To(Succeed())
+		fetcher.AssertNotCalled(GinkgoT(), "FetchRepoGraphQL", mock.Anything, repo2)
+		writer.AssertNumberOfCalls(GinkgoT(), "ImportRepo", 1)
+	})
+
 	It("hopper over repo der GraphQL feiler og fortsetter", func() {
 		repo := models.RepoMeta{FullName: "testorg/fails", Name: "fails"}
 		fetcher.On("GetReposPage", mock.Anything, cfg, 1).Return([]models.RepoMeta{repo}, nil)

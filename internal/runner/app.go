@@ -50,6 +50,7 @@ func (a *App) Run(processingCtx, shutdownCtx context.Context) error {
 
 	page := 1
 	var repoIndex int64
+	var debugDispatchCount int64
 	var skippedForGraphqlFailure int64
 	gracefulShutdown := false
 
@@ -88,14 +89,21 @@ loop:
 				continue
 			}
 
-			// Debug-grense-sjekk før goroutine
-			currentIndex := atomic.LoadInt64(&repoIndex)
-			if a.Cfg.Debug && currentIndex >= a.Cfg.MaxDebugRepos {
-				slog.Info("Debug-modus: nådd maks antall repos", "antall", a.Cfg.MaxDebugRepos)
-				break loop
+			reservedDebugSlot := false
+			if a.Cfg.Debug {
+				nextDispatchCount := atomic.AddInt64(&debugDispatchCount, 1)
+				if nextDispatchCount > a.Cfg.MaxDebugRepos {
+					atomic.AddInt64(&debugDispatchCount, -1)
+					slog.Info("Debug-modus: nådd maks antall repos", "antall", a.Cfg.MaxDebugRepos)
+					break loop
+				}
+				reservedDebugSlot = true
 			}
 
 			if err := acquireWorkerSlot(groupCtx, shutdownCtx, sem); err != nil {
+				if reservedDebugSlot {
+					atomic.AddInt64(&debugDispatchCount, -1)
+				}
 				if errors.Is(err, context.Canceled) && shutdownRequested(shutdownCtx) {
 					gracefulShutdown = true
 					break loop
