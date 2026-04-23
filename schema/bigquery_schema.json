@@ -293,6 +293,11 @@
         "bq_name": "uses_pip_install_without_no_cache"
       },
       {
+        "field": "UsesPipInstallWithoutHashes",
+        "go_type": "bool",
+        "bq_name": "uses_pip_install_without_hashes"
+      },
+      {
         "field": "UsesCurlBashPipe",
         "go_type": "bool",
         "bq_name": "uses_curl_bash_pipe"

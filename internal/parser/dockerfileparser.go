@@ -26,6 +26,7 @@ type DockerfileFeatures struct {
 	UsesNpmCiWithoutIgnoreScripts bool
 	UsesYarnInstallWithoutFrozen  bool
 	UsesPipInstallWithoutNoCache  bool
+	UsesPipInstallWithoutHashes   bool
 	UsesCurlBashPipe              bool
 }
 
@@ -105,7 +106,7 @@ func ParseDockerfile(content string) (DockerfileFeatures, []DockerStageMeta) {
 		case strings.HasPrefix(line, "healthcheck"):
 			features.HasHealthcheck = true
 		case strings.HasPrefix(line, "copy "), strings.HasPrefix(line, "add "):
-			if strings.Contains(line, "add ") {
+			if strings.HasPrefix(line, "add ") {
 				features.UsesAddInstruction = true
 			}
 			if strings.Contains(line, ".ssh") || strings.Contains(line, "id_rsa") || strings.Contains(line, "secrets") {
@@ -146,6 +147,9 @@ func ParseDockerfile(content string) (DockerfileFeatures, []DockerStageMeta) {
 		}
 		if isPipInstallWithoutNoCache(line) {
 			features.UsesPipInstallWithoutNoCache = true
+		}
+		if isPipInstallWithoutHashes(line) {
+			features.UsesPipInstallWithoutHashes = true
 		}
 		if isCurlBashPipe(line) {
 			features.UsesCurlBashPipe = true
