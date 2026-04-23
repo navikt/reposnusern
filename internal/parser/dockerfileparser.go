@@ -36,126 +36,226 @@ type DockerStageMeta struct {
 	BaseTag    string
 }
 
-func ParseDockerfile(content string) (DockerfileFeatures, []DockerStageMeta) {
-	lines := strings.Split(content, "\n")
+type dockerInstruction struct {
+	keyword string
+	value   string
+}
 
+type fromInstruction struct {
+	alias      string
+	baseImage  string
+	baseTag    string
+	isAlias    bool
+	unresolved bool
+}
+
+func ParseDockerfile(content string) (DockerfileFeatures, []DockerStageMeta) {
 	var features DockerfileFeatures
 	var stages []DockerStageMeta
-	knownAliases := map[string]bool{}
+	knownAliases := map[string]struct{}{}
 	stageIndex := 0
 
-	for _, rawLine := range lines {
-		line := strings.TrimSpace(strings.ToLower(rawLine))
-
-		// === FROM parsing ===
-		if strings.HasPrefix(strings.ToLower(line), "from ") {
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				image := parts[1]
-				imageLower := strings.ToLower(image)
-
-				// FROM ... AS alias
-				if len(parts) >= 4 && strings.ToLower(parts[2]) == "as" {
-					alias := parts[3]
-					knownAliases[alias] = true
-				}
-
-				// Skip if the "image" is an alias
-				if knownAliases[imageLower] || strings.HasPrefix(image, "${") {
-					continue
-				}
-
-				baseImage := image
-				baseTag := "latest"
-				if strings.Contains(image, ":") {
-					split := strings.SplitN(image, ":", 2)
-					baseImage = split[0]
-					baseTag = split[1]
-				}
-
-				if baseTag == "latest" {
-					features.UsesLatestTag = true
-				}
-
-				// Sett første base-image i DockerfileFeatures
-				if features.BaseImage == "" {
-					features.BaseImage = baseImage
-					features.BaseTag = baseTag
-				}
-
-				stages = append(stages, DockerStageMeta{
-					StageIndex: stageIndex,
-					BaseImage:  baseImage,
-					BaseTag:    baseTag,
-				})
-				stageIndex++
+	for _, instruction := range parseDockerInstructions(content) {
+		switch instruction.keyword {
+		case "from":
+			parsed := parseFromInstruction(instruction.value, knownAliases)
+			if parsed.alias != "" {
+				knownAliases[strings.ToLower(parsed.alias)] = struct{}{}
 			}
-			continue
-		}
+			if parsed.isAlias || parsed.unresolved || parsed.baseImage == "" {
+				continue
+			}
 
-		// === Feature flags ===
-		switch {
-		case strings.HasPrefix(line, "user "):
+			if parsed.baseTag == "latest" {
+				features.UsesLatestTag = true
+			}
+			if features.BaseImage == "" {
+				features.BaseImage = parsed.baseImage
+				features.BaseTag = parsed.baseTag
+			}
+
+			stages = append(stages, DockerStageMeta{
+				StageIndex: stageIndex,
+				BaseImage:  parsed.baseImage,
+				BaseTag:    parsed.baseTag,
+			})
+			stageIndex++
+		case "user":
 			features.HasUserInstruction = true
-		case strings.HasPrefix(line, "label "):
+		case "label":
 			features.HasLabelMetadata = true
-		case strings.HasPrefix(line, "expose "):
+		case "expose":
 			features.HasExpose = true
-		case strings.HasPrefix(line, "entrypoint"), strings.HasPrefix(line, "cmd"):
+		case "entrypoint", "cmd":
 			features.HasEntrypointOrCmd = true
-		case strings.HasPrefix(line, "healthcheck"):
+		case "healthcheck":
 			features.HasHealthcheck = true
-		case strings.HasPrefix(line, "copy "), strings.HasPrefix(line, "add "):
-			if strings.HasPrefix(line, "add ") {
+		case "copy", "add":
+			lowerValue := strings.ToLower(instruction.value)
+			if instruction.keyword == "add" {
 				features.UsesAddInstruction = true
 			}
-			if strings.Contains(line, ".ssh") || strings.Contains(line, "id_rsa") || strings.Contains(line, "secrets") {
+			if strings.Contains(lowerValue, ".ssh") || strings.Contains(lowerValue, "id_rsa") || strings.Contains(lowerValue, "secrets") {
 				features.HasCopySensitive = true
 			}
-		}
-
-		if strings.Contains(line, "apt-get install") ||
-			strings.Contains(line, "apk add") ||
-			strings.Contains(line, "yum install") ||
-			strings.Contains(line, "dnf install") {
-			features.HasPackageInstalls = true
-		}
-		if strings.Contains(line, "curl") || strings.Contains(line, "wget") {
-			features.InstallsCurlOrWget = true
-		}
-		if strings.Contains(line, "gcc") || strings.Contains(line, "make") || strings.Contains(line, "build-essential") {
-			features.InstallsBuildTools = true
-		}
-		if strings.Contains(line, "apt-get clean") {
-			features.HasAptGetClean = true
-		}
-		if strings.Contains(line, "chmod 777") {
-			features.WorldWritable = true
-		}
-		if (strings.Contains(line, "env ") || strings.Contains(line, "arg ")) &&
-			(strings.Contains(line, "password") || strings.Contains(line, "token") || strings.Contains(line, "secret")) {
-			features.HasSecretsInEnvOrArg = true
-		}
-		if isNpmInstall(line) {
-			features.UsesNpmInstall = true
-		}
-		if isNpmCiWithoutIgnoreScripts(line) {
-			features.UsesNpmCiWithoutIgnoreScripts = true
-		}
-		if isYarnInstallWithoutFrozen(line) {
-			features.UsesYarnInstallWithoutFrozen = true
-		}
-		if isPipInstallWithoutNoCache(line) {
-			features.UsesPipInstallWithoutNoCache = true
-		}
-		if isPipInstallWithoutHashes(line) {
-			features.UsesPipInstallWithoutHashes = true
-		}
-		if isCurlBashPipe(line) {
-			features.UsesCurlBashPipe = true
+		case "run":
+			lowerValue := strings.ToLower(instruction.value)
+			if strings.Contains(lowerValue, "apt-get install") ||
+				strings.Contains(lowerValue, "apk add") ||
+				strings.Contains(lowerValue, "yum install") ||
+				strings.Contains(lowerValue, "dnf install") {
+				features.HasPackageInstalls = true
+			}
+			if strings.Contains(lowerValue, "curl") || strings.Contains(lowerValue, "wget") {
+				features.InstallsCurlOrWget = true
+			}
+			if strings.Contains(lowerValue, "gcc") || strings.Contains(lowerValue, "make") || strings.Contains(lowerValue, "build-essential") {
+				features.InstallsBuildTools = true
+			}
+			if strings.Contains(lowerValue, "apt-get clean") {
+				features.HasAptGetClean = true
+			}
+			if strings.Contains(lowerValue, "chmod 777") {
+				features.WorldWritable = true
+			}
+			if isNpmInstall(lowerValue) {
+				features.UsesNpmInstall = true
+			}
+			if isNpmCiWithoutIgnoreScripts(lowerValue) {
+				features.UsesNpmCiWithoutIgnoreScripts = true
+			}
+			if isYarnInstallWithoutFrozen(lowerValue) {
+				features.UsesYarnInstallWithoutFrozen = true
+			}
+			if isPipInstallWithoutNoCache(lowerValue) {
+				features.UsesPipInstallWithoutNoCache = true
+			}
+			if isPipInstallWithoutHashes(lowerValue) {
+				features.UsesPipInstallWithoutHashes = true
+			}
+			if isCurlBashPipe(lowerValue) {
+				features.UsesCurlBashPipe = true
+			}
+		case "env", "arg":
+			lowerValue := strings.ToLower(instruction.value)
+			if strings.Contains(lowerValue, "password") || strings.Contains(lowerValue, "token") || strings.Contains(lowerValue, "secret") {
+				features.HasSecretsInEnvOrArg = true
+			}
 		}
 	}
 
 	features.UsesMultistage = len(stages) > 1
 	return features, stages
+}
+
+func parseDockerInstructions(content string) []dockerInstruction {
+	lines := strings.Split(content, "\n")
+	var instructions []dockerInstruction
+	var current []string
+
+	flushCurrent := func() {
+		if len(current) == 0 {
+			return
+		}
+
+		joined := strings.Join(current, " ")
+		current = nil
+
+		fields := strings.Fields(joined)
+		if len(fields) == 0 {
+			return
+		}
+
+		keyword := strings.ToLower(fields[0])
+		value := strings.TrimSpace(joined[len(fields[0]):])
+		instructions = append(instructions, dockerInstruction{
+			keyword: keyword,
+			value:   value,
+		})
+	}
+
+	for _, rawLine := range lines {
+		trimmedLine := strings.TrimSpace(rawLine)
+		if len(current) == 0 && (trimmedLine == "" || strings.HasPrefix(trimmedLine, "#")) {
+			continue
+		}
+
+		line := strings.TrimRight(rawLine, " \t\r")
+		continuation := strings.HasSuffix(line, "\\")
+		segment := strings.TrimSpace(strings.TrimSuffix(line, "\\"))
+		if segment != "" {
+			current = append(current, segment)
+		}
+
+		if continuation {
+			continue
+		}
+
+		flushCurrent()
+	}
+
+	flushCurrent()
+	return instructions
+}
+
+func parseFromInstruction(value string, knownAliases map[string]struct{}) fromInstruction {
+	fields := strings.Fields(value)
+	if len(fields) == 0 {
+		return fromInstruction{}
+	}
+
+	i := 0
+	for i < len(fields) && strings.HasPrefix(fields[i], "--") {
+		i++
+	}
+	if i >= len(fields) {
+		return fromInstruction{}
+	}
+
+	imageRef := fields[i]
+	i++
+
+	var alias string
+	if i+1 < len(fields) && strings.EqualFold(fields[i], "as") {
+		alias = fields[i+1]
+	}
+
+	if strings.Contains(imageRef, "$") {
+		return fromInstruction{
+			alias:      alias,
+			unresolved: true,
+		}
+	}
+
+	if _, ok := knownAliases[strings.ToLower(imageRef)]; ok {
+		return fromInstruction{
+			alias:   alias,
+			isAlias: true,
+		}
+	}
+
+	baseImage, baseTag := splitDockerImageReference(imageRef)
+	return fromInstruction{
+		alias:     alias,
+		baseImage: baseImage,
+		baseTag:   baseTag,
+	}
+}
+
+func splitDockerImageReference(ref string) (string, string) {
+	if ref == "" {
+		return "", ""
+	}
+
+	if at := strings.Index(ref, "@"); at >= 0 {
+		return ref[:at], ""
+	}
+
+	lastSlash := strings.LastIndex(ref, "/")
+	lastColon := strings.LastIndex(ref, ":")
+	if lastColon > lastSlash {
+		return ref[:lastColon], ref[lastColon+1:]
+	}
+
+	return ref, "latest"
 }
