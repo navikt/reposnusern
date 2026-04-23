@@ -485,6 +485,33 @@ var _ = Describe("doRequestWithRateLimit", func() {
 		Expect(time.Since(start)).To(BeNumerically("<", 5*time.Second))
 	})
 
+	It("skal avbryte rate limit-ventetid ved shutdown-signal uten å kansellere hovedkonteksten", func() {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("X-RateLimit-Remaining", "0")
+			w.Header().Set("X-RateLimit-Reset", fmt.Sprint(time.Now().Add(60*time.Second).Unix()))
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = fmt.Fprintln(w, `{}`)
+		}))
+		defer ts.Close()
+
+		fetcher.HttpClient = ts.Client()
+		baseCtx := context.Background()
+		waitCtx, cancelWait := context.WithCancel(context.Background())
+		go func() {
+			time.Sleep(50 * time.Millisecond)
+			cancelWait()
+		}()
+
+		start := time.Now()
+		var result any
+		err := fetcher.DoRequestWithRateLimit(fetcher.WithWaitInterrupt(baseCtx, waitCtx), "GET", ts.URL, "dummy-token", nil, &result)
+
+		Expect(err).To(HaveOccurred())
+		Expect(errors.Is(err, fetcher.ErrWaitInterrupted)).To(BeTrue())
+		Expect(baseCtx.Err()).NotTo(HaveOccurred())
+		Expect(time.Since(start)).To(BeNumerically("<", 5*time.Second))
+	})
+
 	It("skal prøve igjen ved serverfeil og lykkes til slutt", func() {
 		callCount := 0
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

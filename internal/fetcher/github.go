@@ -238,8 +238,23 @@ func (r *RepoFetcher) fetchAndParseFiletree(ctx context.Context, baseRepo models
 // context is cancelled. This allows rate-limit and retry waits to be interrupted
 // by a SIGTERM signal, which is essential for graceful Kubernetes job shutdown.
 func sleepWithContext(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+
+	interruptCtx := waitInterruptContext(ctx)
+	if interruptCtx != nil {
+		select {
+		case <-timer.C:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-interruptCtx.Done():
+			return ErrWaitInterrupted
+		}
+	}
+
 	select {
-	case <-time.After(d):
+	case <-timer.C:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
@@ -565,7 +580,7 @@ func ExtractLanguages(data map[string]interface{}) map[string]int {
 // Extracts dockerfiles and dependencyfiles from graphql response
 func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 	files := map[string][]map[string]string{}
-	
+
 	if deps, ok := data["dependencies"].(map[string]interface{}); ok {
 		if entries, ok := deps["entries"].([]interface{}); ok {
 			for _, raw := range entries {
@@ -580,7 +595,7 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 				// Check if this is a file we want to extract
 				var fileType string
 				if isDockerfile(lowerName) {
-					fileType = "dockerfile" 
+					fileType = "dockerfile"
 				} else if isDependencyfile(lowerName) {
 					fileType = "dependencies"
 				} else {
@@ -616,7 +631,7 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 
 // Heuristic for finding dockerfile by name
 func isDockerfile(filename string) bool {
-	return strings.Contains(filename, "dockerfile") && !strings.Contains(filename, "dockerignore");
+	return strings.Contains(filename, "dockerfile") && !strings.Contains(filename, "dockerignore")
 }
 
 // isDependencyfile checks if a filename is a dependency file we care about

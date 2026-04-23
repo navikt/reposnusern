@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/jonmartinstorm/reposnusern/internal/config"
+	fetcherpkg "github.com/jonmartinstorm/reposnusern/internal/fetcher"
 	"github.com/jonmartinstorm/reposnusern/internal/mocks"
 	"github.com/jonmartinstorm/reposnusern/internal/models"
 	"github.com/jonmartinstorm/reposnusern/internal/runner"
@@ -18,6 +20,23 @@ import (
 func TestRunner(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Runner Suite")
+}
+
+type rateLimitWaitingFetcher struct {
+	started chan struct{}
+}
+
+func (f *rateLimitWaitingFetcher) GetReposPage(ctx context.Context, cfg config.Config, page int) ([]models.RepoMeta, error) {
+	if page == 1 {
+		return []models.RepoMeta{{FullName: "testorg/repo1", Name: "repo1"}}, nil
+	}
+	return []models.RepoMeta{}, nil
+}
+
+func (f *rateLimitWaitingFetcher) FetchRepoGraphQL(ctx context.Context, baseRepo models.RepoMeta) (*models.RepoEntry, error) {
+	close(f.started)
+	fetcherpkg.SharedRateLimiter.BlockFor(fetcherpkg.RateLimitResourceGraphQL, time.Minute)
+	return nil, fetcherpkg.SharedRateLimiter.Wait(ctx, fetcherpkg.RateLimitResourceGraphQL)
 }
 
 var _ = Describe("App.Run", func() {
@@ -169,5 +188,29 @@ var _ = Describe("App.Run", func() {
 		Expect(<-done).To(Succeed())
 		writer.AssertNumberOfCalls(GinkgoT(), "ImportRepo", 1)
 		fetcher.AssertNotCalled(GinkgoT(), "FetchRepoGraphQL", mock.Anything, repo2)
+	})
+
+	It("avbryter rate limit-venting ved første shutdown-signal", func() {
+		cfg.Debug = false
+		cfg.Parallelism = 1
+		shutdownCtx, stopShutdown := context.WithCancel(context.Background())
+		defer stopShutdown()
+
+		fetcherpkg.ResetRateLimitStats()
+		defer fetcherpkg.ResetRateLimitStats()
+
+		waitingFetcher := &rateLimitWaitingFetcher{started: make(chan struct{})}
+		app = runner.NewApp(cfg, writer, waitingFetcher)
+
+		done := make(chan error, 1)
+		go func() {
+			done <- app.Run(processingCtx, shutdownCtx)
+		}()
+
+		<-waitingFetcher.started
+		stopShutdown()
+
+		Eventually(done).Should(Receive(Succeed()))
+		writer.AssertNotCalled(GinkgoT(), "ImportRepo")
 	})
 })
