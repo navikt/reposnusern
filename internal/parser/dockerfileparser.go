@@ -81,6 +81,7 @@ func ParseDockerfile(content string) (DockerfileFeatures, []DockerStageMeta) {
 				continue
 			}
 			resolvedValue, _ := resolveArgReferences(defaultValue, globalArgs)
+			resolvedValue = trimMatchingQuotes(resolvedValue)
 			globalArgs[name] = resolvedValue
 		case "from":
 			seenFrom = true
@@ -241,6 +242,7 @@ func parseFromInstruction(value string, knownAliases map[string]struct{}, global
 	imageRef := fields[i]
 	i++
 	resolvedRef, unresolved := resolveArgReferences(imageRef, globalArgs)
+	resolvedRef = trimMatchingQuotes(resolvedRef)
 
 	var alias string
 	if i+1 < len(fields) && strings.EqualFold(fields[i], "as") {
@@ -331,4 +333,18 @@ func splitDockerImageReference(ref string) (string, string) {
 	}
 
 	return ref, "latest"
+}
+
+func trimMatchingQuotes(value string) string {
+	if len(value) < 2 {
+		return value
+	}
+
+	first := value[0]
+	last := value[len(value)-1]
+	if (first == '"' || first == '\'') && first == last {
+		return value[1 : len(value)-1]
+	}
+
+	return value
 }

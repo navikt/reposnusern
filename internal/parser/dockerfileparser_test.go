@@ -359,6 +359,47 @@ FROM ${NODE_BUILD_IMG} AS prepare`,
 			},
 		),
 
+		Entry("Quoted global ARG default resolves FROM image reference",
+			`ARG NODE_BUILD_IMG="node:20-alpine"
+FROM ${NODE_BUILD_IMG} AS prepare`,
+			parser.DockerfileFeatures{
+				BaseImage:     "node",
+				BaseTag:       "20-alpine",
+				UsesLatestTag: false,
+			},
+		),
+
+		Entry("Quoted chained global ARG defaults resolve before FROM parsing",
+			`ARG NODE_VERSION="20-alpine"
+ARG NODE_BUILD_IMG="node:${NODE_VERSION}"
+FROM ${NODE_BUILD_IMG} AS prepare`,
+			parser.DockerfileFeatures{
+				BaseImage:     "node",
+				BaseTag:       "20-alpine",
+				UsesLatestTag: false,
+			},
+		),
+
+		Entry("Quoted empty single-quote ARG prefix resolves before FROM parsing",
+			`ARG REPO_LOCATION=''
+FROM ${REPO_LOCATION}node:18.20.8-alpine3.21`,
+			parser.DockerfileFeatures{
+				BaseImage:     "node",
+				BaseTag:       "18.20.8-alpine3.21",
+				UsesLatestTag: false,
+			},
+		),
+
+		Entry("Quoted empty double-quote ARG prefix resolves before FROM parsing",
+			`ARG BASE_IMAGE_PREFIX=""
+FROM ${BASE_IMAGE_PREFIX}maven AS builder`,
+			parser.DockerfileFeatures{
+				BaseImage:     "maven",
+				BaseTag:       "latest",
+				UsesLatestTag: true,
+			},
+		),
+
 		Entry("COPY with flags still detects sensitive paths",
 			`FROM alpine AS base
 COPY --from=builder .ssh /root/.ssh`,
@@ -432,6 +473,30 @@ FROM base AS final`,
 FROM --platform=${BUILDPLATFORM} ${NODE_BUILD_IMG} AS prepare`,
 			[]parser.DockerStageMeta{
 				{StageIndex: 0, BaseImage: "node", BaseTag: "20-alpine"},
+			},
+		),
+
+		Entry("Quoted global ARG default resolves stage metadata from FROM",
+			`ARG MAVEN_BUILD_IMG='maven:3.9-eclipse-temurin-21'
+FROM ${MAVEN_BUILD_IMG} AS build`,
+			[]parser.DockerStageMeta{
+				{StageIndex: 0, BaseImage: "maven", BaseTag: "3.9-eclipse-temurin-21"},
+			},
+		),
+
+		Entry("Quoted empty single-quote ARG prefix resolves stage metadata from FROM",
+			`ARG REPO_LOCATION=''
+FROM ${REPO_LOCATION}node:18.20.8-alpine3.21`,
+			[]parser.DockerStageMeta{
+				{StageIndex: 0, BaseImage: "node", BaseTag: "18.20.8-alpine3.21"},
+			},
+		),
+
+		Entry("Quoted empty double-quote ARG prefix resolves stage metadata from FROM",
+			`ARG BASE_IMAGE_PREFIX=""
+FROM ${BASE_IMAGE_PREFIX}maven AS builder`,
+			[]parser.DockerStageMeta{
+				{StageIndex: 0, BaseImage: "maven", BaseTag: "latest"},
 			},
 		),
 
