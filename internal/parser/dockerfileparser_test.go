@@ -93,11 +93,20 @@ COPY --from=builder /app /app`,
 			},
 		),
 
-		Entry("Digest reference does not imply latest",
+		Entry("Digest reference is preserved in base tag",
 			`FROM alpine@sha256:deadbeef`,
 			parser.DockerfileFeatures{
 				BaseImage:     "alpine",
-				BaseTag:       "",
+				BaseTag:       "sha256:deadbeef",
+				UsesLatestTag: false,
+			},
+		),
+
+		Entry("Tag and digest are both preserved in base tag",
+			`FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/node:24-slim@sha256:5aac35a0b0f5c43f19d9bfaa0663a0e177903b44f7d8b80f4fd5f928bedfe3ca`,
+			parser.DockerfileFeatures{
+				BaseImage:     "europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/node",
+				BaseTag:       "24-slim@sha256:5aac35a0b0f5c43f19d9bfaa0663a0e177903b44f7d8b80f4fd5f928bedfe3ca",
 				UsesLatestTag: false,
 			},
 		),
@@ -396,10 +405,17 @@ FROM alpine:3.20`,
 			},
 		),
 
-		Entry("Digest references produce empty base tag",
+		Entry("Digest references are preserved in stage base tag",
 			`FROM alpine@sha256:deadbeef`,
 			[]parser.DockerStageMeta{
-				{StageIndex: 0, BaseImage: "alpine", BaseTag: ""},
+				{StageIndex: 0, BaseImage: "alpine", BaseTag: "sha256:deadbeef"},
+			},
+		),
+
+		Entry("Tag and digest are both preserved in stage base tag",
+			`FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/node:24-slim@sha256:5aac35a0b0f5c43f19d9bfaa0663a0e177903b44f7d8b80f4fd5f928bedfe3ca`,
+			[]parser.DockerStageMeta{
+				{StageIndex: 0, BaseImage: "europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/node", BaseTag: "24-slim@sha256:5aac35a0b0f5c43f19d9bfaa0663a0e177903b44f7d8b80f4fd5f928bedfe3ca"},
 			},
 		),
 

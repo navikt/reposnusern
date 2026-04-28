@@ -56,7 +56,7 @@ type fromInstruction struct {
 // Could add more rules
 func LooksLikeDockerfile(content string) bool {
 	return utf8.ValidString(content)
-	}
+}
 
 func ParseDockerfile(content string) (DockerfileFeatures, []DockerStageMeta) {
 	var features DockerfileFeatures
@@ -312,7 +312,16 @@ func splitDockerImageReference(ref string) (string, string) {
 	}
 
 	if at := strings.Index(ref, "@"); at >= 0 {
-		return ref[:at], ""
+		imageRef := ref[:at]
+		digest := ref[at+1:]
+
+		lastSlash := strings.LastIndex(imageRef, "/")
+		lastColon := strings.LastIndex(imageRef, ":")
+		if lastColon > lastSlash {
+			return imageRef[:lastColon], imageRef[lastColon+1:] + "@" + digest
+		}
+
+		return imageRef, digest
 	}
 
 	lastSlash := strings.LastIndex(ref, "/")
