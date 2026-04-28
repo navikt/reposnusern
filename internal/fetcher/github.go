@@ -626,6 +626,10 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 					continue
 				}
 				// For Dockerfiles, we want the content to analyze them later
+				if !parser.LooksLikeDockerfile(content){
+					slog.Debug("Skipper Dockerfile-kandidat med ugyldig innhold", "path", name)
+					continue
+				}
 				if content != "" {
 					files[fileType] = append(files[fileType], map[string]string{
 						"path":    name,
@@ -824,6 +828,7 @@ func (r *RepoFetcher) FetchDockerfilesFromTree(ctx context.Context, owner, repo 
 		// Extract just the filename from the path
 		pathParts := strings.Split(entry.Path, "/")
 		filename := pathParts[len(pathParts)-1]
+		lowername := strings.ToLower(filename)
 
 		// Skip root-level files (they were already fetched via GraphQL)
 		if len(pathParts) == 1 {
@@ -835,10 +840,17 @@ func (r *RepoFetcher) FetchDockerfilesFromTree(ctx context.Context, owner, repo 
 		if entry.Size == 0 {
 			continue
 		}
-		if !isDockerfile(filename) {
+		// Skip root-level files (they were already fetched via GraphQL)
+		if len(pathParts) == 1 {
+			continue
+		}
+		if !isDockerfile(lowername) {
 			continue
 		}
 		content := r.fetchFileContent(ctx, owner, repo, entry.Path)
+		if !parser.LooksLikeDockerfile(content){
+			continue
+		}
 		if content != "" {
 			results = append(results, models.FileEntry{
 				Path:    entry.Path,

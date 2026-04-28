@@ -93,11 +93,20 @@ COPY --from=builder /app /app`,
 			},
 		),
 
-		Entry("Digest reference does not imply latest",
+		Entry("Digest reference is preserved in base tag",
 			`FROM alpine@sha256:deadbeef`,
 			parser.DockerfileFeatures{
 				BaseImage:     "alpine",
-				BaseTag:       "",
+				BaseTag:       "sha256:deadbeef",
+				UsesLatestTag: false,
+			},
+		),
+
+		Entry("Tag and digest are both preserved in base tag",
+			`FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/node:24-slim@sha256:5aac35a0b0f5c43f19d9bfaa0663a0e177903b44f7d8b80f4fd5f928bedfe3ca`,
+			parser.DockerfileFeatures{
+				BaseImage:     "europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/node",
+				BaseTag:       "24-slim@sha256:5aac35a0b0f5c43f19d9bfaa0663a0e177903b44f7d8b80f4fd5f928bedfe3ca",
 				UsesLatestTag: false,
 			},
 		),
@@ -350,6 +359,47 @@ FROM ${NODE_BUILD_IMG} AS prepare`,
 			},
 		),
 
+		Entry("Quoted global ARG default resolves FROM image reference",
+			`ARG NODE_BUILD_IMG="node:20-alpine"
+FROM ${NODE_BUILD_IMG} AS prepare`,
+			parser.DockerfileFeatures{
+				BaseImage:     "node",
+				BaseTag:       "20-alpine",
+				UsesLatestTag: false,
+			},
+		),
+
+		Entry("Quoted chained global ARG defaults resolve before FROM parsing",
+			`ARG NODE_VERSION="20-alpine"
+ARG NODE_BUILD_IMG="node:${NODE_VERSION}"
+FROM ${NODE_BUILD_IMG} AS prepare`,
+			parser.DockerfileFeatures{
+				BaseImage:     "node",
+				BaseTag:       "20-alpine",
+				UsesLatestTag: false,
+			},
+		),
+
+		Entry("Quoted empty single-quote ARG prefix resolves before FROM parsing",
+			`ARG REPO_LOCATION=''
+FROM ${REPO_LOCATION}node:18.20.8-alpine3.21`,
+			parser.DockerfileFeatures{
+				BaseImage:     "node",
+				BaseTag:       "18.20.8-alpine3.21",
+				UsesLatestTag: false,
+			},
+		),
+
+		Entry("Quoted empty double-quote ARG prefix resolves before FROM parsing",
+			`ARG BASE_IMAGE_PREFIX=""
+FROM ${BASE_IMAGE_PREFIX}maven AS builder`,
+			parser.DockerfileFeatures{
+				BaseImage:     "maven",
+				BaseTag:       "latest",
+				UsesLatestTag: true,
+			},
+		),
+
 		Entry("COPY with flags still detects sensitive paths",
 			`FROM alpine AS base
 COPY --from=builder .ssh /root/.ssh`,
@@ -396,10 +446,17 @@ FROM alpine:3.20`,
 			},
 		),
 
-		Entry("Digest references produce empty base tag",
+		Entry("Digest references are preserved in stage base tag",
 			`FROM alpine@sha256:deadbeef`,
 			[]parser.DockerStageMeta{
-				{StageIndex: 0, BaseImage: "alpine", BaseTag: ""},
+				{StageIndex: 0, BaseImage: "alpine", BaseTag: "sha256:deadbeef"},
+			},
+		),
+
+		Entry("Tag and digest are both preserved in stage base tag",
+			`FROM europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/node:24-slim@sha256:5aac35a0b0f5c43f19d9bfaa0663a0e177903b44f7d8b80f4fd5f928bedfe3ca`,
+			[]parser.DockerStageMeta{
+				{StageIndex: 0, BaseImage: "europe-north1-docker.pkg.dev/cgr-nav/pull-through/nav.no/node", BaseTag: "24-slim@sha256:5aac35a0b0f5c43f19d9bfaa0663a0e177903b44f7d8b80f4fd5f928bedfe3ca"},
 			},
 		),
 
@@ -416,6 +473,30 @@ FROM base AS final`,
 FROM --platform=${BUILDPLATFORM} ${NODE_BUILD_IMG} AS prepare`,
 			[]parser.DockerStageMeta{
 				{StageIndex: 0, BaseImage: "node", BaseTag: "20-alpine"},
+			},
+		),
+
+		Entry("Quoted global ARG default resolves stage metadata from FROM",
+			`ARG MAVEN_BUILD_IMG='maven:3.9-eclipse-temurin-21'
+FROM ${MAVEN_BUILD_IMG} AS build`,
+			[]parser.DockerStageMeta{
+				{StageIndex: 0, BaseImage: "maven", BaseTag: "3.9-eclipse-temurin-21"},
+			},
+		),
+
+		Entry("Quoted empty single-quote ARG prefix resolves stage metadata from FROM",
+			`ARG REPO_LOCATION=''
+FROM ${REPO_LOCATION}node:18.20.8-alpine3.21`,
+			[]parser.DockerStageMeta{
+				{StageIndex: 0, BaseImage: "node", BaseTag: "18.20.8-alpine3.21"},
+			},
+		),
+
+		Entry("Quoted empty double-quote ARG prefix resolves stage metadata from FROM",
+			`ARG BASE_IMAGE_PREFIX=""
+FROM ${BASE_IMAGE_PREFIX}maven AS builder`,
+			[]parser.DockerStageMeta{
+				{StageIndex: 0, BaseImage: "maven", BaseTag: "latest"},
 			},
 		),
 
