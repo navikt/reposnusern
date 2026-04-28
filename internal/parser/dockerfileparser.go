@@ -3,6 +3,7 @@ package parser
 import (
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 type DockerfileFeatures struct {
@@ -50,6 +51,12 @@ type fromInstruction struct {
 	unresolved bool
 	parseable  bool
 }
+
+// LooksLikeDockerfile checks whether content is valid UTF-8 text
+// Could add more rules
+func LooksLikeDockerfile(content string) bool {
+	return utf8.ValidString(content)
+	}
 
 func ParseDockerfile(content string) (DockerfileFeatures, []DockerStageMeta) {
 	var features DockerfileFeatures

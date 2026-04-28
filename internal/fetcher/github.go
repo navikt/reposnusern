@@ -626,6 +626,10 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 					continue
 				}
 				// For Dockerfiles, we want the content to analyze them later
+				if !parser.LooksLikeDockerfile(content){
+					slog.Debug("Skipper Dockerfile-kandidat med ugyldig innhold", "path", name)
+					continue
+				}
 				if content != "" {
 					files[fileType] = append(files[fileType], map[string]string{
 						"path":    name,
@@ -839,6 +843,9 @@ func (r *RepoFetcher) FetchDockerfilesFromTree(ctx context.Context, owner, repo 
 			continue
 		}
 		content := r.fetchFileContent(ctx, owner, repo, entry.Path)
+		if !parser.LooksLikeDockerfile(content){
+			continue
+		}
 		if content != "" {
 			results = append(results, models.FileEntry{
 				Path:    entry.Path,
