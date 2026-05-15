@@ -140,6 +140,7 @@ var _ = Describe("BigQuery schema contract", func() {
 			{"UsesPipInstallWithoutHashes", "bool", "uses_pip_install_without_hashes"},
 			{"UsesCurlBashPipe", "bool", "uses_curl_bash_pipe"},
 			{"UsesSudo", "bool", "uses_sudo"},
+			{"SecretNames", "[]string", "secret_names"},
 		}),
 
 		Entry("BGSBOMPackages", bqwriter.BGSBOMPackages{}, []fieldSpec{
@@ -212,7 +213,19 @@ var _ = Describe("Convert* golden file tests", func() {
 			},
 		},
 		CIConfig: []models.FileEntry{
-			{Path: ".github/workflows/ci.yml", Content: "name: CI"},
+			{
+				Path: ".github/workflows/ci.yml",
+				Content: `name: CI
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          API_TOKEN: ${{ secrets.API_TOKEN }}
+          SECONDARY_TOKEN: ${{ secrets["SECONDARY_TOKEN"] }}
+        run: echo ok`,
+			},
 		},
 		SBOM: map[string]interface{}{
 			"sbom": map[string]interface{}{

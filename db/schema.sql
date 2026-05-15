@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS ci_configs (
     uses_pip_install_without_hashes BOOLEAN,
     uses_curl_bash_pipe BOOLEAN,
     uses_sudo BOOLEAN,
+    secret_names TEXT[] NOT NULL DEFAULT '{}',
 
     UNIQUE (repo_id, hentet_dato, path)
 );

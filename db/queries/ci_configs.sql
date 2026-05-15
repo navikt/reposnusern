@@ -7,10 +7,11 @@ INSERT INTO ci_configs (
   uses_pip_install_without_no_cache,
   uses_pip_install_without_hashes,
   uses_curl_bash_pipe,
-  uses_sudo
+  uses_sudo,
+  secret_names
 ) VALUES (
   $1, $2, $3, $4,
-  $5, $6, $7, $8, $9, $10, $11
+  $5, $6, $7, $8, $9, $10, $11, $12
 )
 ON CONFLICT (repo_id, hentet_dato, path) DO UPDATE SET
   content = EXCLUDED.content,
@@ -20,4 +21,5 @@ ON CONFLICT (repo_id, hentet_dato, path) DO UPDATE SET
   uses_pip_install_without_no_cache = EXCLUDED.uses_pip_install_without_no_cache,
   uses_pip_install_without_hashes = EXCLUDED.uses_pip_install_without_hashes,
   uses_curl_bash_pipe = EXCLUDED.uses_curl_bash_pipe,
-  uses_sudo = EXCLUDED.uses_sudo;
+  uses_sudo = EXCLUDED.uses_sudo,
+  secret_names = EXCLUDED.secret_names;

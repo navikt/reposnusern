@@ -9,6 +9,9 @@ import (
 var _ = Describe("ParseCIConfig", func() {
 	DescribeTable("CI config parsing correctly detects antipatterns",
 		func(content string, expected parser.CIFeatures) {
+			if expected.SecretNames == nil {
+				expected.SecretNames = []string{}
+			}
 			result := parser.ParseCIConfig(content)
 			Expect(result).To(Equal(expected))
 		},
@@ -108,6 +111,44 @@ var _ = Describe("ParseCIConfig", func() {
 			parser.CIFeatures{},
 		),
 
+		Entry("static secret names are extracted from expressions",
+			`name: CI
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      API_TOKEN: ${{ secrets.API_TOKEN }}
+      SECONDARY_TOKEN: ${{ secrets['SECONDARY_TOKEN'] }}
+    steps:
+      - run: echo "${{ secrets.API_TOKEN }}"`,
+			parser.CIFeatures{SecretNames: []string{"API_TOKEN", "SECONDARY_TOKEN"}},
+		),
+
+		Entry("dynamic secret lookups are skipped",
+			`name: CI
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "${{ secrets[matrix.secret_name] }}"
+      - run: echo "${{ secrets[inputs.secret_name] }}"`,
+			parser.CIFeatures{},
+		),
+
+		Entry("secret references in comments are ignored",
+			`name: CI
+on: [push]
+# ${{ secrets.FAKE_SECRET }}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok`,
+			parser.CIFeatures{},
+		),
+
 		Entry("realistic GitHub Actions YAML with multiple antipatterns",
 			`name: CI
 on: [push]
@@ -124,6 +165,11 @@ jobs:
         run: pip install requests
       - name: Fetch tool
         run: curl https://example.com/setup.sh | bash
+      - name: Publish
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_TOKEN: ${{ secrets["RELEASE_TOKEN"] }}
+        run: echo "ship it"
       - name: Fix perms
         run: sudo chmod +x ./run.sh`,
 			parser.CIFeatures{
@@ -133,6 +179,7 @@ jobs:
 				UsesPipInstallWithoutHashes:  true,
 				UsesCurlBashPipe:             true,
 				UsesSudo:                     true,
+				SecretNames:                  []string{"NPM_TOKEN", "RELEASE_TOKEN"},
 			},
 		),
 
@@ -152,6 +199,10 @@ jobs:
         run: pip install requests
       - name: Fetch tool
         run: curl https://example.com/setup.sh | bash
+      - name: Publish
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: echo "ship it"
       - name: Fix perms
         run: sudo chmod +x ./run.sh`,
 			parser.CIFeatures{
@@ -161,6 +212,7 @@ jobs:
 				UsesPipInstallWithoutHashes:  true,
 				UsesCurlBashPipe:             true,
 				UsesSudo:                     true,
+				SecretNames:                  []string{"NPM_TOKEN"},
 			},
 		),
 	)
