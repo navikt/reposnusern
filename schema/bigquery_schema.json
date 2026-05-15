@@ -396,6 +396,11 @@
         "field": "UsesSudo",
         "go_type": "bool",
         "bq_name": "uses_sudo"
+      },
+      {
+        "field": "SecretNames",
+        "go_type": "[]string",
+        "bq_name": "secret_names"
       }
     ]
   },

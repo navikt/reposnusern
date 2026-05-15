@@ -1,6 +1,19 @@
 package parser
 
-import "strings"
+import (
+	"io"
+	"regexp"
+	"sort"
+	"strings"
+
+	"gopkg.in/yaml.v3"
+)
+
+var (
+	githubExpressionPattern = regexp.MustCompile(`(?s)\$\{\{.*?\}\}`)
+	secretDotPattern        = regexp.MustCompile(`\bsecrets\.([A-Za-z_][A-Za-z0-9_]*)\b`)
+	secretBracketPattern    = regexp.MustCompile(`\bsecrets\s*\[\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]\s*\]`)
+)
 
 type CIFeatures struct {
 	UsesNpmInstall                bool
@@ -10,6 +23,7 @@ type CIFeatures struct {
 	UsesPipInstallWithoutHashes   bool
 	UsesCurlBashPipe              bool
 	UsesSudo                      bool
+	SecretNames                   []string
 }
 
 // extractRunLines parses a GitHub Actions workflow YAML (as raw text) and
@@ -101,5 +115,72 @@ func ParseCIConfig(content string) CIFeatures {
 		}
 	}
 
+	f.SecretNames = extractSecretNames(content)
+
 	return f
+}
+
+func extractSecretNames(content string) []string {
+	decoder := yaml.NewDecoder(strings.NewReader(content))
+	namesByKey := make(map[string]string)
+
+	for {
+		var doc yaml.Node
+		if err := decoder.Decode(&doc); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return []string{}
+		}
+		collectSecretNames(&doc, namesByKey)
+	}
+
+	if len(namesByKey) == 0 {
+		return []string{}
+	}
+
+	names := make([]string, 0, len(namesByKey))
+	for _, name := range namesByKey {
+		names = append(names, name)
+	}
+
+	sort.Slice(names, func(i, j int) bool {
+		return strings.ToUpper(names[i]) < strings.ToUpper(names[j])
+	})
+
+	return names
+}
+
+func collectSecretNames(node *yaml.Node, namesByKey map[string]string) {
+	if node == nil {
+		return
+	}
+
+	if node.Kind == yaml.ScalarNode && node.Tag == "!!str" {
+		for _, expr := range githubExpressionPattern.FindAllString(node.Value, -1) {
+			for _, match := range secretDotPattern.FindAllStringSubmatch(expr, -1) {
+				addSecretName(namesByKey, match[1])
+			}
+			for _, match := range secretBracketPattern.FindAllStringSubmatch(expr, -1) {
+				addSecretName(namesByKey, match[1])
+			}
+		}
+	}
+
+	for _, child := range node.Content {
+		collectSecretNames(child, namesByKey)
+	}
+}
+
+func addSecretName(namesByKey map[string]string, name string) {
+	if name == "" {
+		return
+	}
+
+	key := strings.ToUpper(name)
+	if _, exists := namesByKey[key]; exists {
+		return
+	}
+
+	namesByKey[key] = name
 }

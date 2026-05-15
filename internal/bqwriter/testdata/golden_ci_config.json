@@ -3,13 +3,17 @@
     "RepoID": 42,
     "WhenCollected": "2025-06-17T12:00:00Z",
     "Path": ".github/workflows/ci.yml",
-    "Content": "name: CI",
+    "Content": "name: CI\non: [push]\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - env:\n          API_TOKEN: ${{ secrets.API_TOKEN }}\n          SECONDARY_TOKEN: ${{ secrets[\"SECONDARY_TOKEN\"] }}\n        run: echo ok",
     "UsesNpmInstall": false,
     "UsesNpmCiWithoutIgnoreScripts": false,
     "UsesYarnInstallWithoutFrozen": false,
     "UsesPipInstallWithoutNoCache": false,
     "UsesPipInstallWithoutHashes": false,
     "UsesCurlBashPipe": false,
-    "UsesSudo": false
+    "UsesSudo": false,
+    "SecretNames": [
+      "API_TOKEN",
+      "SECONDARY_TOKEN"
+    ]
   }
 ]
