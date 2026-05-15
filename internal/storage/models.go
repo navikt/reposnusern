@@ -23,6 +23,7 @@ type CiConfig struct {
 	UsesPipInstallWithoutHashes   sql.NullBool
 	UsesCurlBashPipe              sql.NullBool
 	UsesSudo                      sql.NullBool
+	UsesPullRequestTarget         bool
 	SecretNames                   []string
 }
 

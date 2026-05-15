@@ -23,6 +23,7 @@ type CIFeatures struct {
 	UsesPipInstallWithoutHashes   bool
 	UsesCurlBashPipe              bool
 	UsesSudo                      bool
+	UsesPullRequestTarget         bool
 	SecretNames                   []string
 }
 
@@ -115,9 +116,89 @@ func ParseCIConfig(content string) CIFeatures {
 		}
 	}
 
+	f.UsesPullRequestTarget = hasPullRequestTargetTrigger(content)
 	f.SecretNames = extractSecretNames(content)
 
 	return f
+}
+
+func hasPullRequestTargetTrigger(content string) bool {
+	decoder := yaml.NewDecoder(strings.NewReader(content))
+
+	for {
+		var doc yaml.Node
+		if err := decoder.Decode(&doc); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return false
+		}
+
+		if hasPullRequestTargetInDocument(&doc) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasPullRequestTargetInDocument(doc *yaml.Node) bool {
+	root := dereferenceAlias(doc)
+	if root == nil {
+		return false
+	}
+	if root.Kind == yaml.DocumentNode && len(root.Content) > 0 {
+		root = dereferenceAlias(root.Content[0])
+	}
+	if root == nil || root.Kind != yaml.MappingNode {
+		return false
+	}
+
+	for i := 0; i+1 < len(root.Content); i += 2 {
+		if !strings.EqualFold(root.Content[i].Value, "on") {
+			continue
+		}
+
+		return hasPullRequestTargetEvent(root.Content[i+1])
+	}
+
+	return false
+}
+
+func hasPullRequestTargetEvent(node *yaml.Node) bool {
+	node = dereferenceAlias(node)
+	if node == nil {
+		return false
+	}
+
+	switch node.Kind {
+	case yaml.ScalarNode:
+		return strings.EqualFold(node.Value, "pull_request_target")
+	case yaml.SequenceNode:
+		for _, child := range node.Content {
+			if hasPullRequestTargetEvent(child) {
+				return true
+			}
+		}
+	case yaml.MappingNode:
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			if strings.EqualFold(node.Content[i].Value, "pull_request_target") {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func dereferenceAlias(node *yaml.Node) *yaml.Node {
+	if node == nil {
+		return nil
+	}
+	if node.Kind == yaml.AliasNode && node.Alias != nil {
+		return node.Alias
+	}
+	return node
 }
 
 func extractSecretNames(content string) []string {

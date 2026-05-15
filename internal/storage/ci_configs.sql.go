@@ -23,10 +23,11 @@ INSERT INTO ci_configs (
   uses_pip_install_without_hashes,
   uses_curl_bash_pipe,
   uses_sudo,
+  uses_pull_request_target,
   secret_names
 ) VALUES (
   $1, $2, $3, $4,
-  $5, $6, $7, $8, $9, $10, $11, $12
+  $5, $6, $7, $8, $9, $10, $11, $12, $13
 )
 ON CONFLICT (repo_id, hentet_dato, path) DO UPDATE SET
   content = EXCLUDED.content,
@@ -37,6 +38,7 @@ ON CONFLICT (repo_id, hentet_dato, path) DO UPDATE SET
   uses_pip_install_without_hashes = EXCLUDED.uses_pip_install_without_hashes,
   uses_curl_bash_pipe = EXCLUDED.uses_curl_bash_pipe,
   uses_sudo = EXCLUDED.uses_sudo,
+  uses_pull_request_target = EXCLUDED.uses_pull_request_target,
   secret_names = EXCLUDED.secret_names
 `
 
@@ -52,6 +54,7 @@ type InsertOrUpdateCIConfigParams struct {
 	UsesPipInstallWithoutHashes   sql.NullBool
 	UsesCurlBashPipe              sql.NullBool
 	UsesSudo                      sql.NullBool
+	UsesPullRequestTarget         bool
 	SecretNames                   []string
 }
 
@@ -68,6 +71,7 @@ func (q *Queries) InsertOrUpdateCIConfig(ctx context.Context, arg InsertOrUpdate
 		arg.UsesPipInstallWithoutHashes,
 		arg.UsesCurlBashPipe,
 		arg.UsesSudo,
+		arg.UsesPullRequestTarget,
 		pq.Array(arg.SecretNames),
 	)
 	return err
