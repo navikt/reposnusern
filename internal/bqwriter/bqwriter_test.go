@@ -140,6 +140,7 @@ var _ = Describe("BigQuery schema contract", func() {
 			{"UsesPipInstallWithoutHashes", "bool", "uses_pip_install_without_hashes"},
 			{"UsesCurlBashPipe", "bool", "uses_curl_bash_pipe"},
 			{"UsesSudo", "bool", "uses_sudo"},
+			{"UsesPackagePublish", "bool", "uses_package_publish"},
 			{"UsesPullRequestTarget", "bool", "uses_pull_request_target"},
 			{"SecretNames", "[]string", "secret_names"},
 		}),
@@ -227,7 +228,7 @@ jobs:
       - env:
           API_TOKEN: ${{ secrets.API_TOKEN }}
           SECONDARY_TOKEN: ${{ secrets["SECONDARY_TOKEN"] }}
-        run: echo ok`,
+        run: npm publish`,
 			},
 		},
 		SBOM: map[string]interface{}{

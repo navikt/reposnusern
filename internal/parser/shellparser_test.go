@@ -110,4 +110,19 @@ var _ = Describe("shell command detection", func() {
 		Entry("sudo after pipe", "cat file |sudo tee /tmp/file", true),
 		Entry("no sudo present", "apt-get install -y git", false),
 	)
+
+	DescribeTable("detects npm-family package publishing",
+		func(line string, expected bool) {
+			Expect(isPackagePublish(line)).To(Equal(expected))
+		},
+		Entry("npm publish", "npm publish", true),
+		Entry("pnpm publish", "pnpm publish --access public", true),
+		Entry("yarn publish", "yarn publish", true),
+		Entry("yarn npm publish", "yarn npm publish", true),
+		Entry("publish after chained build", "npm run build && npm publish", true),
+		Entry("pnpm recursive publish", "pnpm -r publish", false),
+		Entry("npm publish dry run is ignored", "npm publish --dry-run", false),
+		Entry("npm run publish script is ignored", "npm run publish", false),
+		Entry("echoing npm publish is ignored", "echo \"npm publish\"", false),
+	)
 })

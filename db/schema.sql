@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS ci_configs (
     uses_pip_install_without_hashes BOOLEAN,
     uses_curl_bash_pipe BOOLEAN,
     uses_sudo BOOLEAN,
+    uses_package_publish BOOLEAN NOT NULL DEFAULT FALSE,
     uses_pull_request_target BOOLEAN NOT NULL DEFAULT FALSE,
     secret_names TEXT[] NOT NULL DEFAULT '{}',
 

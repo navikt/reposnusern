@@ -111,6 +111,50 @@ var _ = Describe("ParseCIConfig", func() {
 			parser.CIFeatures{},
 		),
 
+		Entry("npm-family package publishing is detected",
+			`name: Release
+on: [push]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm publish`,
+			parser.CIFeatures{UsesPackagePublish: true},
+		),
+
+		Entry("yarn npm publish in chained commands is detected",
+			`name: Release
+on: [push]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm test && yarn npm publish`,
+			parser.CIFeatures{UsesPackagePublish: true},
+		),
+
+		Entry("publish dry run is not detected as package publish",
+			`name: Release
+on: [push]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm publish --dry-run`,
+			parser.CIFeatures{},
+		),
+
+		Entry("npm run publish script does not count as direct package publish",
+			`name: Release
+on: [push]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm run publish`,
+			parser.CIFeatures{},
+		),
+
 		Entry("pull_request_target scalar trigger is detected",
 			`name: CI
 on: pull_request_target
@@ -240,6 +284,7 @@ jobs:
 				UsesPipInstallWithoutHashes:  true,
 				UsesCurlBashPipe:             true,
 				UsesSudo:                     true,
+				UsesPackagePublish:           false,
 				SecretNames:                  []string{"NPM_TOKEN", "RELEASE_TOKEN"},
 			},
 		),
@@ -273,6 +318,7 @@ jobs:
 				UsesPipInstallWithoutHashes:  true,
 				UsesCurlBashPipe:             true,
 				UsesSudo:                     true,
+				UsesPackagePublish:           false,
 				SecretNames:                  []string{"NPM_TOKEN"},
 			},
 		),

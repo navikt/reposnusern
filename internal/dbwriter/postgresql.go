@@ -191,6 +191,7 @@ func insertCIConfig(
 			UsesPipInstallWithoutHashes:   sql.NullBool{Bool: features.UsesPipInstallWithoutHashes, Valid: true},
 			UsesCurlBashPipe:              sql.NullBool{Bool: features.UsesCurlBashPipe, Valid: true},
 			UsesSudo:                      sql.NullBool{Bool: features.UsesSudo, Valid: true},
+			UsesPackagePublish:            features.UsesPackagePublish,
 			UsesPullRequestTarget:         features.UsesPullRequestTarget,
 			SecretNames:                   features.SecretNames,
 		}); err != nil {

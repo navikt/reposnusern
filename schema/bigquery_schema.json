@@ -398,6 +398,11 @@
         "bq_name": "uses_sudo"
       },
       {
+        "field": "UsesPackagePublish",
+        "go_type": "bool",
+        "bq_name": "uses_package_publish"
+      },
+      {
         "field": "UsesPullRequestTarget",
         "go_type": "bool",
         "bq_name": "uses_pull_request_target"
