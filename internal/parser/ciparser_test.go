@@ -111,6 +111,67 @@ var _ = Describe("ParseCIConfig", func() {
 			parser.CIFeatures{},
 		),
 
+		Entry("pull_request_target scalar trigger is detected",
+			`name: CI
+on: pull_request_target
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok`,
+			parser.CIFeatures{UsesPullRequestTarget: true},
+		),
+
+		Entry("pull_request_target in trigger list is detected",
+			`name: CI
+on: [push, pull_request_target]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok`,
+			parser.CIFeatures{UsesPullRequestTarget: true},
+		),
+
+		Entry("pull_request_target mapping trigger is detected",
+			`name: CI
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok`,
+			parser.CIFeatures{UsesPullRequestTarget: true},
+		),
+
+		Entry("unquoted on key still detects pull_request_target",
+			`name: CI
+on:
+  pull_request_target:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ok`,
+			parser.CIFeatures{UsesPullRequestTarget: true},
+		),
+
+		Entry("pull_request_target outside top-level triggers is ignored",
+			`name: CI
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: pull_request_target check
+        if: github.event_name == 'pull_request_target'
+        run: echo ok`,
+			parser.CIFeatures{},
+		),
+
 		Entry("static secret names are extracted from expressions",
 			`name: CI
 on: [push]

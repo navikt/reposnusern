@@ -140,6 +140,7 @@ var _ = Describe("BigQuery schema contract", func() {
 			{"UsesPipInstallWithoutHashes", "bool", "uses_pip_install_without_hashes"},
 			{"UsesCurlBashPipe", "bool", "uses_curl_bash_pipe"},
 			{"UsesSudo", "bool", "uses_sudo"},
+			{"UsesPullRequestTarget", "bool", "uses_pull_request_target"},
 			{"SecretNames", "[]string", "secret_names"},
 		}),
 
@@ -216,7 +217,9 @@ var _ = Describe("Convert* golden file tests", func() {
 			{
 				Path: ".github/workflows/ci.yml",
 				Content: `name: CI
-on: [push]
+on:
+  pull_request_target:
+    types: [opened]
 jobs:
   build:
     runs-on: ubuntu-latest

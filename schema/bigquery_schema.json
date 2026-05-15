@@ -398,6 +398,11 @@
         "bq_name": "uses_sudo"
       },
       {
+        "field": "UsesPullRequestTarget",
+        "go_type": "bool",
+        "bq_name": "uses_pull_request_target"
+      },
+      {
         "field": "SecretNames",
         "go_type": "[]string",
         "bq_name": "secret_names"

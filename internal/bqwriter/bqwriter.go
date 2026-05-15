@@ -182,6 +182,7 @@ type BGCIConfig struct {
 	UsesPipInstallWithoutHashes   bool      `bigquery:"uses_pip_install_without_hashes"`
 	UsesCurlBashPipe              bool      `bigquery:"uses_curl_bash_pipe"`
 	UsesSudo                      bool      `bigquery:"uses_sudo"`
+	UsesPullRequestTarget         bool      `bigquery:"uses_pull_request_target"`
 	SecretNames                   []string  `bigquery:"secret_names"`
 }
 
@@ -316,6 +317,7 @@ func ConvertCI(entry models.RepoEntry, snapshot time.Time) []BGCIConfig {
 			UsesPipInstallWithoutHashes:   features.UsesPipInstallWithoutHashes,
 			UsesCurlBashPipe:              features.UsesCurlBashPipe,
 			UsesSudo:                      features.UsesSudo,
+			UsesPullRequestTarget:         features.UsesPullRequestTarget,
 			SecretNames:                   features.SecretNames,
 		})
 	}
