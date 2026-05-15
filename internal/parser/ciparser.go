@@ -23,6 +23,7 @@ type CIFeatures struct {
 	UsesPipInstallWithoutHashes   bool
 	UsesCurlBashPipe              bool
 	UsesSudo                      bool
+	UsesPackagePublish            bool
 	UsesPullRequestTarget         bool
 	SecretNames                   []string
 }
@@ -113,6 +114,9 @@ func ParseCIConfig(content string) CIFeatures {
 		}
 		if isSudo(line) {
 			f.UsesSudo = true
+		}
+		if isPackagePublish(line) {
+			f.UsesPackagePublish = true
 		}
 	}
 

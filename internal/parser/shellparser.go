@@ -97,3 +97,27 @@ func isSudo(line string) bool {
 	}
 	return false
 }
+
+// isPackagePublish detects direct npm-family publish commands in run segments.
+func isPackagePublish(line string) bool {
+	commands := []string{
+		"npm publish",
+		"pnpm publish",
+		"yarn npm publish",
+		"yarn publish",
+	}
+
+	for _, segment := range splitRunSegments(line) {
+		s := strings.TrimSpace(segment)
+		if strings.Contains(s, "--dry-run") {
+			continue
+		}
+		for _, cmd := range commands {
+			if containsCmd(s, cmd) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
