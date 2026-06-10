@@ -9,6 +9,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -56,6 +58,8 @@ var HttpClient = &http.Client{
 var RetryBackoff = func(attempt int) time.Duration {
 	return time.Duration(1<<uint(attempt-1)) * time.Second
 }
+
+var dockerfileNamePattern = regexp.MustCompile(`(^|[._-])dockerfile([._-]|$)`)
 
 func formatWaitForLog(wait time.Duration) string {
 	if wait >= time.Second {
@@ -626,7 +630,7 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 					continue
 				}
 				// For Dockerfiles, we want the content to analyze them later
-				if !parser.LooksLikeDockerfile(content){
+				if !parser.LooksLikeDockerfile(content) {
 					slog.Debug("Skipper Dockerfile-kandidat med ugyldig innhold", "path", name)
 					continue
 				}
@@ -644,7 +648,12 @@ func ExtractFiles(data map[string]interface{}) map[string][]models.FileEntry {
 
 // Heuristic for finding dockerfile by name
 func isDockerfile(filename string) bool {
-	return strings.Contains(filename, "dockerfile") && !strings.Contains(filename, "dockerignore")
+	lowerBaseName := path.Base(strings.ToLower(strings.ReplaceAll(filename, "\\", "/")))
+	if strings.Contains(lowerBaseName, "dockerignore") {
+		return false
+	}
+
+	return dockerfileNamePattern.MatchString(lowerBaseName)
 }
 
 // isDependencyfile checks if a filename is a dependency file we care about
@@ -848,7 +857,7 @@ func (r *RepoFetcher) FetchDockerfilesFromTree(ctx context.Context, owner, repo 
 			continue
 		}
 		content := r.fetchFileContent(ctx, owner, repo, entry.Path)
-		if !parser.LooksLikeDockerfile(content){
+		if !parser.LooksLikeDockerfile(content) {
 			continue
 		}
 		if content != "" {
