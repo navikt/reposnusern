@@ -251,6 +251,16 @@ RUN yarn install --frozen-lockfile`,
 			},
 		),
 
+		Entry("npx in RUN is flagged",
+			`FROM node:18
+RUN npx tsx script.ts`,
+			parser.DockerfileFeatures{
+				BaseImage: "node",
+				BaseTag:   "18",
+				UsesNpx:   true,
+			},
+		),
+
 		Entry("pip install without --no-cache-dir is flagged",
 			`FROM python:3.12
 RUN pip install requests`,

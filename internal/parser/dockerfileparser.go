@@ -27,6 +27,7 @@ type DockerfileFeatures struct {
 	UsesNpmInstall                bool
 	UsesNpmCiWithoutIgnoreScripts bool
 	UsesYarnInstallWithoutFrozen  bool
+	UsesNpx                       bool
 	UsesPipInstallWithoutNoCache  bool
 	UsesPipInstallWithoutHashes   bool
 	UsesCurlBashPipe              bool
@@ -153,6 +154,9 @@ func ParseDockerfile(content string) (DockerfileFeatures, []DockerStageMeta) {
 			}
 			if isYarnInstallWithoutFrozen(lowerValue) {
 				features.UsesYarnInstallWithoutFrozen = true
+			}
+			if isNpxUsage(lowerValue) {
+				features.UsesNpx = true
 			}
 			if isPipInstallWithoutNoCache(lowerValue) {
 				features.UsesPipInstallWithoutNoCache = true

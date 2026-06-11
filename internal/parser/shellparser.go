@@ -30,6 +30,15 @@ func containsCmd(segment, cmd string) bool {
 	return end == len(segment) || !isWordChar(segment[end])
 }
 
+func startsWithCmd(segment, cmd string) bool {
+	if !strings.HasPrefix(segment, cmd) {
+		return false
+	}
+
+	end := len(cmd)
+	return end == len(segment) || !isWordChar(segment[end])
+}
+
 // isNpmInstall detects bare `npm install` (not `npm install-ci-test` or similar).
 func isNpmInstall(line string) bool {
 	for _, segment := range splitRunSegments(line) {
@@ -61,6 +70,17 @@ func isNpmCiWithoutIgnoreScripts(line string) bool {
 // isYarnInstallWithoutFrozen detects `yarn install` without `--frozen-lockfile`.
 func isYarnInstallWithoutFrozen(line string) bool {
 	return commandMissingFlag(line, []string{"yarn install"}, "--frozen-lockfile")
+}
+
+// isNpxUsage detects standalone `npx` execution at the start of a shell segment.
+func isNpxUsage(line string) bool {
+	for _, segment := range splitRunSegments(line) {
+		if startsWithCmd(strings.TrimSpace(segment), "npx") {
+			return true
+		}
+	}
+
+	return false
 }
 
 // isPipInstallWithoutNoCache detects `pip install` (or `pip3 install`) without

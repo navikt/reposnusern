@@ -99,6 +99,17 @@ var _ = Describe("shell command detection", func() {
 		),
 	)
 
+	DescribeTable("detects npx execution",
+		func(line string, expected bool) {
+			Expect(isNpxUsage(line)).To(Equal(expected))
+		},
+		Entry("simple npx command", "npx tsx script.ts", true),
+		Entry("npx after chained build", "npm test && npx eslint .", true),
+		Entry("echoing npx is ignored", "echo npx", false),
+		Entry("quoted npx string is ignored", "echo \"npx tsx script.ts\"", false),
+		Entry("pnpx is ignored", "pnpx prisma generate", false),
+	)
+
 	DescribeTable("detects sudo across chained commands",
 		func(line string, expected bool) {
 			Expect(isSudo(line)).To(Equal(expected))

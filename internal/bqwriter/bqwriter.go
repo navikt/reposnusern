@@ -156,6 +156,7 @@ type BGDockerfileFeatures struct {
 	UsesNpmInstall                bool      `bigquery:"uses_npm_install"`
 	UsesNpmCiWithoutIgnoreScripts bool      `bigquery:"uses_npm_ci_without_ignore_scripts"`
 	UsesYarnInstallWithoutFrozen  bool      `bigquery:"uses_yarn_install_without_frozen"`
+	UsesNpx                       bool      `bigquery:"uses_npx"`
 	UsesPipInstallWithoutNoCache  bool      `bigquery:"uses_pip_install_without_no_cache"`
 	UsesPipInstallWithoutHashes   bool      `bigquery:"uses_pip_install_without_hashes"`
 	UsesCurlBashPipe              bool      `bigquery:"uses_curl_bash_pipe"`
@@ -178,6 +179,7 @@ type BGCIConfig struct {
 	UsesNpmInstall                bool      `bigquery:"uses_npm_install"`
 	UsesNpmCiWithoutIgnoreScripts bool      `bigquery:"uses_npm_ci_without_ignore_scripts"`
 	UsesYarnInstallWithoutFrozen  bool      `bigquery:"uses_yarn_install_without_frozen"`
+	UsesNpx                       bool      `bigquery:"uses_npx"`
 	UsesPipInstallWithoutNoCache  bool      `bigquery:"uses_pip_install_without_no_cache"`
 	UsesPipInstallWithoutHashes   bool      `bigquery:"uses_pip_install_without_hashes"`
 	UsesCurlBashPipe              bool      `bigquery:"uses_curl_bash_pipe"`
@@ -281,6 +283,7 @@ func ConvertDockerfileFeatures(entry models.RepoEntry, snapshot time.Time) ([]BG
 				UsesNpmInstall:                features.UsesNpmInstall,
 				UsesNpmCiWithoutIgnoreScripts: features.UsesNpmCiWithoutIgnoreScripts,
 				UsesYarnInstallWithoutFrozen:  features.UsesYarnInstallWithoutFrozen,
+				UsesNpx:                       features.UsesNpx,
 				UsesPipInstallWithoutNoCache:  features.UsesPipInstallWithoutNoCache,
 				UsesPipInstallWithoutHashes:   features.UsesPipInstallWithoutHashes,
 				UsesCurlBashPipe:              features.UsesCurlBashPipe,
@@ -314,6 +317,7 @@ func ConvertCI(entry models.RepoEntry, snapshot time.Time) []BGCIConfig {
 			UsesNpmInstall:                features.UsesNpmInstall,
 			UsesNpmCiWithoutIgnoreScripts: features.UsesNpmCiWithoutIgnoreScripts,
 			UsesYarnInstallWithoutFrozen:  features.UsesYarnInstallWithoutFrozen,
+			UsesNpx:                       features.UsesNpx,
 			UsesPipInstallWithoutNoCache:  features.UsesPipInstallWithoutNoCache,
 			UsesPipInstallWithoutHashes:   features.UsesPipInstallWithoutHashes,
 			UsesCurlBashPipe:              features.UsesCurlBashPipe,

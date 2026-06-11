@@ -19,6 +19,7 @@ type CiConfig struct {
 	UsesNpmInstall                sql.NullBool
 	UsesNpmCiWithoutIgnoreScripts sql.NullBool
 	UsesYarnInstallWithoutFrozen  sql.NullBool
+	UsesNpx                       sql.NullBool
 	UsesPipInstallWithoutNoCache  sql.NullBool
 	UsesPipInstallWithoutHashes   sql.NullBool
 	UsesCurlBashPipe              sql.NullBool
@@ -55,6 +56,7 @@ type Dockerfile struct {
 	UsesNpmInstall                sql.NullBool
 	UsesNpmCiWithoutIgnoreScripts sql.NullBool
 	UsesYarnInstallWithoutFrozen  sql.NullBool
+	UsesNpx                       sql.NullBool
 	UsesPipInstallWithoutNoCache  sql.NullBool
 	UsesPipInstallWithoutHashes   sql.NullBool
 	UsesCurlBashPipe              sql.NullBool

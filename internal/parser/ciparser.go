@@ -19,6 +19,7 @@ type CIFeatures struct {
 	UsesNpmInstall                bool
 	UsesNpmCiWithoutIgnoreScripts bool
 	UsesYarnInstallWithoutFrozen  bool
+	UsesNpx                       bool
 	UsesPipInstallWithoutNoCache  bool
 	UsesPipInstallWithoutHashes   bool
 	UsesCurlBashPipe              bool
@@ -102,6 +103,9 @@ func ParseCIConfig(content string) CIFeatures {
 		}
 		if isYarnInstallWithoutFrozen(line) {
 			f.UsesYarnInstallWithoutFrozen = true
+		}
+		if isNpxUsage(line) {
+			f.UsesNpx = true
 		}
 		if isPipInstallWithoutNoCache(line) {
 			f.UsesPipInstallWithoutNoCache = true

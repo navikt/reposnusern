@@ -288,6 +288,11 @@
         "bq_name": "uses_yarn_install_without_frozen"
       },
       {
+        "field": "UsesNpx",
+        "go_type": "bool",
+        "bq_name": "uses_npx"
+      },
+      {
         "field": "UsesPipInstallWithoutNoCache",
         "go_type": "bool",
         "bq_name": "uses_pip_install_without_no_cache"
@@ -376,6 +381,11 @@
         "field": "UsesYarnInstallWithoutFrozen",
         "go_type": "bool",
         "bq_name": "uses_yarn_install_without_frozen"
+      },
+      {
+        "field": "UsesNpx",
+        "go_type": "bool",
+        "bq_name": "uses_npx"
       },
       {
         "field": "UsesPipInstallWithoutNoCache",

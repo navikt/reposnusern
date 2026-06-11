@@ -71,6 +71,11 @@ var _ = Describe("ParseCIConfig", func() {
 			parser.CIFeatures{},
 		),
 
+		Entry("npx usage is flagged",
+			`run: npx tsx script.ts`,
+			parser.CIFeatures{UsesNpx: true},
+		),
+
 		Entry("pip install without --require-hashes is flagged",
 			`run: pip install -r requirements.txt`,
 			parser.CIFeatures{UsesPipInstallWithoutNoCache: true, UsesPipInstallWithoutHashes: true},

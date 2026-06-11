@@ -19,6 +19,7 @@ INSERT INTO ci_configs (
   uses_npm_install,
   uses_npm_ci_without_ignore_scripts,
   uses_yarn_install_without_frozen,
+  uses_npx,
   uses_pip_install_without_no_cache,
   uses_pip_install_without_hashes,
   uses_curl_bash_pipe,
@@ -28,13 +29,14 @@ INSERT INTO ci_configs (
   secret_names
 ) VALUES (
   $1, $2, $3, $4,
-  $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+  $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
 )
 ON CONFLICT (repo_id, hentet_dato, path) DO UPDATE SET
   content = EXCLUDED.content,
   uses_npm_install = EXCLUDED.uses_npm_install,
   uses_npm_ci_without_ignore_scripts = EXCLUDED.uses_npm_ci_without_ignore_scripts,
   uses_yarn_install_without_frozen = EXCLUDED.uses_yarn_install_without_frozen,
+  uses_npx = EXCLUDED.uses_npx,
   uses_pip_install_without_no_cache = EXCLUDED.uses_pip_install_without_no_cache,
   uses_pip_install_without_hashes = EXCLUDED.uses_pip_install_without_hashes,
   uses_curl_bash_pipe = EXCLUDED.uses_curl_bash_pipe,
@@ -52,6 +54,7 @@ type InsertOrUpdateCIConfigParams struct {
 	UsesNpmInstall                sql.NullBool
 	UsesNpmCiWithoutIgnoreScripts sql.NullBool
 	UsesYarnInstallWithoutFrozen  sql.NullBool
+	UsesNpx                       sql.NullBool
 	UsesPipInstallWithoutNoCache  sql.NullBool
 	UsesPipInstallWithoutHashes   sql.NullBool
 	UsesCurlBashPipe              sql.NullBool
@@ -70,6 +73,7 @@ func (q *Queries) InsertOrUpdateCIConfig(ctx context.Context, arg InsertOrUpdate
 		arg.UsesNpmInstall,
 		arg.UsesNpmCiWithoutIgnoreScripts,
 		arg.UsesYarnInstallWithoutFrozen,
+		arg.UsesNpx,
 		arg.UsesPipInstallWithoutNoCache,
 		arg.UsesPipInstallWithoutHashes,
 		arg.UsesCurlBashPipe,

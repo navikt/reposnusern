@@ -23,6 +23,7 @@
     "UsesNpmInstall": false,
     "UsesNpmCiWithoutIgnoreScripts": false,
     "UsesYarnInstallWithoutFrozen": false,
+    "UsesNpx": false,
     "UsesPipInstallWithoutNoCache": false,
     "UsesPipInstallWithoutHashes": false,
     "UsesCurlBashPipe": false
