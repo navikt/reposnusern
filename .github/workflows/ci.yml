@@ -1,4 +1,4 @@
-name: CI/CD # Adding a comment for teh lulz
+name: CI/CD
 
 on:
   push:
