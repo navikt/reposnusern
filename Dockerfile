@@ -1,4 +1,3 @@
-# Nothing to see here
 # --- Build stage ---
 FROM golang:1.26-alpine AS builder
 
