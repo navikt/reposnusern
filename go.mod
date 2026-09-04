@@ -1,6 +1,6 @@
 module github.com/jonmartinstorm/reposnusern
 
-go 1.26
+go 1.27
 
 require (
 	cloud.google.com/go/bigquery v1.77.0
