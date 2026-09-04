@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jonmartinstorm/reposnusern/internal/models"
+	"github.com/navikt/reposnusern/internal/models"
 )
 
 // EcosystemConfig defines manifest and lockfile patterns for a package ecosystem

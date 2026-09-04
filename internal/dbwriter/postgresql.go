@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jonmartinstorm/reposnusern/internal/models"
-	"github.com/jonmartinstorm/reposnusern/internal/parser"
-	"github.com/jonmartinstorm/reposnusern/internal/storage"
+	"github.com/navikt/reposnusern/internal/models"
+	"github.com/navikt/reposnusern/internal/parser"
+	"github.com/navikt/reposnusern/internal/storage"
 )
 
 type PostgresWriter struct {

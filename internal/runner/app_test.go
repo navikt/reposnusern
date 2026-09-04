@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonmartinstorm/reposnusern/internal/config"
-	fetcherpkg "github.com/jonmartinstorm/reposnusern/internal/fetcher"
-	"github.com/jonmartinstorm/reposnusern/internal/mocks"
-	"github.com/jonmartinstorm/reposnusern/internal/models"
-	"github.com/jonmartinstorm/reposnusern/internal/runner"
+	"github.com/navikt/reposnusern/internal/config"
+	fetcherpkg "github.com/navikt/reposnusern/internal/fetcher"
+	"github.com/navikt/reposnusern/internal/mocks"
+	"github.com/navikt/reposnusern/internal/models"
+	"github.com/navikt/reposnusern/internal/runner"
 	"github.com/stretchr/testify/mock"
 
 	. "github.com/onsi/ginkgo/v2"

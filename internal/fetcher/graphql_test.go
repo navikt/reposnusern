@@ -13,9 +13,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/jonmartinstorm/reposnusern/internal/config"
-	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
-	"github.com/jonmartinstorm/reposnusern/internal/models"
+	"github.com/navikt/reposnusern/internal/config"
+	"github.com/navikt/reposnusern/internal/fetcher"
+	"github.com/navikt/reposnusern/internal/models"
 )
 
 // Ginkgo sin test-runner. Denne trengs for at "go test" skal vite hvor den skal starte.

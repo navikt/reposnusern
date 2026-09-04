@@ -3,7 +3,7 @@ package parser
 import (
 	"testing"
 
-	"github.com/jonmartinstorm/reposnusern/internal/models"
+	"github.com/navikt/reposnusern/internal/models"
 )
 
 func TestDetectLockfilePairings_SimplePackageJson(t *testing.T) {

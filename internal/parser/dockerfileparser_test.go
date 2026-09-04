@@ -3,7 +3,7 @@ package parser_test
 import (
 	"testing"
 
-	"github.com/jonmartinstorm/reposnusern/internal/parser"
+	"github.com/navikt/reposnusern/internal/parser"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

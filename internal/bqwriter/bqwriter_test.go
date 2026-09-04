@@ -14,8 +14,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/jonmartinstorm/reposnusern/internal/bqwriter"
-	"github.com/jonmartinstorm/reposnusern/internal/models"
+	"github.com/navikt/reposnusern/internal/bqwriter"
+	"github.com/navikt/reposnusern/internal/models"
 )
 
 var updateSchemaFile = flag.Bool("update-schema", false, "Regenerate schema/bigquery_schema.json")

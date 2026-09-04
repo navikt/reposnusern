@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jonmartinstorm/reposnusern/internal/config"
-	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
-	"github.com/jonmartinstorm/reposnusern/internal/models"
+	"github.com/navikt/reposnusern/internal/config"
+	"github.com/navikt/reposnusern/internal/fetcher"
+	"github.com/navikt/reposnusern/internal/models"
 	_ "github.com/lib/pq"
 	"golang.org/x/sync/errgroup"
 )

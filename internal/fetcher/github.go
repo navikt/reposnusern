@@ -17,9 +17,9 @@ import (
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
-	"github.com/jonmartinstorm/reposnusern/internal/config"
-	"github.com/jonmartinstorm/reposnusern/internal/models"
-	"github.com/jonmartinstorm/reposnusern/internal/parser"
+	"github.com/navikt/reposnusern/internal/config"
+	"github.com/navikt/reposnusern/internal/models"
+	"github.com/navikt/reposnusern/internal/parser"
 )
 
 // apiCallCounter tracks the total number of external API calls made

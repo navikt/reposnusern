@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/jonmartinstorm/reposnusern/internal/config"
-	"github.com/jonmartinstorm/reposnusern/internal/dbwriter"
-	"github.com/jonmartinstorm/reposnusern/internal/models"
+	"github.com/navikt/reposnusern/internal/config"
+	"github.com/navikt/reposnusern/internal/dbwriter"
+	"github.com/navikt/reposnusern/internal/models"
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/mock"
 	"github.com/testcontainers/testcontainers-go"

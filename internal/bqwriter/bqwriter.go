@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/jonmartinstorm/reposnusern/internal/config"
-	"github.com/jonmartinstorm/reposnusern/internal/models"
-	"github.com/jonmartinstorm/reposnusern/internal/parser"
+	"github.com/navikt/reposnusern/internal/config"
+	"github.com/navikt/reposnusern/internal/models"
+	"github.com/navikt/reposnusern/internal/parser"
 	"google.golang.org/api/googleapi"
 )
 

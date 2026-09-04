@@ -8,12 +8,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/jonmartinstorm/reposnusern/internal/bqwriter"
-	"github.com/jonmartinstorm/reposnusern/internal/config"
-	"github.com/jonmartinstorm/reposnusern/internal/dbwriter"
-	"github.com/jonmartinstorm/reposnusern/internal/fetcher"
-	"github.com/jonmartinstorm/reposnusern/internal/logger"
-	"github.com/jonmartinstorm/reposnusern/internal/runner"
+	"github.com/navikt/reposnusern/internal/bqwriter"
+	"github.com/navikt/reposnusern/internal/config"
+	"github.com/navikt/reposnusern/internal/dbwriter"
+	"github.com/navikt/reposnusern/internal/fetcher"
+	"github.com/navikt/reposnusern/internal/logger"
+	"github.com/navikt/reposnusern/internal/runner"
 )
 
 func main() {
