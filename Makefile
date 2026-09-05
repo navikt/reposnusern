@@ -65,7 +65,7 @@ tidy:
 	@go mod tidy
 
 lint:
-	@command -v golangci-lint >/dev/null 2>&1 && golangci-lint run
+	@go tool -modfile=golangci-lint.mod golangci-lint run
 
 
 # -------------------------------
@@ -73,5 +73,4 @@ lint:
 # -------------------------------
 
 generate-mocks:
-	@command -v mockery >/dev/null 2>&1 || { echo "❌ mockery ikke installert. Installer med 'go install github.com/vektra/mockery/v2@latest'"; exit 1; }
-	@mockery
+	@go tool mockery
