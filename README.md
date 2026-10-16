@@ -227,3 +227,4 @@ Under utviklingen av dette innholdet har forfatter(e) benyttet generativ KI – 
 - [x] Gjøre klart for K8s-deploy (config, secrets, jobs)
 - [x] Vurdere om sbom direkte har fjernet behovet for dependency files
 - [x] Forbedre dockerfile features parseren for mer info
+
