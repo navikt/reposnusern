@@ -1,5 +1,5 @@
 # --- Byggfase ---
-FROM golang:1.27.1-alpine AS builder
+FROM cgr.dev/chainguard/go:latest AS builder
 
 WORKDIR /app
 
@@ -11,10 +11,10 @@ RUN go mod download
 COPY . .
 
 # Bygg binæren
-RUN go build -o reposnusern ./cmd/reposnusern
+RUN CGO_ENABLED=0 go build -o reposnusern ./cmd/reposnusern
 
 # --- Runtime stage ---
-FROM gcr.io/distroless/static-debian12
+FROM cgr.dev/chainguard/static:latest
 
 COPY --from=builder /app/reposnusern /reposnusern
 
