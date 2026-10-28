@@ -58,3 +58,8 @@ temp.db
 # Eksempel: `internal/service/mocks/ServiceMock.go`
 **/mocks/
 **/mock_*.go
+
+# Keep the mocks package available to dependency tools in a clean checkout.
+!/internal/mocks/
+/internal/mocks/*
+!/internal/mocks/doc.go

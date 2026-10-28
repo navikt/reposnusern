@@ -43,6 +43,9 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Check module files without generating mocks
+        run: go mod tidy -diff
+
       - name: 🧪 Unit-tester + vet + lint
         run: make generate-mocks tidy vet lint unit
 
