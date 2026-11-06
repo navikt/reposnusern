@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: 📥 Sjekk ut kode
-        uses: actions/checkout@v6.1.0
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
@@ -59,7 +59,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v6.1.0
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-go@v7.0.0
@@ -87,7 +87,7 @@ jobs:
     environment: prod-gcp:appsec
 
     steps:
-      - uses: actions/checkout@v6.1.0
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
@@ -101,7 +101,7 @@ jobs:
           team: appsec
           push_image: true
 
-      - uses: nais/deploy/actions/deploy@v2
+      - uses: nais/deploy/actions/deploy@v3
         env:
           RESOURCE: .nais/nais.yml
           CLUSTER: prod-gcp
