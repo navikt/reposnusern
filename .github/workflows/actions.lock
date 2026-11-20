@@ -5,11 +5,11 @@ version: 'v0.0.3'
 workflows:
     '.github/workflows/ci.yml':
         - 'actions/checkout@v7.0.1'
-        - 'actions/setup-go@v7.0.0'
+        - 'actions/setup-go@v7.1.0'
         - 'nais/deploy@v3'
-        - 'nais/docker-build-push@v0'
+        - 'nais/docker-build-push@v1'
     '.github/workflows/dependabot-automerge.yml':
-        - 'navikt/automerge-dependabot@v1.7.0'
+        - 'navikt/automerge-dependabot@v1.8.0'
 dependencies:
     'actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae':
         ref: 'v5.0.5'
@@ -36,9 +36,9 @@ dependencies:
         commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
-    'actions/setup-go@v7.0.0':
-        ref: 'v7.0.0'
-        commit: 'sha1-b7ad1dad31e06c5925ef5d2fc7ad053ef454303e'
+    'actions/setup-go@v7.1.0':
+        ref: 'v7.1.0'
+        commit: 'sha1-d8cbb8045d7f43706b9177cceb36c1f91a6644d5'
         owner_id: 44036562
         repo_id: 192624594
     'aquasecurity/setup-trivy@3fb12ec12f41e471780db15c232d5dd185dcb514':
@@ -82,16 +82,16 @@ dependencies:
         commit: 'sha1-7c6bc770dae815cd3e89ee6cdf493a5fab2cc093'
         owner_id: 71461757
         repo_id: 407242578
-    'nais/attest-sign@a790bd54d388327e00aed3b1eee2d2311bcce0d5':
-        ref: 'v2.1.3'
-        commit: 'sha1-a790bd54d388327e00aed3b1eee2d2311bcce0d5'
+    'nais/attest-sign@c93befb357f8c0a18f5e96119729907b09cd45b4':
+        ref: 'v2.1.5'
+        commit: 'sha1-c93befb357f8c0a18f5e96119729907b09cd45b4'
         owner_id: 29488289
         repo_id: 617411776
         uses:
             - 'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9'
             - 'aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25'
             - 'oras-project/setup-oras@5e2f2482b30b0cb3e14e67f89a80c88c659a7c63'
-            - 'sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6'
+            - 'sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532'
     'nais/deploy@v3':
         ref: 'v3'
         commit: 'sha1-6a9dcd6df697ec2d38edc78cadb0b9acd1232f50'
@@ -99,15 +99,15 @@ dependencies:
         repo_id: 166402203
         uses:
             - 'nais/setup@fb8692f65df9c904e2cdac5d395630ac876abdcf'
-    'nais/docker-build-push@v0':
-        ref: 'v0'
-        commit: 'sha1-d3a1f7e259ecc381a50435e1d4add9059429ebd7'
+    'nais/docker-build-push@v1':
+        ref: 'v1'
+        commit: 'sha1-6394144a53cad0332745f24a8302f5efaf81719a'
         owner_id: 29488289
         repo_id: 590934741
         uses:
             - 'docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc'
             - 'docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302'
-            - 'nais/attest-sign@a790bd54d388327e00aed3b1eee2d2311bcce0d5'
+            - 'nais/attest-sign@c93befb357f8c0a18f5e96119729907b09cd45b4'
             - 'nais/login@40b72a35a18ddf2ad74b632461139ab838cc2a2f'
     'nais/login@40b72a35a18ddf2ad74b632461139ab838cc2a2f':
         ref: 'v0'
@@ -123,9 +123,9 @@ dependencies:
         commit: 'sha1-fb8692f65df9c904e2cdac5d395630ac876abdcf'
         owner_id: 29488289
         repo_id: 1048418871
-    'navikt/automerge-dependabot@v1.7.0':
-        ref: 'v1.7.0'
-        commit: 'sha1-2c57e8fdb262ad558901e1242c89b19346e3a7a1'
+    'navikt/automerge-dependabot@v1.8.0':
+        ref: 'v1.8.0'
+        commit: 'sha1-69852d2204654904759e85f88f4a45bbf8854905'
         owner_id: 11848947
         repo_id: 982732266
     'oras-project/setup-oras@5e2f2482b30b0cb3e14e67f89a80c88c659a7c63':
@@ -133,8 +133,8 @@ dependencies:
         commit: 'sha1-5e2f2482b30b0cb3e14e67f89a80c88c659a7c63'
         owner_id: 81890686
         repo_id: 590286646
-    'sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6':
-        ref: 'v4.1.2'
-        commit: 'sha1-6f9f17788090df1f26f669e9d70d6ae9567deba6'
+    'sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532':
+        ref: 'v4.1.3'
+        commit: 'sha1-756fe2d284c7292c4e9b62c8a28f1e5629c59532'
         owner_id: 71096353
         repo_id: 351211695
